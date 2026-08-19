@@ -1,0 +1,13 @@
+node_modules
+dist
+dist-ssr
+*.local
+.env
+.env.*
+!.env.example
+.firebase
+.DS_Store
+*.log
+.vscode/*
+!.vscode/extensions.json
+.claude/settings.local.json

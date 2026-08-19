@@ -1,0 +1,9 @@
+@import "tailwindcss";
+
+@theme {
+  /* W-01은 파이프라인 확인용 최소 토큰만 정의한다.
+     전체 디자인 토큰은 W-02에서 PRD §7.1~7.3 기준으로 채운다. */
+  --color-sundo-ink: #14352A;
+  --color-sundo-primary: #1F5138;
+  --font-sundo: "Spoqa Han Sans Neo", -apple-system, sans-serif;
+}
