@@ -1,9 +1,263 @@
 @import "tailwindcss";
 
+/* ============================================================
+   SunDO 디자인 토큰 — PRD docs/SunDO_PRD.md §7.1~§7.3
+   값의 정본은 PRD 표다. 임의로 바꾸지 않는다.
+   ============================================================ */
 @theme {
-  /* W-01은 파이프라인 확인용 최소 토큰만 정의한다.
-     전체 디자인 토큰은 W-02에서 PRD §7.1~7.3 기준으로 채운다. */
-  --color-sundo-ink: #14352A;
-  --color-sundo-primary: #1F5138;
-  --font-sundo: "Spoqa Han Sans Neo", -apple-system, sans-serif;
+  /* --- 컬러 (§7.1) ------------------------------------------
+     PRD 변수명 → Tailwind v4 네임스페이스에 맞춰 이름만 매핑.
+     PRD의 보조 텍스트 색 변수는 v4의 글꼴 크기 네임스페이스와 충돌하므로
+     --color-sundo-ink-60/70으로 옮긴다. */
+  --color-sundo-900: #14352a;
+  --color-sundo-800: #1f5138;
+  --color-sundo-700: #2e6b4c;
+  --color-sundo-500: #57906f;
+  --color-sundo-300: #9fc4ae;
+
+  --color-sundo-bg-top: #f7fbf8;
+  --color-sundo-bg-bottom: #eaf3ed;
+  --color-sundo-bg-outer: #dde9e1;
+
+  --color-sundo-glass: rgba(255, 255, 255, 0.55);
+  --color-sundo-sheet: rgba(255, 255, 255, 0.86);
+  --color-sundo-neu-from: #f8fcf9;
+  --color-sundo-neu-to: #e9f2ec;
+
+  --color-sundo-border-light: rgba(255, 255, 255, 0.7);
+  --color-sundo-divider: rgba(20, 53, 38, 0.06);
+
+  --color-sundo-tint-08: rgba(31, 81, 56, 0.08);
+  --color-sundo-tint-10: rgba(31, 81, 56, 0.1);
+  --color-sundo-tint-12: rgba(31, 81, 56, 0.12);
+
+  --color-sundo-ink-60: rgba(20, 53, 38, 0.6);
+  --color-sundo-ink-70: rgba(20, 53, 38, 0.7);
+
+  /* §7.1 미수록 보완 토큰 5개 — 값을 새로 만든 것이 아니라
+     PRD 본문·Claude Design 산출물에서 반복 사용 중인 리터럴을 승격한 것. */
+  --color-sundo-danger: #c0392b;
+  --color-sundo-danger-active: #a93226;
+  --color-sundo-control: rgba(255, 255, 255, 0.6);
+  --color-sundo-line-surface: rgba(255, 255, 255, 0.72);
+  --color-sundo-line-border: rgba(46, 107, 76, 0.3);
+
+  /* --- 그림자 (§7.1) --- */
+  --shadow-glass: 0 8px 26px rgba(20, 53, 38, 0.09);
+  --shadow-primary: 0 10px 24px rgba(31, 81, 56, 0.35);
+  --shadow-neu: 7px 7px 16px rgba(20, 53, 38, 0.1), -7px -7px 16px rgba(255, 255, 255, 0.95);
+
+  /* --- 그라디언트 (§7.1) ---
+     Tailwind v4가 인식하는 네임스페이스가 아니므로 유틸리티는 생성되지 않는다.
+     @layer components에서 var()로 참조한다. */
+  --gradient-primary: linear-gradient(160deg, #2e6b4c, #1f5138);
+  --gradient-stage: linear-gradient(180deg, #f7fbf8 0%, #eaf3ed 100%);
+  --gradient-neu: linear-gradient(145deg, #f8fcf9, #e9f2ec);
+
+  /* --- 타이포그래피 (§7.2) ---
+     AC-05: rem 기반. 루트 16px 기준이며 px 값은 바뀌지 않는다.
+     html에 고정 font-size를 주지 않는다(iOS 글자 크기 설정을 따른다).
+     줄 높이는 PRD에 없으므로 정의하지 않는다. */
+  --font-sans: "Spoqa Han Sans Neo", -apple-system, system-ui, sans-serif;
+
+  --text-h1: 1.75rem; /* 28px */
+  --text-h1--letter-spacing: -0.01em;
+  --text-h2: 1.5rem; /* 24px */
+  --text-h2--letter-spacing: -0.01em;
+  --text-sheet: 1.1875rem; /* 19px */
+  --text-grade: 1.3125rem; /* 21px */
+  --text-classno: 1.4375rem; /* 23px */
+  --text-stat: 1.5rem; /* 24px */
+  --text-body: 0.9375rem; /* 15px */
+  --text-button: 1rem; /* 16px */
+  --text-row: 0.90625rem; /* 14.5px */
+  --text-label: 0.75rem; /* 12px */
+  --text-caption: 0.71875rem; /* 11.5px */
+  --text-micro: 0.6875rem; /* 11px */
+  --text-dock: 0.625rem; /* 10px */
+
+  /* --- 반경 (§7.3 + Claude Design 공통 프롬프트의 24) ---
+     용도별 의미 이름이 아니라 숫자 이름으로 둔다. 용도는 화면마다 달라진다. */
+  --radius-pill: 9999px;
+  --radius-28: 28px;
+  --radius-26: 26px;
+  --radius-24: 24px;
+  --radius-22: 22px;
+  --radius-20: 20px;
+  --radius-18: 18px;
+  --radius-16: 16px;
+  --radius-15: 15px;
+  --radius-14: 14px;
+  --radius-12: 12px;
+  --radius-11: 11px;
+
+  /* --- 이징 (§7.4) ---
+     §7.4에서 8회 이상 반복되는 값 1개만 토큰화한다. */
+  --ease-sundo: cubic-bezier(0.2, 0.8, 0.25, 1);
+}
+
+/* ============================================================
+   표면 스타일 — PRD §7.3
+   다중 속성 컴포넌트 스타일이므로 @utility가 아니라 @layer components.
+   ============================================================ */
+@layer components {
+  /* 유리 카드. 내부 상단 하이라이트는 design/index.html에서 이식. */
+  .glass {
+    background: var(--color-sundo-glass);
+    backdrop-filter: blur(18px) saturate(160%);
+    -webkit-backdrop-filter: blur(18px) saturate(160%);
+    border: 1px solid var(--color-sundo-border-light);
+    box-shadow: var(--shadow-glass), inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  }
+
+  /* 뉴모피즘. 내부 링과 transition은 design/index.html에서 이식.
+     :active는 §7.4 "그림자 반전" — 같은 그림자를 inset으로 뒤집는다. */
+  .neu {
+    background: var(--gradient-neu);
+    box-shadow: var(--shadow-neu), inset 0 0 0 1px rgba(255, 255, 255, 0.6);
+    transition:
+      box-shadow 0.2s,
+      transform 0.15s;
+  }
+
+  .neu:active {
+    box-shadow:
+      inset 7px 7px 16px rgba(20, 53, 38, 0.1),
+      inset -7px -7px 16px rgba(255, 255, 255, 0.95),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.6);
+    transform: scale(0.98);
+  }
+
+  /* 주 버튼. inset 하이라이트와 transition은 design/index.html에서 이식. */
+  .btnp {
+    background: var(--gradient-primary);
+    border-radius: var(--radius-15);
+    padding: 15px;
+    box-shadow: var(--shadow-primary), inset 0 1px 0 rgba(255, 255, 255, 0.28);
+    color: #fff;
+    font-size: var(--text-button);
+    font-weight: 700;
+    transition: transform 0.15s;
+  }
+
+  .btnp:active {
+    transform: scale(0.97);
+  }
+
+  /* 라벨 광택 스윕. @keyframes는 design/index.html 원문 그대로이고,
+     적용 규칙은 프로토타입에 없어 W-02에서 신규 확정했다(회신 §1.2).
+     background-size: 200% 100% 조합에서 130% → -30%는 좌 → 우 이동이다. */
+  .shine {
+    display: inline-block;
+    background-image: linear-gradient(
+      100deg,
+      rgba(255, 255, 255, 0) 40%,
+      rgba(255, 255, 255, 0.45) 50%,
+      rgba(255, 255, 255, 0) 60%
+    );
+    background-size: 200% 100%;
+    background-repeat: no-repeat;
+    animation: shine 2.8s linear infinite;
+  }
+
+  /* 인원 수·상태 표시 */
+  .chip {
+    border-radius: var(--radius-pill);
+    padding: 6px 12px;
+    background: var(--color-sundo-tint-10);
+    font-size: var(--text-label);
+    font-weight: 700;
+    color: var(--color-sundo-800);
+  }
+
+  /* 기록 조회 필터 칩. 비활성/활성 모두 design/index.html에서 이식. */
+  .fchip {
+    border-radius: var(--radius-pill);
+    padding: 8px 14px;
+    white-space: nowrap;
+    background: var(--color-sundo-control);
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    font-size: var(--text-label);
+    font-weight: 500;
+    color: var(--color-sundo-ink-70);
+  }
+
+  /* AC-04: 활성 칩은 배경 반전 + 굵기 700으로 이중 표시.
+     그림자는 --shadow-primary와 값이 달라 토큰화하지 않고 design 원문을 쓴다. */
+  .fchip-on {
+    background: var(--gradient-primary);
+    border-color: transparent;
+    box-shadow: 0 6px 16px rgba(31, 81, 56, 0.28);
+    font-weight: 700;
+    color: #fff;
+  }
+
+  /* 승인·거절·양도 */
+  .pill {
+    border-radius: var(--radius-pill);
+    padding: 7px 13px;
+    font-size: var(--text-caption);
+    font-weight: 700;
+  }
+
+  .pill-soft {
+    background: var(--color-sundo-tint-10);
+    color: var(--color-sundo-800);
+  }
+
+  .pill-fill {
+    background: var(--gradient-primary);
+    color: #fff;
+  }
+
+  /* line 계열 표면은 .tage와 동일하게 처리한다(회신 §3). */
+  .pill-line {
+    background: var(--color-sundo-line-surface);
+    border: 1px solid var(--color-sundo-line-border);
+    color: var(--color-sundo-700);
+  }
+
+  /* 사유 태그 3종 */
+  .tagf,
+  .tagl,
+  .tage {
+    border-radius: var(--radius-pill);
+    padding: 5px 10px;
+    font-size: var(--text-micro);
+    font-weight: 700;
+  }
+
+  .tagf {
+    background: var(--gradient-primary);
+    color: #fff;
+  }
+
+  .tagl {
+    background: var(--color-sundo-tint-10);
+    color: var(--color-sundo-800);
+  }
+
+  .tage {
+    background: var(--color-sundo-line-surface);
+    border: 1px solid var(--color-sundo-line-border);
+    color: var(--color-sundo-700);
+  }
+}
+
+/* design/index.html 원문 그대로 — 수정 금지 */
+@keyframes shine {
+  from {
+    background-position: 130% 0;
+  }
+  to {
+    background-position: -30% 0;
+  }
+}
+
+/* AC-07 — 이번 작업 범위에서는 .shine 정지만 처리한다.
+   나머지 모션의 reduce 대응은 해당 요소를 만드는 작업에서 한다. */
+@media (prefers-reduced-motion: reduce) {
+  .shine {
+    animation: none;
+  }
 }
