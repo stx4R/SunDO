@@ -1,268 +1,200 @@
+import { useEffect, useRef, useState } from 'react'
+import { AppShell } from './components/AppShell'
+import { Field, type FieldHandle } from './components/Field'
+import { Switch } from './components/Switch'
 import { cn } from './lib/cn'
 
-// W-02 검증용 쇼케이스. W-03 AppShell 작업에서 폐기한다.
-
-const COLORS = [
-  'sundo-900',
-  'sundo-800',
-  'sundo-700',
-  'sundo-500',
-  'sundo-300',
-  'sundo-bg-top',
-  'sundo-bg-bottom',
-  'sundo-bg-outer',
-  'sundo-glass',
-  'sundo-sheet',
-  'sundo-neu-from',
-  'sundo-neu-to',
-  'sundo-border-light',
-  'sundo-divider',
-  'sundo-tint-08',
-  'sundo-tint-10',
-  'sundo-tint-12',
-  'sundo-ink-60',
-  'sundo-ink-70',
-  'sundo-danger',
-  'sundo-danger-active',
-  'sundo-control',
-  'sundo-line-surface',
-  'sundo-line-border',
-]
-
-// Tailwind는 클래스명을 소스에서 정적으로 훑는다. 문자열을 조립하면 감지되지 않으므로
-// 전부 온전한 리터럴로 적는다.
-const COLOR_SWATCH: Record<string, string> = {
-  'sundo-900': 'bg-sundo-900',
-  'sundo-800': 'bg-sundo-800',
-  'sundo-700': 'bg-sundo-700',
-  'sundo-500': 'bg-sundo-500',
-  'sundo-300': 'bg-sundo-300',
-  'sundo-bg-top': 'bg-sundo-bg-top',
-  'sundo-bg-bottom': 'bg-sundo-bg-bottom',
-  'sundo-bg-outer': 'bg-sundo-bg-outer',
-  'sundo-glass': 'bg-sundo-glass',
-  'sundo-sheet': 'bg-sundo-sheet',
-  'sundo-neu-from': 'bg-sundo-neu-from',
-  'sundo-neu-to': 'bg-sundo-neu-to',
-  'sundo-border-light': 'bg-sundo-border-light',
-  'sundo-divider': 'bg-sundo-divider',
-  'sundo-tint-08': 'bg-sundo-tint-08',
-  'sundo-tint-10': 'bg-sundo-tint-10',
-  'sundo-tint-12': 'bg-sundo-tint-12',
-  'sundo-ink-60': 'bg-sundo-ink-60',
-  'sundo-ink-70': 'bg-sundo-ink-70',
-  'sundo-danger': 'bg-sundo-danger',
-  'sundo-danger-active': 'bg-sundo-danger-active',
-  'sundo-control': 'bg-sundo-control',
-  'sundo-line-surface': 'bg-sundo-line-surface',
-  'sundo-line-border': 'bg-sundo-line-border',
-}
-
-const TYPE = [
-  ['h1', 'text-h1', '28px 화면 대제목'],
-  ['h2', 'text-h2', '24px 하위 화면 제목'],
-  ['sheet', 'text-sheet', '19px 바텀시트 제목'],
-  ['grade', 'text-grade', '21px 학년 버튼'],
-  ['classno', 'text-classno', '23px 반 숫자'],
-  ['stat', 'text-stat', '24px 통계 수치'],
-  ['body', 'text-body', '15px 본문'],
-  ['button', 'text-button', '16px 버튼 라벨'],
-  ['row', 'text-row', '14.5px 기록 행'],
-  ['label', 'text-label', '12px 폼 라벨'],
-  ['caption', 'text-caption', '11.5px 학번 보조'],
-  ['micro', 'text-micro', '11px 브레드크럼'],
-  ['dock', 'text-dock', '10px 탭 라벨'],
-] as const
-
-const SPACING = [
-  ['1.5', 'p-1.5', 6],
-  ['2', 'p-2', 8],
-  ['2.5', 'p-2.5', 10],
-  ['3', 'p-3', 12],
-  ['3.5', 'p-3.5', 14],
-  ['4', 'p-4', 16],
-  ['4.5', 'p-4.5', 18],
-  ['5.5', 'p-5.5', 22],
-  ['6.5', 'p-6.5', 26],
-] as const
-
-const RADII = [
-  ['pill', 'rounded-pill'],
-  ['28', 'rounded-28'],
-  ['26', 'rounded-26'],
-  ['24', 'rounded-24'],
-  ['22', 'rounded-22'],
-  ['20', 'rounded-20'],
-  ['18', 'rounded-18'],
-  ['16', 'rounded-16'],
-  ['15', 'rounded-15'],
-  ['14', 'rounded-14'],
-  ['12', 'rounded-12'],
-  ['11', 'rounded-11'],
-] as const
+/* W-03A 검증용 스토리 페이지. 화면 구현이 아니라 §8 DoD 실측 대상이다. */
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="flex flex-col gap-3">
-      <h2 className="text-label font-bold text-sundo-ink-70">{title}</h2>
-      {children}
+    <section className="mt-6.5">
+      <h2 className={cn('text-label', 'font-bold', 'text-sundo-ink-70')}>{title}</h2>
+      <div className="mt-3 flex flex-col gap-4">{children}</div>
     </section>
   )
 }
 
-function App() {
+function Slot({ n, children }: { n: string; children: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-sundo-bg-outer">
-      <div
-        className="mx-auto flex max-w-[430px] flex-col gap-8 p-6.5"
-        style={{ background: 'var(--gradient-stage)' }}
-      >
-        <h1 className="text-h1 font-bold text-sundo-900">디자인 토큰 확인</h1>
-
-        <Section title="컬러 24">
-          <div className="grid grid-cols-4 gap-2">
-            {COLORS.map((name) => (
-              <div key={name} className="flex flex-col gap-1">
-                <div
-                  data-probe="color"
-                  data-name={name}
-                  className={cn(
-                    'h-10 rounded-12 border border-sundo-divider',
-                    COLOR_SWATCH[name],
-                  )}
-                />
-                <span className="text-micro text-sundo-ink-60">{name.replace('sundo-', '')}</span>
-              </div>
-            ))}
-          </div>
-        </Section>
-
-        <Section title="타이포그래피 13">
-          <div className="flex flex-col gap-1">
-            {/* cn()으로 묶지 않는다. tailwind-merge 기본 설정은 커스텀 글꼴 크기(text-h1)와
-                커스텀 색(text-sundo-900)을 같은 text-* 그룹으로 보고 앞의 것을 버린다.
-                W-02 보고서 §6 참조. extendTailwindMerge 도입은 W-03 판단이다. */}
-            {TYPE.map(([key, cls, desc]) => (
-              <p key={key} data-probe="type" data-name={key} className={`${cls} text-sundo-900`}>
-                {desc}
-              </p>
-            ))}
-          </div>
-        </Section>
-
-        <Section title="간격 9 (커스텀 토큰 없이 기본 --spacing 배수)">
-          <div className="flex flex-wrap gap-2">
-            {SPACING.map(([key, cls, px]) => (
-              <div
-                key={key}
-                data-probe="spacing"
-                data-name={key}
-                data-expect={px}
-                className={cn('rounded-12 bg-sundo-tint-08', cls)}
-              >
-                <div className="size-2 rounded-pill bg-sundo-800" />
-              </div>
-            ))}
-          </div>
-        </Section>
-
-        <Section title="반경 12">
-          <div className="flex flex-wrap gap-2">
-            {RADII.map(([key, cls]) => (
-              <div
-                key={key}
-                data-probe="radius"
-                data-name={key}
-                className={cn('flex size-14 items-center justify-center bg-sundo-tint-10', cls)}
-              >
-                <span className="text-micro font-bold text-sundo-800">{key}</span>
-              </div>
-            ))}
-          </div>
-        </Section>
-
-        <Section title="그림자 3 · 이징 1">
-          <div className="flex flex-wrap items-center gap-3">
-            <div data-probe="shadow" data-name="glass" className="rounded-20 bg-white p-4 shadow-glass">
-              <span className="text-micro font-bold text-sundo-800">shadow-glass</span>
-            </div>
-            <div data-probe="shadow" data-name="primary" className="rounded-20 bg-white p-4 shadow-primary">
-              <span className="text-micro font-bold text-sundo-800">shadow-primary</span>
-            </div>
-            <div data-probe="shadow" data-name="neu" className="rounded-20 bg-white p-4 shadow-neu">
-              <span className="text-micro font-bold text-sundo-800">shadow-neu</span>
-            </div>
-            <div
-              data-probe="ease"
-              data-name="sundo"
-              className="rounded-20 bg-white p-4 transition-transform duration-200 ease-sundo"
-            >
-              <span className="text-micro font-bold text-sundo-800">ease-sundo</span>
-            </div>
-          </div>
-        </Section>
-
-        <Section title="표면 스타일 11">
-          <div data-probe="surface" data-name="glass" className="glass rounded-20 p-4.5">
-            <p className="text-label font-bold text-sundo-ink-70">glass</p>
-            <p className="text-stat font-bold text-sundo-800 tabular-nums">128</p>
-          </div>
-
-          <div data-probe="surface" data-name="neu" className="neu rounded-22 p-5.5">
-            <p className="text-grade font-bold text-sundo-900">neu · 눌러보면 그림자가 반전됩니다</p>
-          </div>
-
-          <button data-probe="surface" data-name="btnp" className="btnp w-full">
-            <span data-probe="surface" data-name="shine" className="shine">
-              btnp + shine
-            </span>
-          </button>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <span data-probe="surface" data-name="chip" className="chip">
-              chip 24명
-            </span>
-            <span data-probe="surface" data-name="fchip" className="fchip">
-              fchip 비활성
-            </span>
-            <span data-probe="surface" data-name="fchip-on" className="fchip fchip-on">
-              fchip 활성
-            </span>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <span data-probe="surface" data-name="pill-soft" className="pill pill-soft">
-              양도
-            </span>
-            <span data-probe="surface" data-name="pill-fill" className="pill pill-fill">
-              승인
-            </span>
-            <span data-probe="surface" data-name="pill-line" className="pill pill-line">
-              거절
-            </span>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <span data-probe="surface" data-name="tagf" className="tagf">
-              복장 불량
-            </span>
-            <span data-probe="surface" data-name="tagl" className="tagl">
-              실내화 미착용
-            </span>
-            <span data-probe="surface" data-name="tage" className="tage">
-              기타
-            </span>
-          </div>
-        </Section>
-
-        <Section title="cn() 병합">
-          <div data-probe="cn" className={cn('rounded-11', 'p-4', 'bg-sundo-tint-10')}>
-            <span className="text-micro font-bold text-sundo-800">cn('rounded-11','p-4')</span>
-          </div>
-        </Section>
-      </div>
+    <div>
+      <div className={cn('mb-1.5', 'text-micro', 'font-bold', 'text-sundo-700')}>{n}</div>
+      {children}
     </div>
   )
 }
 
-export default App
+function PersonIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+      <circle cx="10" cy="7" r="3.2" stroke="rgba(20,53,38,0.45)" strokeWidth="1.7" />
+      <path
+        d="M4.2 16.2c.9-2.7 3.1-4.1 5.8-4.1s4.9 1.4 5.8 4.1"
+        stroke="rgba(20,53,38,0.45)"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
+const required = (msg: string) => (v: string) => (v.trim() ? null : msg)
+
+export default function App() {
+  const [hasDock, setHasDock] = useState(false)
+
+  const [empty, setEmpty] = useState('')
+  const [filled, setFilled] = useState('유이준')
+  const [focused, setFocused] = useState('')
+  const [caret, setCaret] = useState('')
+  const [okValue, setOkValue] = useState('유이준')
+  const [errValue, setErrValue] = useState('')
+  const [checkingValue, setCheckingValue] = useState('SUNDO24')
+  const [roValue] = useState('2026-08-20 08:32')
+  const [subValue, setSubValue] = useState('제출 중입니다')
+  const [iconValue, setIconValue] = useState('')
+
+  const [notifyOn, setNotifyOn] = useState(true)
+  const [notifyOff, setNotifyOff] = useState(false)
+  const [lockedOn] = useState(true)
+  const [lockedOff] = useState(false)
+
+  const focusRef = useRef<FieldHandle>(null)
+  const okRef = useRef<FieldHandle>(null)
+  const errRef = useRef<FieldHandle>(null)
+
+  /* 7상태를 동시에 보이게 하려면 상태 2·4·5를 착수 시점에 만들어야 한다.
+     전용 프로퍼티를 늘리지 않고 공개 ref API만 쓴다. */
+  useEffect(() => {
+    okRef.current?.validate()
+    errRef.current?.validate()
+    focusRef.current?.focus()
+  }, [])
+
+  return (
+    <AppShell hasDock={hasDock}>
+      <header>
+        <h1 className={cn('text-h1', 'font-bold', 'text-sundo-900')}>공통 컴포넌트</h1>
+        <p className={cn('mt-1', 'text-caption', 'font-medium', 'text-sundo-ink-60')}>
+          W-03A — AppShell · Field · Switch
+        </p>
+      </header>
+
+      <Section title="FIELD — 7상태">
+        <Slot n="1 라벨 부상 — 비어 있고 비포커스 (세로 중앙)">
+          <Field label="순찰 장소" value={empty} onChange={setEmpty} />
+        </Slot>
+
+        <Slot n="1 라벨 부상 — 값 있음 (상단 9px)">
+          <Field label="이름" value={filled} onChange={setFilled} />
+        </Slot>
+
+        <Slot n="2 포커스 — 테두리 1.5px · 포커스 링 · 배경 상향">
+          <Field
+            ref={focusRef}
+            label="담당자 이름"
+            value={focused}
+            onChange={setFocused}
+            placeholder="예) 유이준"
+          />
+        </Slot>
+
+        <Slot n="3 커서 — caret-color #2E6B4C (클릭하면 초록 커서)">
+          <Field
+            label="순찰 시간"
+            value={caret}
+            onChange={setCaret}
+            inputMode="numeric"
+            placeholder="예) 08:30"
+          />
+        </Slot>
+
+        <Slot n="4 성공 — 체크 드로잉 0.28s + 필드 y -2→0">
+          <Field
+            ref={okRef}
+            label="이름"
+            value={okValue}
+            onChange={setOkValue}
+            validate={required('이름을 입력해 주세요')}
+          />
+        </Slot>
+
+        <Slot n="5 실패 — shake 1회 + 에러 문구 펼침">
+          <Field
+            ref={errRef}
+            label="순찰 장소"
+            value={errValue}
+            onChange={setErrValue}
+            validate={required('순찰 장소를 입력해 주세요')}
+          />
+        </Slot>
+
+        <Slot n="6 검사 중 — 우측 스피너 16px">
+          <Field
+            label="가입 코드"
+            value={checkingValue}
+            onChange={setCheckingValue}
+            checking
+            maxLength={8}
+          />
+        </Slot>
+
+        <Slot n="7 읽기 전용 — 틴트 배경 · 자물쇠 · 커서 없음">
+          <Field label="발생 일시" value={roValue} onChange={() => {}} readOnly inputMode="numeric" />
+        </Slot>
+      </Section>
+
+      <Section title="FIELD — 추가 상태">
+        <Slot n="제출 중 — 전체 투명도 0.6">
+          <Field label="기타 사유" value={subValue} onChange={setSubValue} submitting />
+        </Slot>
+
+        <Slot n="leadingIcon — 좌측 기준선 44px">
+          <Field
+            label="담당자 이름 검색"
+            value={iconValue}
+            onChange={setIconValue}
+            leadingIcon={<PersonIcon />}
+          />
+        </Slot>
+      </Section>
+
+      <Section title="SWITCH">
+        <div className="flex items-center justify-between gap-3">
+          <span className={cn('text-row', 'font-medium', 'text-sundo-900')}>켜짐</span>
+          <Switch checked={notifyOn} onChange={setNotifyOn} />
+        </div>
+
+        <div className="flex items-center justify-between gap-3">
+          <span className={cn('text-row', 'font-medium', 'text-sundo-900')}>꺼짐</span>
+          <Switch checked={notifyOff} onChange={setNotifyOff} />
+        </div>
+
+        <div className="flex items-center justify-between gap-3">
+          <span className={cn('text-row', 'font-medium', 'text-sundo-900')}>잠금 — 켜짐</span>
+          <Switch checked={lockedOn} onChange={() => {}} locked describedById="sw-lock-note" />
+        </div>
+
+        <div className="flex items-center justify-between gap-3">
+          <span className={cn('text-row', 'font-medium', 'text-sundo-900')}>잠금 — 꺼짐</span>
+          <Switch checked={lockedOff} onChange={() => {}} locked describedById="sw-lock-note" />
+        </div>
+
+        <p id="sw-lock-note" className={cn('text-micro', 'font-medium', 'text-sundo-ink-70')}>
+          홈 화면에 추가하면 알림을 받을 수 있습니다
+        </p>
+      </Section>
+
+      <Section title="APPSHELL">
+        <div className="flex items-center justify-between gap-3">
+          <span className={cn('text-row', 'font-medium', 'text-sundo-900')}>
+            hasDock — 상단 26px ↔ 34px
+          </span>
+          <Switch checked={hasDock} onChange={setHasDock} />
+        </div>
+      </Section>
+
+      <div className="h-6.5" />
+    </AppShell>
+  )
+}

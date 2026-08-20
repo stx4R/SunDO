@@ -242,6 +242,320 @@
     border: 1px solid var(--color-sundo-line-border);
     color: var(--color-sundo-700);
   }
+
+  /* ==========================================================
+     오라 블롭 — PRD §7.5 / Claude Design 공통 프롬프트 [배경 장식]
+     크기·좌표·색은 design/index.html 인라인 style 원문(각 71/66/71회 반복).
+     지속·이징은 PRD §7.4. 적용 규칙은 프로토타입에 0건이라 회신으로 확정했다
+     (좌하단은 aur1 재사용. 8s와 12s로 주기가 달라 동기화되지 않는다).
+     ========================================================== */
+  .aura {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(28px);
+  }
+
+  .aura-1 {
+    top: -70px;
+    left: -60px;
+    width: 300px;
+    height: 300px;
+    background: radial-gradient(circle, rgba(87, 144, 111, 0.3), transparent 65%);
+    animation: aur1 8s ease-in-out infinite alternate;
+  }
+
+  .aura-2 {
+    top: 150px;
+    right: -90px;
+    width: 260px;
+    height: 260px;
+    background: radial-gradient(circle, rgba(46, 107, 76, 0.2), transparent 65%);
+    animation: aur2 10s ease-in-out infinite alternate;
+  }
+
+  .aura-3 {
+    bottom: -80px;
+    left: 30px;
+    width: 320px;
+    height: 320px;
+    background: radial-gradient(circle, rgba(159, 196, 174, 0.38), transparent 65%);
+    animation: aur1 12s ease-in-out infinite alternate;
+  }
+
+  /* ==========================================================
+     입력 필드 v2 — PRD §7.3 별도 표. design/index.html `.ff` 계열 원문 이식.
+     값이 토큰과 정확히 일치하는 것만 var()로 치환했다. 나머지는 원문 리터럴이다.
+     네이티브 input을 직접 쓰지 않는다(PRD 프롬프트 지침 5) — 이 클래스는
+     src/components/Field.tsx 전용이다.
+     ========================================================== */
+  .ff {
+    position: relative;
+    height: 56px;
+    box-sizing: border-box;
+    border-radius: var(--radius-14);
+    background: var(--color-sundo-glass);
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    box-shadow: inset 0 1px 3px rgba(20, 53, 38, 0.05);
+    /* PRD §7.3이 padding을 "컨테이너" 행에 적었다. 실제 여백은 .ff input이
+       만들지만(design 원문), 컨테이너 규격이므로 여기에도 명시한다.
+       자식이 전부 absolute라 이 padding 자체는 레이아웃에 영향이 없다. */
+    padding: 22px 16px 8px;
+    transition:
+      box-shadow 0.15s,
+      background 0.15s;
+  }
+
+  .ff input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    border: 0;
+    background: transparent;
+    border-radius: var(--radius-14);
+    padding: 22px 16px 8px;
+    font-family: inherit;
+    font-size: var(--text-body);
+    font-weight: 500;
+    color: var(--color-sundo-900);
+    caret-color: var(--color-sundo-700);
+    outline: none;
+  }
+
+  /* §7.3 placeholder — 라벨 대용으로 쓰지 않는다. 포커스 중에만 노출. */
+  .ff input::placeholder {
+    color: transparent;
+  }
+
+  .ff input:focus::placeholder {
+    color: rgba(20, 53, 38, 0.3);
+  }
+
+  /* Floating Label. 좌측 기준선은 부상 전후 16px로 고정된다(아이콘 있으면 44px). */
+  .ff label {
+    position: absolute;
+    left: 16px;
+    top: 19px;
+    font-size: var(--text-body);
+    font-weight: 500;
+    color: rgba(20, 53, 38, 0.45);
+    pointer-events: none;
+    transition:
+      top 0.18s var(--ease-sundo),
+      font-size 0.18s var(--ease-sundo),
+      color 0.18s var(--ease-sundo);
+  }
+
+  /* 부상은 CSS만으로 처리한다. JS 상태(design의 .ff-fill)를 쓰지 않는다. */
+  .ff:focus-within label,
+  .ff input:not(:placeholder-shown) ~ label {
+    top: 9px;
+    font-size: var(--text-caption);
+    font-weight: 700;
+    color: var(--color-sundo-700);
+  }
+
+  .ff:focus-within {
+    background: var(--color-sundo-line-surface);
+    box-shadow:
+      inset 0 0 0 1.5px var(--color-sundo-700),
+      inset 0 1px 3px rgba(20, 53, 38, 0.05),
+      0 0 0 3px rgba(46, 107, 76, 0.12);
+  }
+
+  .ff-ic input {
+    padding-left: 44px;
+  }
+
+  .ff-ic label {
+    left: 44px;
+  }
+
+  /* design에 아이콘 슬롯 규칙이 없어 신규 확정: 16px + 아이콘 20px + 8px = 44px. */
+  .ff-lead {
+    position: absolute;
+    left: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    pointer-events: none;
+  }
+
+  .ff-num input {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .ff-end {
+    position: absolute;
+    right: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    pointer-events: none;
+  }
+
+  /* 4 성공 */
+  .ff-ok {
+    box-shadow:
+      inset 0 0 0 1.5px var(--color-sundo-700),
+      inset 0 1px 3px rgba(20, 53, 38, 0.05);
+    animation: settleY 0.2s ease-out both;
+  }
+
+  .ff-check path {
+    stroke-dasharray: 12;
+    stroke-dashoffset: 12;
+    animation: drawCheck 0.28s ease-out forwards;
+  }
+
+  /* 5 실패 */
+  .ff-err {
+    box-shadow:
+      inset 0 0 0 1.5px var(--color-sundo-danger),
+      inset 0 1px 3px rgba(20, 53, 38, 0.05);
+  }
+
+  .ff-err label,
+  .ff-err input:placeholder-shown:not(:focus) ~ label {
+    color: var(--color-sundo-danger) !important;
+  }
+
+  .ff-err:focus-within {
+    box-shadow:
+      inset 0 0 0 1.5px var(--color-sundo-danger),
+      inset 0 1px 3px rgba(20, 53, 38, 0.05),
+      0 0 0 3px rgba(192, 57, 43, 0.12);
+  }
+
+  /* design 원문은 .ff-err에 animation을 함께 넣었다. AC-07이 reduce에서 shake만
+     제거하고 색·아이콘·문구는 유지하라고 하고, shake는 에러당 1회만이어야 하므로
+     애니메이션만 분리한다. 담는 요소가 .ff 바깥이라 에러 문구는 흔들리지 않는다. */
+  .ff-shake {
+    animation: shakeX 0.32s ease-out both;
+  }
+
+  /* 6 검사 중. design의 스피너 구성(border-top-color + spin .8s)을 §7.3의 16px로. */
+  .ff-spin {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 2px solid rgba(46, 107, 76, 0.22);
+    border-top-color: var(--color-sundo-700);
+    animation: spin 0.8s linear infinite;
+  }
+
+  /* 7 읽기 전용 */
+  .ff-ro {
+    background: rgba(31, 81, 56, 0.06);
+    /* 테두리 "없음"은 투명으로 낸다. border: 0으로 지우면 padding box가 1px
+       커져 라벨 좌측 기준선이 다른 상태와 어긋난다(§8 DoD 15). */
+    border: 1px solid transparent;
+    box-shadow: none;
+  }
+
+  .ff-ro input {
+    color: var(--color-sundo-900);
+    caret-color: transparent;
+  }
+
+  .ff-ro label {
+    top: 9px !important;
+    font-size: var(--text-caption) !important;
+    font-weight: 700 !important;
+    color: var(--color-sundo-700) !important;
+  }
+
+  /* 테두리 없음은 유지하되 AC-09를 위해 포커스 링만 남긴다. */
+  .ff-ro:focus-within {
+    background: rgba(31, 81, 56, 0.06);
+    box-shadow: 0 0 0 3px rgba(46, 107, 76, 0.12);
+  }
+
+  /* 제출 중 */
+  .ff-sub {
+    opacity: 0.6;
+  }
+
+  .ff-sub input {
+    caret-color: transparent;
+  }
+
+  /* 에러 문구 펼침. 높이 0→auto는 grid-template-rows 0fr→1fr로 구현한다.
+     문구 노드는 항상 마운트해 role="alert" 라이브 영역이 먼저 존재하도록 한다. */
+  .ff-msgwrap {
+    display: grid;
+    grid-template-rows: 0fr;
+    opacity: 0;
+    transition:
+      grid-template-rows 0.2s ease,
+      opacity 0.2s ease;
+  }
+
+  .ff-msgwrap-open {
+    grid-template-rows: 1fr;
+    opacity: 1;
+  }
+
+  .ff-msg {
+    overflow: hidden;
+    padding-top: 6px;
+    font-size: var(--text-micro);
+    font-weight: 500;
+    color: var(--color-sundo-danger);
+  }
+
+  /* ==========================================================
+     토글 스위치 — PRD §7.3 switch 행 + §7.4 토글 노브.
+     design/index.html S10 인라인 style 원문.
+     ========================================================== */
+  .sw {
+    position: relative;
+    width: 50px;
+    height: 30px;
+    flex: none;
+    border-radius: var(--radius-pill);
+    background: rgba(20, 53, 38, 0.14);
+  }
+
+  /* 트랙 색 전환 0.2s. 그라디언트는 색과 보간되지 않으므로 별도 층을 겹쳐
+     opacity로 교차시킨다. 색 값은 design 원문 그대로다. */
+  .sw::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: var(--gradient-primary);
+    opacity: 0;
+    transition: opacity 0.2s var(--ease-sundo);
+  }
+
+  .sw-on::before {
+    opacity: 1;
+  }
+
+  .sw-knob {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 2px 6px rgba(20, 53, 38, 0.18);
+    transition: left 0.2s var(--ease-sundo);
+  }
+
+  .sw-on .sw-knob {
+    left: 22px;
+  }
+
+  .sw-locked {
+    opacity: 0.4;
+  }
 }
 
 /* design/index.html 원문 그대로 — 수정 금지 */
@@ -254,10 +568,103 @@
   }
 }
 
-/* AC-07 — 이번 작업 범위에서는 .shine 정지만 처리한다.
-   나머지 모션의 reduce 대응은 해당 요소를 만드는 작업에서 한다. */
+/* design/index.html 원문 그대로 — 오라 블롭. 프로토타입에는 정의만 있고
+   적용 규칙이 0건이었다(회신으로 확정, 보고서 §5 참조). */
+@keyframes aur1 {
+  0% {
+    transform: translate(0, 0) scale(1);
+  }
+  100% {
+    transform: translate(26px, -18px) scale(1.15);
+  }
+}
+
+@keyframes aur2 {
+  0% {
+    transform: translate(0, 0) scale(1.1);
+  }
+  100% {
+    transform: translate(-24px, 16px) scale(0.94);
+  }
+}
+
+/* design/index.html 원문 그대로 — 검증 실패 shake (PRD §7.4와 값 일치) */
+@keyframes shakeX {
+  0% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-6px);
+  }
+  50% {
+    transform: translateX(5px);
+  }
+  75% {
+    transform: translateX(-3px);
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+/* design/index.html 원문 그대로 — 스피너 */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* W-03A 신규 — PRD §7.3·§7.4의 "필드 y -2→0 0.2s 정착". design에 원문 없음. */
+@keyframes settleY {
+  from {
+    transform: translateY(-2px);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+/* W-03A 신규 — PRD §7.3·§7.4의 "체크 stroke-dashoffset 0.28s 드로잉".
+   design의 체크 path(M5.8 10.2l2.7 2.7 5.4-5.4) 길이는 약 11.5다. */
+@keyframes drawCheck {
+  from {
+    stroke-dashoffset: 12;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* AC-07 — reduce에서 정지시킬 모션.
+   검증 실패는 shake 진동만 제거하고 색·아이콘·에러 문구는 그대로 둔다.
+   스피너는 진행 중을 알리는 필수 피드백이라 정지 대상이 아니다. */
 @media (prefers-reduced-motion: reduce) {
   .shine {
     animation: none;
+  }
+
+  .aura {
+    animation: none;
+  }
+
+  .ff-shake {
+    animation: none;
+  }
+
+  .ff label {
+    transition: none;
+  }
+
+  .ff-ok {
+    animation: none;
+  }
+
+  .ff-check path {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+
+  .ff-msgwrap {
+    transition: none;
   }
 }
