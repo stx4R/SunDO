@@ -101,7 +101,7 @@ export function Footer({ variant, logoSrc, onNavigate }: FooterProps) {
         rel="noopener noreferrer"
       >
         Developed by <b>stx4R</b>
-        <ExternalLinkIcon className="ml-[3px]" />
+        <ExternalLinkIcon className="ml-[3px] text-sundo-ink-45" />
         <span className="sr-only">외부 링크로 이동</span>
       </a>
     </footer>

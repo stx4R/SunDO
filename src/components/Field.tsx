@@ -66,19 +66,19 @@ function AlertIcon() {
 
 function LockIcon() {
   return (
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+    <svg className="ff-lock" width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
       <rect
         x="2.9"
         y="6.1"
         width="8.2"
         height="5.6"
         rx="1.6"
-        stroke="rgba(20,53,38,0.45)"
+        stroke="currentColor"
         strokeWidth="1.9"
       />
       <path
         d="M4.8 6.1V4.6a2.2 2.2 0 014.4 0v1.5"
-        stroke="rgba(20,53,38,0.45)"
+        stroke="currentColor"
         strokeWidth="1.9"
         strokeLinecap="round"
       />

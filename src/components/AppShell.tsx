@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { createContext, useState, type ReactNode } from 'react'
 
 interface AppShellProps {
   children: ReactNode
@@ -9,6 +9,16 @@ interface AppShellProps {
 }
 
 /**
+ * 오버레이(토스트·시트·모달)가 붙을 DOM 노드. 스테이지 안에 있어야 430px 밖
+ * 화면에서도 스테이지를 벗어나지 않는다(W-03B §4-9와 같은 이유).
+ *
+ * 첫 렌더에는 `null`이다 — ref 콜백이 돌아야 노드가 생긴다.
+ * 구독자는 `null`이면 아무것도 그리지 않고 다음 렌더를 기다린다.
+ * `document.getElementById`로 찾지 마라. 첫 렌더에 없다.
+ */
+export const OverlayRootContext = createContext<HTMLElement | null>(null)
+
+/**
  * PRD §7.5 레이아웃 규격.
  * 스테이지는 430px 고정 폭 · 100dvh · overflow hidden이고, 세로 스크롤은 그 안쪽
  * 영역이 담당한다. 오라 블롭은 스크롤 영역 바깥에 있어 스크롤과 무관하게 고정된다.
@@ -16,6 +26,8 @@ interface AppShellProps {
 export function AppShell({ children, hasDock = false, bottomGap }: AppShellProps) {
   const topGap = hasDock ? 34 : 26
   const bottom = bottomGap ?? (hasDock ? 120 : 0)
+
+  const [overlayEl, setOverlayEl] = useState<HTMLElement | null>(null)
 
   return (
     // 430px 초과 화면에서 좌우를 --bg-outer로 채운다.
@@ -37,14 +49,20 @@ export function AppShell({ children, hasDock = false, bottomGap }: AppShellProps
           <div className="aura aura-3" aria-hidden="true" />
         </div>
 
-        <div
-          className="relative h-full overflow-y-auto"
-          style={{
-            padding: `calc(env(safe-area-inset-top) + ${topGap}px) 22px ${bottom}px`,
-          }}
-        >
-          {children}
-        </div>
+        <OverlayRootContext.Provider value={overlayEl}>
+          <div
+            className="relative h-full overflow-y-auto"
+            style={{
+              padding: `calc(env(safe-area-inset-top) + ${topGap}px) 22px ${bottom}px`,
+            }}
+          >
+            {children}
+          </div>
+
+          {/* 스크롤 영역의 형제다. 안에 두면 시트가 본문과 함께 스크롤된다.
+              루트 자체는 클릭을 통과시키고 딤·시트·모달만 되돌린다. */}
+          <div ref={setOverlayEl} className="ovl-root" />
+        </OverlayRootContext.Provider>
       </div>
     </div>
   )

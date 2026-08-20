@@ -91,16 +91,39 @@ export function ExternalLinkIcon({ className }: IconProps) {
     <svg width="10" height="10" viewBox="0 0 12 12" fill="none" aria-hidden="true" className={className}>
       <path
         d="M6.6 2.1h3.3v3.3M9.6 2.4L5.5 6.5"
-        stroke="rgba(20,53,38,0.45)"
+        stroke="currentColor"
         strokeWidth="1.5"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
       <path
         d="M9.2 7.4v2.1a.9.9 0 01-.9.9H2.6a.9.9 0 01-.9-.9V3.8a.9.9 0 01.9-.9h2.1"
-        stroke="rgba(20,53,38,0.45)"
+        stroke="currentColor"
         strokeWidth="1.5"
         strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
+/** 토스트용 체크. design `10e` 원문 — viewBox `0 0 14 14`, stroke 2.2, 라운드 캡. */
+export function ToastCheckIcon({ className }: IconProps) {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 14 14"
+      fill="none"
+      aria-hidden="true"
+      className={className}
+      style={{ flex: 'none' }}
+    >
+      <path
+        d="M2.8 7.4l2.8 2.8L11.2 4"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
       />
     </svg>
   )

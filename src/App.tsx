@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { AppShell } from './components/AppShell'
+import { BottomSheet } from './components/BottomSheet'
 import { Chip, FilterChip } from './components/Chip'
+import { ConfirmModal } from './components/ConfirmModal'
 import { Dock, type DockTab } from './components/Dock'
 import { Field, type FieldHandle } from './components/Field'
 import { Footer } from './components/Footer'
@@ -9,9 +11,10 @@ import { NeuButton } from './components/NeuButton'
 import { Pill } from './components/Pill'
 import { PrimaryButton } from './components/PrimaryButton'
 import { Switch } from './components/Switch'
+import { ToastProvider, useToast } from './components/Toast'
 import { cn } from './lib/cn'
 
-/* W-03A·W-03B 검증용 스토리 페이지. 화면 구현이 아니라 DoD 실측 대상이다. */
+/* W-03A·W-03B·W-03C 검증용 스토리 페이지. 화면 구현이 아니라 DoD 실측 대상이다. */
 
 /* 독은 스테이지 기준 absolute다. 스토리에서 실치수를 재려면 스테이지와 같은
    430px 폭의 relative 박스가 필요하다. AppShell 본문은 좌우 22px이 빠진
@@ -44,11 +47,11 @@ function Slot({ n, children }: { n: string; children: React.ReactNode }) {
 
 function PersonIcon() {
   return (
-    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-      <circle cx="10" cy="7" r="3.2" stroke="rgba(20,53,38,0.45)" strokeWidth="1.7" />
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" className="text-sundo-ink-45">
+      <circle cx="10" cy="7" r="3.2" stroke="currentColor" strokeWidth="1.7" />
       <path
         d="M4.2 16.2c.9-2.7 3.1-4.1 5.8-4.1s4.9 1.4 5.8 4.1"
-        stroke="rgba(20,53,38,0.45)"
+        stroke="currentColor"
         strokeWidth="1.7"
         strokeLinecap="round"
       />
@@ -57,6 +60,166 @@ function PersonIcon() {
 }
 
 const required = (msg: string) => (v: string) => (v.trim() ? null : msg)
+
+/* §8.10.4 확인 모달 사전. `{이름}` 자리표시자는 스토리에서 김부원으로 채운다. */
+const MODALS = [
+  {
+    code: 'MD-01',
+    title: '코드 재발급',
+    body: '이전 코드는 즉시 만료됩니다. 재발급할까요?',
+    confirmLabel: '재발급',
+    destructive: false,
+  },
+  {
+    code: 'MD-02',
+    title: '부장 권한 양도',
+    body: '김부원님에게 부장 권한을 넘깁니다. 내 계정은 부원으로 전환됩니다.',
+    confirmLabel: '양도',
+    destructive: false,
+  },
+  {
+    code: 'MD-03',
+    title: '가입 거절',
+    body: '김부원님의 가입을 거절할까요?',
+    confirmLabel: '거절',
+    destructive: true,
+  },
+  {
+    code: 'MD-04',
+    title: '기록 삭제',
+    body: '이 기록을 삭제할까요? 삭제 이력은 관리자에게 남습니다.',
+    confirmLabel: '삭제',
+    destructive: true,
+  },
+  {
+    code: 'MD-05',
+    title: '중복 기록 확인',
+    body: '오늘 이미 같은 사유로 기록된 학생입니다. 계속할까요?',
+    confirmLabel: '계속',
+    destructive: false,
+  },
+  {
+    code: 'MD-06',
+    title: '로그아웃',
+    body: '로그아웃할까요?',
+    confirmLabel: '로그아웃',
+    destructive: false,
+  },
+  {
+    code: 'MD-07',
+    title: '계정 탈퇴',
+    body: '자율생활부 앱 이용이 종료됩니다. 내가 작성한 기록은 삭제되지 않고 그대로 남습니다.',
+    confirmLabel: '탈퇴',
+    destructive: true,
+  },
+] as const
+
+/* §8.10.1 토스트 사전에서 3건. 문구는 호출부가 넘긴다. */
+const TOASTS = [
+  { code: 'TS-01', message: '기록 저장됨' },
+  { code: 'TS-02', message: '기록 저장됨 · 연결되면 자동 전송' },
+  { code: 'TS-12', message: '접근 권한이 없습니다' },
+] as const
+
+/* useToast는 Provider 안쪽에서만 부를 수 있어 절을 따로 둔다. */
+function OverlaySections() {
+  const toast = useToast()
+  const [sheetOpen, setSheetOpen] = useState(false)
+  const [modalIndex, setModalIndex] = useState<number | null>(null)
+  const [modalLoading, setModalLoading] = useState(false)
+  const [cancelCount, setCancelCount] = useState(0)
+  const [confirmCount, setConfirmCount] = useState(0)
+
+  return (
+    <>
+      <Section title="TOAST — 상단 · 2.2초 · 동시 1개">
+        <div className="flex flex-wrap gap-2">
+          {TOASTS.map((t) => (
+            <NeuButton
+              key={t.code}
+              radius={20}
+              className="px-3.5 py-2.5"
+              onClick={() => toast(t.message)}
+            >
+              <span className={cn('text-label', 'font-bold', 'text-sundo-800')}>{t.code}</span>
+            </NeuButton>
+          ))}
+          <NeuButton
+            radius={20}
+            className="px-3.5 py-2.5"
+            onClick={() => toast(TOASTS[0].message)}
+          >
+            <span className={cn('text-label', 'font-bold', 'text-sundo-800')}>TS-01 다시</span>
+          </NeuButton>
+        </div>
+      </Section>
+
+      <Section title="BOTTOMSHEET — 딤 탭 · ESC · 포커스 복귀">
+        <div id="sheet-trigger-slot">
+          <PrimaryButton label="시트 열기" onClick={() => setSheetOpen(true)} />
+        </div>
+        <BottomSheet open={sheetOpen} onClose={() => setSheetOpen(false)} title="기록 작성">
+          <p className={cn('mt-3.5', 'text-row', 'font-medium', 'text-sundo-ink-70')}>
+            시트 껍데기만 확인한다. 내용물은 W-09에서 붙인다.
+          </p>
+          <div className="mt-4 flex gap-2">
+            <NeuButton radius={20} className="flex-1 py-3" onClick={() => setSheetOpen(false)}>
+              <span className={cn('text-label', 'font-bold', 'text-sundo-800')}>닫기</span>
+            </NeuButton>
+            <NeuButton radius={20} className="flex-1 py-3">
+              <span className={cn('text-label', 'font-bold', 'text-sundo-800')}>두 번째</span>
+            </NeuButton>
+          </div>
+        </BottomSheet>
+      </Section>
+
+      <Section title="CONFIRMMODAL — MD-01 ~ MD-07">
+        <div className="flex items-center justify-between gap-3">
+          <span className={cn('text-row', 'font-medium', 'text-sundo-900')}>실행 중(loading)</span>
+          <Switch checked={modalLoading} onChange={setModalLoading} />
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          {MODALS.map((m, i) => (
+            <NeuButton
+              key={m.code}
+              radius={20}
+              className="px-3.5 py-2.5"
+              onClick={() => setModalIndex(i)}
+            >
+              <span className={cn('text-label', 'font-bold', 'text-sundo-800')}>{m.code}</span>
+            </NeuButton>
+          ))}
+        </div>
+
+        <div className={cn('text-micro', 'font-medium', 'text-sundo-ink-70')}>
+          취소 <span id="modal-cancel">{cancelCount}</span> · 실행{' '}
+          <span id="modal-confirm">{confirmCount}</span>
+        </div>
+
+        {MODALS.map((m, i) => (
+          <ConfirmModal
+            key={m.code}
+            open={modalIndex === i}
+            title={m.title}
+            body={m.body}
+            confirmLabel={m.confirmLabel}
+            destructive={m.destructive}
+            loading={modalLoading}
+            onCancel={() => {
+              setCancelCount((n) => n + 1)
+              setModalIndex(null)
+            }}
+            onConfirm={() => {
+              setConfirmCount((n) => n + 1)
+              setModalIndex(null)
+            }}
+          />
+        ))}
+      </Section>
+    </>
+  )
+}
 
 export default function App() {
   const [hasDock, setHasDock] = useState(false)
@@ -100,6 +263,7 @@ export default function App() {
 
   return (
     <AppShell hasDock={hasDock}>
+      <ToastProvider>
       <header>
         <h1 className={cn('text-h1', 'font-bold', 'text-sundo-900')}>공통 컴포넌트</h1>
         <p className={cn('mt-1', 'text-caption', 'font-medium', 'text-sundo-ink-60')}>
@@ -322,6 +486,8 @@ export default function App() {
         </div>
       </Section>
 
+      <OverlaySections />
+
       <Section title="FOOTER — 전체형 / 축약형">
         <Slot n="14a 전체형 — S10">
           <div id="ft-full" className="-mx-[22px]">
@@ -337,6 +503,7 @@ export default function App() {
       </Section>
 
       <div className="h-6.5" />
+      </ToastProvider>
     </AppShell>
   )
 }

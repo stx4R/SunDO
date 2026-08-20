@@ -32,10 +32,11 @@
   --color-sundo-tint-10: rgba(31, 81, 56, 0.1);
   --color-sundo-tint-12: rgba(31, 81, 56, 0.12);
 
+  --color-sundo-ink-45: rgba(20, 53, 38, 0.45);
   --color-sundo-ink-60: rgba(20, 53, 38, 0.6);
   --color-sundo-ink-70: rgba(20, 53, 38, 0.7);
 
-  /* §7.1 미수록 보완 토큰 6개 — 값을 새로 만든 것이 아니라
+  /* §7.1 미수록 보완 토큰 8개 — 값을 새로 만든 것이 아니라
      PRD 본문·Claude Design 산출물에서 반복 사용 중인 리터럴을 승격한 것. */
   --color-sundo-danger: #c0392b;
   --color-sundo-danger-active: #a93226;
@@ -51,6 +52,8 @@
   /* --- 그라디언트 (§7.1) ---
      Tailwind v4가 인식하는 네임스페이스가 아니므로 유틸리티는 생성되지 않는다.
      @layer components에서 var()로 참조한다. */
+  --highlight-top: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+
   --gradient-primary: linear-gradient(160deg, #2e6b4c, #1f5138);
   --gradient-stage: linear-gradient(180deg, #f7fbf8 0%, #eaf3ed 100%);
   --gradient-neu: linear-gradient(145deg, #f8fcf9, #e9f2ec);
@@ -110,7 +113,7 @@
     background: var(--color-sundo-glass);
     backdrop-filter: blur(18px) saturate(160%);
     border: 1px solid var(--color-sundo-border-light);
-    box-shadow: var(--shadow-glass), inset 0 1px 0 rgba(255, 255, 255, 0.85);
+    box-shadow: var(--shadow-glass), var(--highlight-top);
   }
 
   /* 뉴모피즘. 내부 링과 transition은 design/index.html에서 이식.
@@ -342,7 +345,7 @@
     top: 19px;
     font-size: var(--text-body);
     font-weight: 500;
-    color: rgba(20, 53, 38, 0.45);
+    color: var(--color-sundo-ink-45);
     pointer-events: none;
     transition:
       top 0.18s var(--ease-sundo),
@@ -439,6 +442,11 @@
      애니메이션만 분리한다. 담는 요소가 .ff 바깥이라 에러 문구는 흔들리지 않는다. */
   .ff-shake {
     animation: shakeX 0.32s ease-out both;
+  }
+
+  /* 자물쇠는 currentColor로 그려져 있다. 색은 여기서만 제어한다. */
+  .ff-lock {
+    color: var(--color-sundo-ink-45);
   }
 
   /* 6 검사 중. design의 스피너 구성(border-top-color + spin .8s)을 §7.3의 16px로. */
@@ -618,7 +626,7 @@
     border: 1px solid rgba(255, 255, 255, 0.75);
     box-shadow:
       0 14px 36px rgba(20, 53, 38, 0.16),
-      inset 0 1px 0 rgba(255, 255, 255, 0.85);
+      var(--highlight-top);
   }
 
   /* 활성 배경 알약. 항목마다 배경을 켜고 끄면 슬라이드가 안 되므로
@@ -669,7 +677,7 @@
     height: 21px;
     flex: none;
     display: block;
-    color: rgba(20, 53, 38, 0.45);
+    color: var(--color-sundo-ink-45);
   }
 
   .dock-item[data-active='true'] .dock-icon {
@@ -788,6 +796,208 @@
     font-weight: 700;
     color: var(--color-sundo-700);
   }
+
+  /* ==========================================================
+     오버레이 3종 — 토스트 · 바텀시트 · 확인 모달
+     전부 AppShell 스테이지 안(`absolute`)에 뜬다. `fixed`로 두면 430px 밖
+     화면에서 스테이지를 벗어난다(W-03B §4-9와 같은 이유).
+     `-webkit-` 접두사를 손으로 적지 않는다 — lightningcss가 표준 선언을 지운다.
+     ========================================================== */
+  .ovl-root {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  /* 딤 (§6.4 z 40). 시트·모달이 공유한다. design 원문은 fadeDim 키프레임이지만
+     닫힐 때도 같은 값으로 되감아야 해서 transition으로 낸다. */
+  .dim {
+    position: absolute;
+    inset: 0;
+    z-index: 40;
+    background: rgba(20, 53, 38, 0.3);
+    backdrop-filter: blur(3px);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: auto;
+    /* 시트가 열린 동안 배경 스크롤을 막는다(§5.2). 스크롤 영역은 형제라
+       휠 이벤트도 전달되지 않는다. */
+    touch-action: none;
+  }
+
+  .dim-open {
+    opacity: 1;
+  }
+
+  /* 토스트 (§6.4 z 60). 조작 대상이 아니라 pointer-events를 되돌리지 않는다. */
+  .toast {
+    position: absolute;
+    top: calc(env(safe-area-inset-top) + 18px);
+    left: 50%;
+    z-index: 60;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 11px 18px;
+    border-radius: var(--radius-pill);
+    background: rgba(31, 81, 56, 0.92);
+    backdrop-filter: blur(12px);
+    box-shadow: 0 14px 34px rgba(20, 53, 38, 0.35);
+    color: #fff;
+    animation: toastIn 0.3s ease both;
+  }
+
+  .toast-text {
+    /* 13px은 §7.2 스케일에 없다. 1회 사용이라 토큰을 만들지 않는다(보고서 §6). */
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.35;
+  }
+
+  /* 바텀시트 (§6.4 z 50). 껍데기만 — 내용물은 W-09다. */
+  .sheet {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 50;
+    box-sizing: border-box;
+    border-radius: var(--radius-26) var(--radius-26) 0 0;
+    background: var(--color-sundo-sheet);
+    backdrop-filter: blur(24px) saturate(180%);
+    border-top: 1px solid rgba(255, 255, 255, 0.9);
+    box-shadow:
+      0 -14px 44px rgba(20, 53, 38, 0.2),
+      var(--highlight-top);
+    padding: 12px 22px calc(env(safe-area-inset-bottom) + 26px);
+    transform: translateY(110%);
+    transition: transform 0.38s var(--ease-sundo);
+    pointer-events: auto;
+  }
+
+  .sheet-open {
+    transform: translateY(0);
+  }
+
+  .sheet-handle {
+    width: 38px;
+    height: 4.5px;
+    margin: 0 auto 14px;
+    border-radius: var(--radius-pill);
+    background: rgba(20, 53, 38, 0.18);
+  }
+
+  .sheet-title {
+    font-size: var(--text-sheet);
+    font-weight: 700;
+    color: var(--color-sundo-900);
+  }
+
+  /* 확인 모달 (§6.4 z 55). design 4a~4f·20c 원문. */
+  .modal {
+    position: absolute;
+    left: 50%;
+    top: 45%;
+    z-index: 55;
+    width: calc(100% - 88px);
+    box-sizing: border-box;
+    padding: 24px 22px;
+    border-radius: var(--radius-24);
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(24px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.9);
+    box-shadow: 0 20px 50px rgba(20, 53, 38, 0.25);
+    /* modalPop 원문은 scale(.94)→1 + opacity. 닫힘에도 같은 값을 쓰려고
+       키프레임 대신 transition으로 낸다. translate는 위치라 항상 유지한다. */
+    transform: translate(-50%, -50%) scale(0.94);
+    opacity: 0;
+    transition:
+      transform 0.25s var(--ease-sundo),
+      opacity 0.25s var(--ease-sundo);
+    pointer-events: auto;
+  }
+
+  .modal-open {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+
+  /* 17 · 14 · 13.5px은 §7.2 스케일에 없다. 이 컴포넌트 전용이라 인라인으로 둔다. */
+  .modal-title {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--color-sundo-900);
+    text-align: center;
+    line-height: 1.35;
+  }
+
+  .modal-body {
+    margin-top: 12px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--color-sundo-ink-70);
+    text-align: center;
+    line-height: 1.6;
+    text-wrap: pretty;
+  }
+
+  .modal-actions {
+    margin-top: 20px;
+    display: flex;
+    gap: 10px;
+  }
+
+  /* 모달 버튼은 높이 48 · radius 14다. `.pill`(radius 999)과 다른 표면이라
+     Pill을 쓰지 않는다(지시서 §6.1). */
+  .mbtn {
+    flex: 1;
+    height: 48px;
+    box-sizing: border-box;
+    border-radius: var(--radius-14);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13.5px;
+    font-weight: 700;
+    transition: transform 0.15s;
+  }
+
+  .mbtn:active {
+    transform: scale(0.97);
+  }
+
+  .mbtn:disabled {
+    opacity: 0.45;
+  }
+
+  .mbtn-line {
+    background: var(--color-sundo-glass);
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    box-shadow: 0 4px 12px rgba(20, 53, 38, 0.06);
+    color: var(--color-sundo-ink-70);
+  }
+
+  .mbtn-fill {
+    background: var(--gradient-primary);
+    box-shadow:
+      var(--shadow-primary),
+      inset 0 1px 0 rgba(255, 255, 255, 0.28);
+    color: #fff;
+  }
+
+  /* design 20c 원문. 이 컴포넌트 전용 1회라 그라디언트를 토큰화하지 않는다(§3 기준).
+     색 두 개는 이미 토큰이라 그대로 참조한다. */
+  .mbtn-danger {
+    background: linear-gradient(
+      160deg,
+      var(--color-sundo-danger),
+      var(--color-sundo-danger-active)
+    );
+    box-shadow:
+      0 10px 24px rgba(192, 57, 43, 0.32),
+      inset 0 1px 0 rgba(255, 255, 255, 0.28);
+    color: #fff;
+  }
 }
 
 /* design/index.html 원문 그대로 — 수정 금지 */
@@ -856,6 +1066,20 @@
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+/* W-03C 신규 — design 10e의 토스트 진입은 `blurIn .35s`이지만 blurIn은 W-05
+   범위다(§10). 같은 방향·거리(10px)를 유지하고 blur만 뺀 뒤 §4.1이 지정한
+   0.3s ease로 맞췄다. translateX(-50%)는 위치라 키프레임이 계속 들고 있어야 한다. */
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 10px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
   }
 }
 
@@ -946,5 +1170,27 @@
   .rise {
     animation-duration: 0.01s;
     animation-delay: 0s;
+  }
+
+  /* 지시서 §2.2 — 모션이 곧 정보인 것만 남긴다. 알약은 **최종 위치**가 정보이고
+     활성 탭은 배경·굵기·색으로 그대로 전달되므로 없애도 잃는 정보가 없다.
+     스피너(회전 자체가 "진행 중")와 갈리는 지점이다. */
+  .dock-pill-anim {
+    transition-duration: 0.01s;
+  }
+
+  .dock-item[data-active='true'] .dock-icon {
+    animation-duration: 0.01s;
+  }
+
+  /* AC-07이 "화면 전환·시트는 0.01s"로 명시한다. 딤·모달·토스트도 같은 범주다. */
+  .dim,
+  .sheet,
+  .modal {
+    transition-duration: 0.01s;
+  }
+
+  .toast {
+    animation-duration: 0.01s;
   }
 }
