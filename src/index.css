@@ -581,6 +581,16 @@
   }
 
   /* ==========================================================
+     화면 전환 (§7.4 `blurIn`) — design/index.html 원문
+     라우트가 바뀔 때마다 래퍼가 새 노드로 교체되어 다시 돈다(§4.2).
+     `rise`와 같은 이유로 지연을 커스텀 속성으로 받는다.
+     ========================================================== */
+  .blur-in {
+    animation: blurIn 0.35s ease both;
+    animation-delay: var(--blur-in-delay, 0s);
+  }
+
+  /* ==========================================================
      주 버튼 상태 (§6.3) — 로딩 스피너는 design 원문
      `2px solid rgba(255,255,255,0.35)` + `border-top-color:#fff`.
      .ff-spin과 크기·색만 다르고 spin 키프레임을 공유한다.
@@ -795,6 +805,86 @@
     margin-left: 3.5px;
     font-weight: 700;
     color: var(--color-sundo-700);
+  }
+
+  /* ==========================================================
+     스플래시 — PRD §6.4(z 100) + §8.1.5 + design `10a`
+     오버레이 3종과 같은 이유로 스테이지 기준 `absolute`다.
+     배경을 깔지 않는다 — design 10a의 그라디언트·오라 블롭은 AppShell이
+     이미 같은 값으로 갖고 있어 다시 그리면 두 겹이 된다.
+     ========================================================== */
+  .splash {
+    position: absolute;
+    inset: 0;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* design 10a 원문: 84px 흰 원 + `0 12px 26px rgba(31,81,56,0.25)`.
+     §7.1에 없는 그림자라 인라인 리터럴로 둔다(보고서 §5). */
+  .splash-logo {
+    display: flex;
+    width: 84px;
+    height: 84px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 12px 26px rgba(31, 81, 56, 0.25);
+    overflow: hidden;
+  }
+
+  /* 27px·13px은 §7.2 타입 스케일에 없는 값이다. PRD §8.1.2가 두 값을 명시하고
+     S1(W-06)이 같은 27px 타이틀을 다시 쓰므로 그때 토큰 승격을 판단한다.
+     AC-05를 위해 px가 아니라 rem으로 적는다. */
+  .splash-title {
+    margin-top: 16px;
+    display: flex;
+    font-size: 1.6875rem; /* 27px */
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--color-sundo-900);
+  }
+
+  .splash-sub {
+    margin-top: 6px;
+    font-size: 0.8125rem; /* 13px */
+    font-weight: 500;
+    color: var(--color-sundo-ink-70);
+  }
+
+  .splash-dots {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 100px;
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  /* §7.4 원문 `pulseDot 1.6s ease infinite`. design 10a만 1.4s ease-in-out으로
+     적혀 있으나 design의 다른 pulseDot 6곳이 전부 1.6s다(보고서 §5).
+     순차 깜빡임 지연은 design 10a의 0 / .2s / .4s를 따른다. */
+  .splash-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--color-sundo-700);
+    animation: pulseDot 1.6s ease infinite;
+    animation-delay: var(--dot-delay, 0s);
+  }
+
+  /* 3초 초과 오류 화면(§8.1.5). 문구는 §8.10.3 사전에서만 고른다. */
+  .splash-err {
+    display: flex;
+    max-width: 300px;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
   }
 
   /* ==========================================================
@@ -1071,6 +1161,31 @@
   }
 }
 
+/* design/index.html 원문 그대로 — 화면 전환. */
+@keyframes blurIn {
+  from {
+    opacity: 0;
+    filter: blur(8px);
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: translateY(0);
+  }
+}
+
+/* design/index.html 원문 그대로 — 동기화 점·스플래시 점. */
+@keyframes pulseDot {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
 /* W-03C 신규 — design 10e의 토스트 진입은 `blurIn .35s`이지만 blurIn은 W-05
    범위다(§10). 같은 방향·거리(10px)를 유지하고 blur만 뺀 뒤 §4.1이 지정한
    0.3s ease로 맞췄다. translateX(-50%)는 위치라 키프레임이 계속 들고 있어야 한다. */
@@ -1185,11 +1300,24 @@
     animation-duration: 0.01s;
   }
 
-  /* AC-07이 "화면 전환·시트는 0.01s"로 명시한다. 딤·모달·토스트도 같은 범주다. */
+  /* AC-07이 "화면 전환·시트는 0.01s"로 명시한다. 딤·모달·토스트도 같은 범주다.
+     `blurIn`이 곧 화면 전환이다. 스플래시 타이틀의 글자 스태거도 여기서
+     함께 없앤다 — 지속시간만 줄이면 마지막 글자가 여전히 0.36s 뒤에 나타난다. */
+  .blur-in {
+    animation-duration: 0.01s;
+    animation-delay: 0s;
+  }
+
   .dim,
   .sheet,
   .modal {
     transition-duration: 0.01s;
+  }
+
+  /* AC-07이 `pulseDot`을 **정지** 대상으로 명시한다. 스피너와 갈리는 지점이다 —
+     스플래시 점은 "진행 중"을 알리는 유일한 수단이 아니다(로고·타이틀이 이미 있다). */
+  .splash-dot {
+    animation: none;
   }
 
   .toast {
