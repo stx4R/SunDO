@@ -12,6 +12,7 @@ import { Pill } from './components/Pill'
 import { PrimaryButton } from './components/PrimaryButton'
 import { Switch } from './components/Switch'
 import { ToastProvider, useToast } from './components/Toast'
+import { AuthProvider, useAuth } from './contexts/AuthProvider'
 import { cn } from './lib/cn'
 
 /* W-03A·W-03B·W-03C 검증용 스토리 페이지. 화면 구현이 아니라 DoD 실측 대상이다. */
@@ -120,6 +121,66 @@ const TOASTS = [
   { code: 'TS-02', message: '기록 저장됨 · 연결되면 자동 전송' },
   { code: 'TS-12', message: '접근 권한이 없습니다' },
 ] as const
+
+/* W-04 2단계 DoD 14~19·27·28 실측용. 화면이 아니라 상태 표시판이다 —
+   S1·S2·S2-1은 W-06이 만든다. W-05 라우팅에서 이 페이지 전체가 대체된다. */
+function AuthSection() {
+  const { status, profile, parsed, rejectedEmail, errorCode, signIn, signOut, clearRejection } =
+    useAuth()
+  const [log, setLog] = useState<string[]>([])
+  const seen = useRef('')
+
+  /* 상태 전이를 눈으로 좇을 수 없어서(로그아웃이 거절을 덮는 순간이 핵심이다) 줄로 쌓는다. */
+  useEffect(() => {
+    const line = `status=${status} rejected=${rejectedEmail ?? '-'} error=${errorCode ?? '-'}`
+    if (line === seen.current) return
+    seen.current = line
+    setLog((prev) => [...prev, line].slice(-12))
+  }, [status, rejectedEmail, errorCode])
+
+  const snapshot = [
+    `status        ${status}`,
+    `rejectedEmail ${rejectedEmail ?? '-'}`,
+    `errorCode     ${errorCode ?? '-'}`,
+    `parsed        ${parsed ? (parsed.ok ? `ok ${parsed.memberStudentNo} ${parsed.name}` : `fail ${parsed.reason}`) : '-'}`,
+    `profile       ${profile ? `${profile.name} / ${profile.role} / ${profile.status} / ${profile.nameSource}` : '-'}`,
+  ].join('\n')
+
+  return (
+    <Section title="AUTH — W-04 2단계 상태판">
+      <div className="flex flex-wrap gap-2">
+        <NeuButton radius={20} className="px-3.5 py-2.5" onClick={() => void signIn()}>
+          <span className={cn('text-label', 'font-bold', 'text-sundo-800')}>Google 로그인</span>
+        </NeuButton>
+        <NeuButton radius={20} className="px-3.5 py-2.5" onClick={() => void signOut()}>
+          <span className={cn('text-label', 'font-bold', 'text-sundo-800')}>로그아웃</span>
+        </NeuButton>
+        <NeuButton radius={20} className="px-3.5 py-2.5" onClick={clearRejection}>
+          <span className={cn('text-label', 'font-bold', 'text-sundo-800')}>거절 지우기</span>
+        </NeuButton>
+      </div>
+
+      <pre
+        id="auth-snapshot"
+        className={cn('text-micro', 'font-medium', 'text-sundo-900')}
+        style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}
+      >
+        {snapshot}
+      </pre>
+
+      <div>
+        <div className={cn('mb-1.5', 'text-micro', 'font-bold', 'text-sundo-700')}>전이 로그</div>
+        <pre
+          id="auth-log"
+          className={cn('text-micro', 'font-medium', 'text-sundo-ink-70')}
+          style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}
+        >
+          {log.join('\n')}
+        </pre>
+      </div>
+    </Section>
+  )
+}
 
 /* useToast는 Provider 안쪽에서만 부를 수 있어 절을 따로 둔다. */
 function OverlaySections() {
@@ -263,6 +324,7 @@ export default function App() {
 
   return (
     <AppShell hasDock={hasDock}>
+      <AuthProvider>
       <ToastProvider>
       <header>
         <h1 className={cn('text-h1', 'font-bold', 'text-sundo-900')}>공통 컴포넌트</h1>
@@ -488,6 +550,8 @@ export default function App() {
 
       <OverlaySections />
 
+      <AuthSection />
+
       <Section title="FOOTER — 전체형 / 축약형">
         <Slot n="14a 전체형 — S10">
           <div id="ft-full" className="-mx-[22px]">
@@ -504,6 +568,7 @@ export default function App() {
 
       <div className="h-6.5" />
       </ToastProvider>
+      </AuthProvider>
     </AppShell>
   )
 }

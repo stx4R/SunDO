@@ -866,9 +866,11 @@
     background: var(--color-sundo-sheet);
     backdrop-filter: blur(24px) saturate(180%);
     border-top: 1px solid rgba(255, 255, 255, 0.9);
+    /* design 17a 원문은 0.9다. `--highlight-top`(0.85)이 아니다 — PRD가 시트 내부
+       하이라이트에 침묵하므로 DS-01대로 산출물을 따른다(W-04 지시서 §2). */
     box-shadow:
       0 -14px 44px rgba(20, 53, 38, 0.2),
-      var(--highlight-top);
+      inset 0 1px 0 rgba(255, 255, 255, 0.9);
     padding: 12px 22px calc(env(safe-area-inset-bottom) + 26px);
     transform: translateY(110%);
     transition: transform 0.38s var(--ease-sundo);
