@@ -1,10 +1,28 @@
 import { useEffect, useRef, useState } from 'react'
 import { AppShell } from './components/AppShell'
+import { Chip, FilterChip } from './components/Chip'
+import { Dock, type DockTab } from './components/Dock'
 import { Field, type FieldHandle } from './components/Field'
+import { Footer } from './components/Footer'
+import { GlassCard } from './components/GlassCard'
+import { NeuButton } from './components/NeuButton'
+import { Pill } from './components/Pill'
+import { PrimaryButton } from './components/PrimaryButton'
 import { Switch } from './components/Switch'
 import { cn } from './lib/cn'
 
-/* W-03A 검증용 스토리 페이지. 화면 구현이 아니라 §8 DoD 실측 대상이다. */
+/* W-03A·W-03B 검증용 스토리 페이지. 화면 구현이 아니라 DoD 실측 대상이다. */
+
+/* 독은 스테이지 기준 absolute다. 스토리에서 실치수를 재려면 스테이지와 같은
+   430px 폭의 relative 박스가 필요하다. AppShell 본문은 좌우 22px이 빠진
+   386px이라 음수 마진으로 되돌린다. */
+function StageBox({ children, h }: { children: React.ReactNode; h: number }) {
+  return (
+    <div className="relative -mx-[22px] overflow-hidden" style={{ height: h }}>
+      {children}
+    </div>
+  )
+}
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -54,6 +72,13 @@ export default function App() {
   const [subValue, setSubValue] = useState('제출 중입니다')
   const [iconValue, setIconValue] = useState('')
 
+  /* --- W-03B --- */
+  const [loading, setLoading] = useState(true)
+  const [disabledTaps, setDisabledTaps] = useState(0)
+  const [filter, setFilter] = useState('전체')
+  const [tab, setTab] = useState<DockTab>('home')
+  const [dockRole, setDockRole] = useState(false) // true = member(4탭)
+
   const [notifyOn, setNotifyOn] = useState(true)
   const [notifyOff, setNotifyOff] = useState(false)
   const [lockedOn] = useState(true)
@@ -64,9 +89,11 @@ export default function App() {
   const errRef = useRef<FieldHandle>(null)
 
   /* 7상태를 동시에 보이게 하려면 상태 2·4·5를 착수 시점에 만들어야 한다.
-     전용 프로퍼티를 늘리지 않고 공개 ref API만 쓴다. */
+     성공(4)은 이제 blur에서만 켜지므로(W-03B §1) focus → blur를 1회 돌린다.
+     실제 사용자 경로와 같은 경로라 우회가 아니다. */
   useEffect(() => {
-    okRef.current?.validate()
+    okRef.current?.focus()
+    ;(document.activeElement as HTMLElement | null)?.blur()
     errRef.current?.validate()
     focusRef.current?.focus()
   }, [])
@@ -76,7 +103,7 @@ export default function App() {
       <header>
         <h1 className={cn('text-h1', 'font-bold', 'text-sundo-900')}>공통 컴포넌트</h1>
         <p className={cn('mt-1', 'text-caption', 'font-medium', 'text-sundo-ink-60')}>
-          W-03A — AppShell · Field · Switch
+          W-03A AppShell · Field · Switch / W-03B 표면 6종 · Dock · Footer
         </p>
       </header>
 
@@ -192,6 +219,121 @@ export default function App() {
           </span>
           <Switch checked={hasDock} onChange={setHasDock} />
         </div>
+      </Section>
+
+      <Section title="GLASSCARD — radius 4종 · rise 스태거">
+        <div className="flex flex-col gap-3">
+          {([24, 22, 20, 18] as const).map((r, i) => (
+            <GlassCard
+              key={r}
+              radius={r}
+              riseDelay={50 + i * 150}
+              className="p-4"
+            >
+              <div className={cn('text-row', 'font-bold', 'text-sundo-900')}>radius {r}</div>
+              <div className={cn('mt-1', 'text-micro', 'font-medium', 'text-sundo-ink-70')}>
+                riseDelay {50 + i * 150}ms
+              </div>
+            </GlassCard>
+          ))}
+        </div>
+      </Section>
+
+      <Section title="NEUBUTTON — 누르면 그림자 반전 + scale 0.98">
+        <div className="flex gap-3">
+          <NeuButton radius={22} className="flex-1 px-4 py-4">
+            <div className={cn('text-grade', 'font-bold', 'text-sundo-800')}>1학년</div>
+          </NeuButton>
+          <NeuButton radius={20} className="flex-1 px-4 py-4">
+            <div className={cn('text-classno', 'font-bold', 'text-sundo-800')}>7</div>
+          </NeuButton>
+        </div>
+      </Section>
+
+      <Section title="PRIMARYBUTTON — 4상태">
+        <Slot n="기본 — 라벨 광택 스윕">
+          <PrimaryButton label="기록 저장" />
+        </Slot>
+
+        <Slot n="로딩 — 스피너 18px · 광택 정지">
+          <PrimaryButton label="기록 저장" loading={loading} />
+        </Slot>
+
+        <Slot n="비활성 — 투명도 0.45 · 탭 차단">
+          <PrimaryButton
+            label="기록 저장"
+            disabled
+            onClick={() => setDisabledTaps((n) => n + 1)}
+          />
+          <div
+            id="disabled-taps"
+            className={cn('mt-1.5', 'text-micro', 'font-medium', 'text-sundo-ink-70')}
+          >
+            눌린 횟수 {disabledTaps}
+          </div>
+        </Slot>
+
+        <div className="flex items-center justify-between gap-3">
+          <span className={cn('text-row', 'font-medium', 'text-sundo-900')}>로딩 토글</span>
+          <Switch checked={loading} onChange={setLoading} />
+        </div>
+      </Section>
+
+      <Section title="CHIP · FILTERCHIP · PILL">
+        <Slot n="Chip — 정적 표시">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Chip>28명</Chip>
+            <Chip>부장</Chip>
+            <Chip>동기화됨</Chip>
+          </div>
+        </Slot>
+
+        <Slot n="FilterChip — 4개 · gap 6 · 한 줄 · 가로 스크롤 없음">
+          <div id="filter-row" className="flex gap-1.5 overflow-x-hidden">
+            {['전체', '복장 불량', '실내화 미착용', '기타'].map((f) => (
+              <FilterChip key={f} label={f} active={filter === f} onClick={() => setFilter(f)} />
+            ))}
+          </div>
+        </Slot>
+
+        <Slot n="Pill — soft · fill · line">
+          <div className="flex flex-wrap items-center gap-2">
+            <Pill variant="soft">승인</Pill>
+            <Pill variant="fill">양도</Pill>
+            <Pill variant="line">거절</Pill>
+          </div>
+        </Slot>
+      </Section>
+
+      <Section title="DOCK — 5탭 / 부원 4탭">
+        <div className="flex items-center justify-between gap-3">
+          <span className={cn('text-row', 'font-medium', 'text-sundo-900')}>
+            role — {dockRole ? 'member (4탭)' : 'head (5탭)'}
+          </span>
+          <Switch checked={dockRole} onChange={setDockRole} />
+        </div>
+
+        <StageBox h={120}>
+          <Dock active={tab} onChange={setTab} role={dockRole ? 'member' : 'head'} />
+        </StageBox>
+
+        <div className={cn('text-micro', 'font-medium', 'text-sundo-ink-70')}>
+          현재 탭 <span id="dock-active">{tab}</span>
+        </div>
+      </Section>
+
+      <Section title="FOOTER — 전체형 / 축약형">
+        <Slot n="14a 전체형 — S10">
+          <div id="ft-full" className="-mx-[22px]">
+            <Footer variant="full" />
+          </div>
+        </Slot>
+
+        <Slot n="14b 축약형 — S1 · S2-1">
+          <div id="ft-compact" className="-mx-[22px]">
+            <Footer variant="compact" />
+          </div>
+        </Slot>
       </Section>
 
       <div className="h-6.5" />

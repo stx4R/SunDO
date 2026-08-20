@@ -27,6 +27,7 @@
   --color-sundo-border-light: rgba(255, 255, 255, 0.7);
   --color-sundo-divider: rgba(20, 53, 38, 0.06);
 
+  --color-sundo-tint-06: rgba(31, 81, 56, 0.06);
   --color-sundo-tint-08: rgba(31, 81, 56, 0.08);
   --color-sundo-tint-10: rgba(31, 81, 56, 0.1);
   --color-sundo-tint-12: rgba(31, 81, 56, 0.12);
@@ -34,7 +35,7 @@
   --color-sundo-ink-60: rgba(20, 53, 38, 0.6);
   --color-sundo-ink-70: rgba(20, 53, 38, 0.7);
 
-  /* §7.1 미수록 보완 토큰 5개 — 값을 새로 만든 것이 아니라
+  /* §7.1 미수록 보완 토큰 6개 — 값을 새로 만든 것이 아니라
      PRD 본문·Claude Design 산출물에서 반복 사용 중인 리터럴을 승격한 것. */
   --color-sundo-danger: #c0392b;
   --color-sundo-danger-active: #a93226;
@@ -101,11 +102,13 @@
    다중 속성 컴포넌트 스타일이므로 @utility가 아니라 @layer components.
    ============================================================ */
 @layer components {
-  /* 유리 카드. 내부 상단 하이라이트는 design/index.html에서 이식. */
+  /* 유리 카드. 내부 상단 하이라이트는 design/index.html에서 이식.
+     -webkit- 접두사는 손으로 적지 않는다. 함께 적으면 lightningcss가 둘을 같은
+     속성으로 보고 표준 선언을 지운다(빌드 산출물에 -webkit-만 남는다).
+     표준만 적으면 접두사판을 자동으로 덧붙인다. 보고서 §4-1. */
   .glass {
     background: var(--color-sundo-glass);
     backdrop-filter: blur(18px) saturate(160%);
-    -webkit-backdrop-filter: blur(18px) saturate(160%);
     border: 1px solid var(--color-sundo-border-light);
     box-shadow: var(--shadow-glass), inset 0 1px 0 rgba(255, 255, 255, 0.85);
   }
@@ -450,7 +453,7 @@
 
   /* 7 읽기 전용 */
   .ff-ro {
-    background: rgba(31, 81, 56, 0.06);
+    background: var(--color-sundo-tint-06);
     /* 테두리 "없음"은 투명으로 낸다. border: 0으로 지우면 padding box가 1px
        커져 라벨 좌측 기준선이 다른 상태와 어긋난다(§8 DoD 15). */
     border: 1px solid transparent;
@@ -471,7 +474,7 @@
 
   /* 테두리 없음은 유지하되 AC-09를 위해 포커스 링만 남긴다. */
   .ff-ro:focus-within {
-    background: rgba(31, 81, 56, 0.06);
+    background: var(--color-sundo-tint-06);
     box-shadow: 0 0 0 3px rgba(46, 107, 76, 0.12);
   }
 
@@ -556,6 +559,235 @@
   .sw-locked {
     opacity: 0.4;
   }
+
+  /* ==========================================================
+     등장 모션 (§7.4 `rise`) — design/index.html 원문
+     `animation:rise .5s ease both` + 지연. opacity가 원문에 함께 있어
+     PRD §7.4의 translateY 단독 표기 대신 원문을 따른다(지시서 §5).
+     ========================================================== */
+  .rise {
+    animation: rise 0.5s ease both;
+    /* 지연을 인라인 style로 주면 reduce 미디어 쿼리가 이길 수 없다.
+       커스텀 속성으로 받아 스타일시트끼리 겨루게 한다. */
+    animation-delay: var(--rise-delay, 0s);
+  }
+
+  /* ==========================================================
+     주 버튼 상태 (§6.3) — 로딩 스피너는 design 원문
+     `2px solid rgba(255,255,255,0.35)` + `border-top-color:#fff`.
+     .ff-spin과 크기·색만 다르고 spin 키프레임을 공유한다.
+     ========================================================== */
+  .btnp-spin {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.35);
+    border-top-color: #fff;
+    animation: spin 0.8s linear infinite;
+  }
+
+  /* 눌림 scale은 §7.4가 `0.92~0.95` 범위로만 적었고 design에 :active 규칙이
+     0건이라 범위 상단인 0.95로 확정했다(지시서 §6.5). */
+  .pill {
+    transition: transform 0.15s;
+  }
+
+  .pill:active {
+    transform: scale(0.95);
+  }
+
+  /* ==========================================================
+     하단 독 — PRD §6.2 + design `15a`~`15d`
+     스테이지(AppShell) 기준 absolute다. fixed로 두면 430px 밖 화면에서
+     좌우 18px이 뷰포트 기준이 되어 스테이지를 벗어난다.
+     여백은 AppShell이 hasDock으로 이미 소유한다. 여기서 만들지 않는다.
+     ========================================================== */
+  .dock {
+    position: absolute;
+    left: 18px;
+    right: 18px;
+    bottom: calc(env(safe-area-inset-bottom) + 16px);
+    z-index: 30;
+    box-sizing: border-box;
+    display: flex;
+    justify-content: space-around;
+    border-radius: var(--radius-28);
+    padding: 9px 8px;
+    background: var(--color-sundo-control);
+    backdrop-filter: blur(22px) saturate(170%);
+    border: 1px solid rgba(255, 255, 255, 0.75);
+    box-shadow:
+      0 14px 36px rgba(20, 53, 38, 0.16),
+      inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  }
+
+  /* 활성 배경 알약. 항목마다 배경을 켜고 끄면 슬라이드가 안 되므로
+     절대 위치 요소 **1개**를 이동시킨다(§7.4). */
+  .dock-pill {
+    position: absolute;
+    top: 9px;
+    bottom: 9px;
+    left: 0;
+    border-radius: var(--radius-16);
+    background: var(--color-sundo-tint-10);
+    pointer-events: none;
+  }
+
+  /* 첫 페인트에서 translateX(0)부터 미끄러지지 않도록 마운트 후에만 켠다. */
+  .dock-pill-anim {
+    transition: transform 0.24s var(--ease-sundo);
+  }
+
+  .dock-item {
+    position: relative;
+    width: 58px;
+    flex: none;
+    box-sizing: border-box;
+    padding: 7px 0 5px;
+    border-radius: var(--radius-16);
+    background: transparent;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+  }
+
+  /* 5탭에서 항목 사이가 8px 미만이면 폭을 54까지만 줄이고, 그래도 부족하면
+     아이콘을 19px로 줄인다. 라벨은 어떤 경우에도 축약하지 않는다(§7.3). */
+  .dock-tight .dock-item {
+    width: 54px;
+  }
+
+  .dock-tighter .dock-icon {
+    width: 19px;
+    height: 19px;
+  }
+
+  /* 아이콘은 currentColor로 그려져 있다. 색은 여기서만 제어한다. */
+  .dock-icon {
+    width: 21px;
+    height: 21px;
+    flex: none;
+    display: block;
+    color: rgba(20, 53, 38, 0.45);
+  }
+
+  .dock-item[data-active='true'] .dock-icon {
+    color: var(--color-sundo-800);
+    animation: dockPop 0.18s var(--ease-sundo) both;
+  }
+
+  .dock-label {
+    font-size: var(--text-dock);
+    font-weight: 500;
+    /* §6.2 원문. §15.2 AC-01(18px 미만 0.70 이상)과 충돌한다 — 보고서 §7 참조. */
+    color: rgba(20, 53, 38, 0.5);
+    line-height: 1;
+    white-space: nowrap;
+    transition:
+      color 0.15s,
+      font-weight 0.15s;
+  }
+
+  .dock-item[data-active='true'] .dock-label {
+    color: var(--color-sundo-800);
+    font-weight: 700;
+  }
+
+  /* ==========================================================
+     Footer — PRD §6.4 C6 + design `14a`~`14c`
+     배경을 깔지 않는다. 스테이지 그라디언트가 비친다.
+     ========================================================== */
+  .ft {
+    padding-left: 22px;
+    padding-right: 22px;
+    /* design 14a는 env()를 못 읽어 45px로 굳혔다. 링크 자체 padding 15px을
+       더한 60px이 safe-area 34px + 26px과 정확히 같다(보고서 §5). */
+    padding-bottom: calc(env(safe-area-inset-bottom) + 26px);
+  }
+
+  .ft-hr {
+    height: 1px;
+    background: var(--color-sundo-divider);
+  }
+
+  .ft-logo {
+    width: 32px;
+    height: 32px;
+    flex: none;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 6px 14px rgba(31, 81, 56, 0.16);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  /* 링크의 세로 44px은 시각 높이를 유지한 채 투명 패딩으로 만든다(C6).
+     패딩을 음수 마진으로 상쇄해 시각 높이를 14px로 되돌리고, 컨테이너가
+     같은 15px을 되돌려받는다. 이렇게 해야 320px에서 2줄로 접혔을 때
+     줄 간격이 30px이 아니라 규격대로 10px이 된다(design 14c). */
+  .ft-links {
+    padding: 15px 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    column-gap: 10px;
+    row-gap: 10px;
+  }
+
+  .ft-a {
+    padding: 15px 0;
+    margin-block: -15px;
+    font-size: var(--text-label);
+    font-weight: 700;
+    color: var(--color-sundo-700);
+    text-decoration: none;
+    line-height: 14px;
+    white-space: nowrap;
+  }
+
+  .ft-row {
+    display: flex;
+    align-items: center;
+    column-gap: 10px;
+  }
+
+  .ft-sep {
+    width: 1px;
+    height: 10px;
+    flex: none;
+    background: rgba(20, 53, 38, 0.18);
+  }
+
+  .ft-copy {
+    margin-top: 1px;
+    font-size: var(--text-micro);
+    font-weight: 500;
+    color: var(--color-sundo-ink-70);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* -9px + padding 15px = 저작권 줄과 시각 간격 6px (design 원문). */
+  .ft-dev {
+    margin-top: -9px;
+    display: inline-flex;
+    align-items: center;
+    padding: 15px 0;
+    font-size: var(--text-micro);
+    font-weight: 500;
+    color: var(--color-sundo-ink-70);
+    text-decoration: none;
+    line-height: 14px;
+  }
+
+  /* design 14a 원문: 공백 문자에 더해 좌측 3.5px. */
+  .ft-dev b {
+    margin-left: 3.5px;
+    font-weight: 700;
+    color: var(--color-sundo-700);
+  }
 }
 
 /* design/index.html 원문 그대로 — 수정 금지 */
@@ -614,6 +846,30 @@
   }
 }
 
+/* design/index.html 원문 그대로 — 카드·로고 등장.
+   PRD §7.4는 translateY만 적었으나 원문에 opacity가 함께 있어 원문을 따른다. */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* W-03B 신규 — §6.2 "새 탭 아이콘 scale(0.9)→1 0.18s". design 15d 노트에도
+   같은 값이 적혀 있으나 키프레임 원문은 없다. 이징은 §7.4 독 행의 값을 쓴다. */
+@keyframes dockPop {
+  from {
+    transform: scale(0.9);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
 /* W-03A 신규 — PRD §7.3·§7.4의 "필드 y -2→0 0.2s 정착". design에 원문 없음. */
 @keyframes settleY {
   from {
@@ -632,6 +888,21 @@
   }
   to {
     stroke-dashoffset: 0;
+  }
+}
+
+/* design `14c` — 정책 링크 3개가 한 줄에 안 들어가는 폭에서 2줄로 접는다.
+   좌측 정렬을 유지하고 줄 간격은 10px이다(§8.2-2). 줄바꿈 지점에 구분선이
+   남지 않도록 바깥 구분선만 숨긴다. 접힘 폭은 헤드리스 실측으로 잡았다. */
+@media (max-width: 380px) {
+  .ft-links-full {
+    flex-direction: column;
+    align-items: flex-start;
+    row-gap: 10px;
+  }
+
+  .ft-links-full > .ft-sep-outer {
+    display: none;
   }
 }
 
@@ -666,5 +937,14 @@
 
   .ff-msgwrap {
     transition: none;
+  }
+
+  /* AC-07 목록에 `rise`가 없다. 카드 등장은 화면 전환과 같은 범주라
+     정지가 아니라 0.01s로 줄인다(지시서 §5, 보고서 §4).
+     스태거 지연도 함께 없앤다 — 줄인 지속시간만으로는 마지막 카드가
+     여전히 0.5s 뒤에 나타난다. */
+  .rise {
+    animation-duration: 0.01s;
+    animation-delay: 0s;
   }
 }

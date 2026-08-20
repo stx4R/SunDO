@@ -119,8 +119,10 @@ export function Field({
   const inputRef = useRef<HTMLInputElement>(null)
   const shakeRef = useRef<HTMLDivElement>(null)
 
-  /* allowSuccess는 blur·제출처럼 "검증을 마친" 시점에만 켠다. 값이 바뀔 때마다 도는
-     재검사에서 켜면 타이핑 도중 성공 체크가 떠서 §5.5(blur 후 통과 시 표시)를 어긴다. */
+  /* allowSuccess는 blur에서만 켠다. 값이 바뀔 때마다 도는 재검사에서 켜면 타이핑 도중
+     성공 체크가 떠서 §5.5(blur 후 통과 시 표시)를 어긴다.
+     ref.validate()(제출)도 켜지 않는다 — 제출 시점의 주인공은 통과가 아니라 에러다
+     (W-03B 지시서 §1). 이미 켜져 있던 성공은 유지된다. */
   const runValidate = useCallback(
     (v: string, allowSuccess = false): boolean => {
       if (!validate) return true
@@ -134,7 +136,9 @@ export function Field({
       }
       errorRef.current = null
       setError(null)
-      setOk(allowSuccess)
+      /* 켜기만 한다. blur로 이미 성공한 필드를 ref.validate()가 끄면 안 된다.
+         해제는 값이 바뀔 때 handleChange가 담당한다. */
+      setOk((prev) => prev || allowSuccess)
       return true
     },
     [validate],
@@ -143,7 +147,7 @@ export function Field({
   useImperativeHandle(
     ref,
     () => ({
-      validate: () => runValidate(value, true),
+      validate: () => runValidate(value),
       focus: () => inputRef.current?.focus(),
     }),
     [runValidate, value],
