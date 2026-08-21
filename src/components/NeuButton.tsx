@@ -30,6 +30,9 @@ export function NeuButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
+      /* 네이티브 `disabled`만으로도 AT에 전달되지만, PRD §15.3·§8.2.6이
+         `aria-disabled="true"`를 명시한다. 둘을 함께 두는 것은 무해하다. */
+      aria-disabled={disabled || undefined}
       className={cn('neu', RADIUS[radius], disabled && 'opacity-45', className)}
     >
       {children}

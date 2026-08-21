@@ -192,7 +192,11 @@ export const router = createBrowserRouter([
               {
                 path: 'signup',
                 element: <Signup />,
-                handle: { allow: ['noProfile', 'withdrawn'] } satisfies RouteHandle,
+                /* BR-28 — 거절 계정은 재신청할 수 있다. S2-1의 `가입 코드 다시 입력`이
+                   여기로 오므로 `rejected`가 없으면 `/pending`으로 되튕긴다.
+                   **착지 표는 그대로다** — `rejected`의 기본 착지는 여전히 `/pending`이고,
+                   `allow` 확장은 "직접 이동이 허용된다"는 뜻일 뿐이다(§4). */
+                handle: { allow: ['noProfile', 'withdrawn', 'rejected'] } satisfies RouteHandle,
               },
               {
                 path: 'pending',

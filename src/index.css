@@ -1002,6 +1002,85 @@
   }
 
   /* ==========================================================
+     S2-1 승인 대기 — design `3a`~`3c` (R-03 델타 적용본)
+     ========================================================== */
+
+  /* 96px 유리 원 + 테두리 바깥 8px 글로우 링. `box-shadow`는 덧붙일 수 없으므로
+     `.glass`를 조합하지 않고 전체를 다시 적는다. 글로우 색만 변형이 바꾼다. */
+  .pend-badge {
+    display: flex;
+    width: 96px;
+    height: 96px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: var(--color-sundo-glass);
+    backdrop-filter: blur(18px) saturate(160%);
+    border: 1px solid var(--color-sundo-border-light);
+    box-shadow:
+      0 0 0 8px var(--pend-glow, var(--color-sundo-tint-10)),
+      var(--shadow-glass),
+      var(--highlight-top);
+  }
+
+  /* 상태 칩(A 전용). AC-03 — 색만으로 의미를 전달하지 않도록 점 + 텍스트 병기다. */
+  .pend-chip {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    border-radius: var(--radius-pill);
+    padding: 7px 14px;
+    background: var(--color-sundo-tint-10);
+  }
+
+  /* `.splash-dot`과 같은 규격이지만 스태거 지연이 없다. §7.4 원문은 `ease`다
+     (design 3a의 `ease-in-out`은 W-05 §5.2에서 이미 PRD로 정리했다). */
+  .pend-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--color-sundo-700);
+    animation: pulseDot 1.6s ease infinite;
+  }
+
+  /* 신원 요약 줄(R-03 델타 1 — 세 변형 공통). */
+  .pend-id {
+    display: flex;
+    align-items: center;
+    border-radius: var(--radius-pill);
+    padding: 7px 14px;
+    background: var(--color-sundo-tint-06);
+  }
+
+  .pend-avatar {
+    display: flex;
+    width: 22px;
+    height: 22px;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: var(--gradient-primary);
+  }
+
+  /* design 3c — 확인 중에는 버튼을 **눌린 상태**로 둔다(흐리게가 아니다).
+     값은 design 3c(5px/12px)가 아니라 PRD §7.3이 규정한 `.neu:active`와 맞춘다 —
+     같은 표면의 눌림 표현이 두 벌 생기면 갈라진다(보고서 §5-3). */
+  .pend-busy {
+    box-shadow:
+      inset 7px 7px 16px rgba(20, 53, 38, 0.1),
+      inset -7px -7px 16px rgba(255, 255, 255, 0.95),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.6);
+  }
+
+  /* design 3c 원문 — S2-1 스피너는 CSS 테두리가 아니라 **SVG 원호**다.
+     회전부 `#1F5138`·트랙 `rgba(31,81,56,0.22)`로 S1(`#2E6B4C` 계열)과 색이 다르다.
+     회전만 여기서 주고 색은 SVG가 갖는다(§8 — 트랙 색이 달라 토큰 승격 안 함). */
+  .pend-spin {
+    animation: spin 0.8s linear infinite;
+  }
+
+  /* ==========================================================
      오버레이 3종 — 토스트 · 바텀시트 · 확인 모달
      전부 AppShell 스테이지 안(`absolute`)에 뜬다. `fixed`로 두면 430px 밖
      화면에서 스테이지를 벗어난다(W-03B §4-9와 같은 이유).
@@ -1430,7 +1509,8 @@
 
   /* AC-07이 `pulseDot`을 **정지** 대상으로 명시한다. 스피너와 갈리는 지점이다 —
      스플래시 점은 "진행 중"을 알리는 유일한 수단이 아니다(로고·타이틀이 이미 있다). */
-  .splash-dot {
+  .splash-dot,
+  .pend-dot {
     animation: none;
   }
 

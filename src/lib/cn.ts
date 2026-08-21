@@ -13,6 +13,11 @@ const twMerge = extendTailwindMerge({
           text: [
             'h1',
             'h2',
+            /* W-06에서 @theme에 추가한 뒤 여기 등록이 빠져 있었다(W-07 §5-6).
+               등록하지 않으면 tailwind-merge가 `text-brand`를 **색**으로 보고
+               `text-sundo-900`과 같은 그룹으로 묶어 뒤엣것만 남긴다. */
+            'brand',
+            'subtitle',
             'sheet',
             'grade',
             'classno',

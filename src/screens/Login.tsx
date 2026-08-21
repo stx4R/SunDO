@@ -213,7 +213,7 @@ export default function Login() {
                 <button
                   type="button"
                   className="s1-chip-x"
-                  aria-label="거절된 계정 지우기"
+                  aria-label="거절된 계정 안내 닫기"
                   onClick={clearRejection}
                 >
                   <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">

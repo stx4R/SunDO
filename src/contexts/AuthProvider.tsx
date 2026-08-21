@@ -73,6 +73,19 @@ export interface AuthContextValue {
   signIn: () => Promise<void>
   signOut: () => Promise<void>
   clearRejection: () => void
+  /**
+   * 현재 로그인된 사용자로 판정을 **다시 돌린다**(W-07 §3 — A안).
+   *
+   * 판정 로직을 새로 쓰지 않고 `resolve()`를 재사용하므로, W-17이 `getDoc` 경로를
+   * 고치면 이 경로도 함께 고쳐진다. `throw`하지 않는다.
+   *
+   * **실패해도 `status`를 흔들지 않는다** — 폴링 1회 실패에 사용자가 화면 밖으로
+   * 튕기면 안 된다. 미인증 상태에서는 아무 것도 하지 않는다(재인증 유발 금지).
+   *
+   * 🔴 **W-12에서 `onSnapshot`으로 전환하면 이것과 S2-1의 폴링 루프를 함께 걷어내야 한다.**
+   * 구독이 들어오면 수동 재조회와 30초 폴링은 중복이 된다. 지금 심는 부채다.
+   */
+  refresh: () => Promise<void>
 }
 
 /**
@@ -114,6 +127,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
      `clearRejection()`이 불릴 때까지 살아남는 래치로 따로 들고 있는다. */
   const rejectionRef = useRef<string | null>(null)
 
+  /* W-07 §3.2 규칙 4 — 재조회 재진입 빗장. `useState`로는 같은 태스크 안의
+     동시 호출을 막지 못한다(리렌더 전이라 전부 옛 값을 본다 — W-06 §5-4).
+     동기적으로 즉시 서는 ref여야 한다. */
+  const refreshingRef = useRef(false)
+
   useEffect(() => {
     let cancelled = false
 
@@ -141,135 +159,148 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  /** 인증된 사용자 1명에 대한 판정. §6.1 인증 분기 규칙 표와 1:1이다. */
-  const resolve = useCallback(async (user: User | null, stale: () => boolean) => {
-    if (!user) {
-      setProfile(null)
-      setParsed(null)
-      if (rejectionRef.current) {
-        /* 거절 직후의 로그아웃이다. 판정을 되돌리지 않는다. */
-        setRejectedEmail(rejectionRef.current)
+  /**
+   * 인증된 사용자 1명에 대한 판정. §6.1 인증 분기 규칙 표와 1:1이다.
+   *
+   * `silent`는 **조회 실패 시 판정을 흔들지 않는다**는 뜻이다(W-07 §3.2 규칙 3).
+   * 재조회(`refresh()`)는 이미 화면이 떠 있는 상태에서 도는데, 실패를 `loading`으로
+   * 떨어뜨리면 `AuthGate`가 스플래시를 씌워 S2-1이 30초마다 사라진다.
+   */
+  const resolve = useCallback(
+    async (user: User | null, stale: () => boolean, options?: { silent?: boolean }) => {
+      if (!user) {
+        setProfile(null)
+        setParsed(null)
+        if (rejectionRef.current) {
+          /* 거절 직후의 로그아웃이다. 판정을 되돌리지 않는다. */
+          setRejectedEmail(rejectionRef.current)
+          setStatus('domainRejected')
+          return
+        }
+        setStatus('signedOut')
+        return
+      }
+
+      const email = (user.email ?? '').toLowerCase()
+
+      /* 도메인 3중 방어의 2차. `hd` 힌트(1차)는 강제가 아니라 여기서 다시 본다. */
+      if (!SCHOOL_DOMAIN.test(email)) {
+        /* 삭제·로그아웃보다 **먼저** 래치를 세운다. 아래 두 호출 사이에
+           `onAuthStateChanged(null)`이 끼어들어도 거절 판정이 살아남아야 한다. */
+        rejectionRef.current = email
+
+        /* 순서 주의 — `signOut`을 먼저 하면 권한이 사라져 계정이 그대로 남는다.
+           `deleteUser`는 `auth/requires-recent-login`으로 실패할 수 있는데,
+           실패해도 **반드시 로그아웃은 한다.** */
+        try {
+          await deleteUser(user)
+        } catch (error: unknown) {
+          const code = (error as { code?: string })?.code ?? 'auth/delete-user-failed'
+          console.warn('[auth] 도메인 거절 계정 삭제 실패 — 로그아웃만 수행한다:', code)
+          setErrorCode(code)
+        }
+        try {
+          await firebaseSignOut(auth)
+        } catch {
+          /* 로그아웃까지 실패하면 다음 onAuthStateChanged가 다시 판정한다. */
+        }
+        if (stale()) return
+        setProfile(null)
+        setParsed(null)
+        setRejectedEmail(email)
         setStatus('domainRejected')
         return
       }
-      setStatus('signedOut')
-      return
-    }
 
-    const email = (user.email ?? '').toLowerCase()
+      /* 도메인이 정상인 계정으로 들어왔다. 이전 거절 배너는 더 이상 유효하지 않다. */
+      rejectionRef.current = null
+      setRejectedEmail(null)
 
-    /* 도메인 3중 방어의 2차. `hd` 힌트(1차)는 강제가 아니라 여기서 다시 본다. */
-    if (!SCHOOL_DOMAIN.test(email)) {
-      /* 삭제·로그아웃보다 **먼저** 래치를 세운다. 아래 두 호출 사이에
-         `onAuthStateChanged(null)`이 끼어들어도 거절 판정이 살아남아야 한다. */
-      rejectionRef.current = email
+      const raw = user.displayName ?? ''
+      const parsedName = parseDisplayName(raw)
+      if (stale()) return
+      setParsed(parsedName)
 
-      /* 순서 주의 — `signOut`을 먼저 하면 권한이 사라져 계정이 그대로 남는다.
-         `deleteUser`는 `auth/requires-recent-login`으로 실패할 수 있는데,
-         실패해도 **반드시 로그아웃은 한다.** */
+      const ref = doc(db, 'users', user.uid)
+      let snapshot
       try {
-        await deleteUser(user)
+        snapshot = await getDoc(ref)
       } catch (error: unknown) {
-        const code = (error as { code?: string })?.code ?? 'auth/delete-user-failed'
-        console.warn('[auth] 도메인 거절 계정 삭제 실패 — 로그아웃만 수행한다:', code)
+        /* **조회 실패는 `noProfile`이 아니다.** 문서가 없는 것(`exists() === false`)과
+           읽지 못한 것(`permission-denied`·네트워크·규칙 미게시)을 같게 다루면
+           오프라인이나 규칙 오류일 때 활성 부원이 가입 신청 화면으로 튕긴다.
+           판정을 확정하지 않고(`loading`) 이유만 `errorCode`로 넘긴다 —
+           스플래시 3초 타임아웃(§8.1.5)과 오류 화면은 W-06이 붙인다. */
+        const code = (error as { code?: string })?.code ?? 'firestore/get-profile-failed'
         setErrorCode(code)
-      }
-      try {
-        await firebaseSignOut(auth)
-      } catch {
-        /* 로그아웃까지 실패하면 다음 onAuthStateChanged가 다시 판정한다. */
+        if (stale()) return
+        /* 재조회는 **판정을 흔들지 않는다**(W-07 §3.2 규칙 2·3).
+           이미 확정된 상태를 `loading`으로 되돌리면 스플래시가 화면을 덮고,
+           `profile`을 비우면 신원 요약 줄이 사라진다. 이유는 `errorCode`로만 넘긴다. */
+        if (options?.silent) return
+        setProfile(null)
+        setStatus('loading')
+        return
       }
       if (stale()) return
-      setProfile(null)
-      setParsed(null)
-      setRejectedEmail(email)
-      setStatus('domainRejected')
-      return
-    }
 
-    /* 도메인이 정상인 계정으로 들어왔다. 이전 거절 배너는 더 이상 유효하지 않다. */
-    rejectionRef.current = null
-    setRejectedEmail(null)
+      if (!snapshot.exists()) {
+        setProfile(null)
+        setStatus('noProfile')
+        return
+      }
 
-    const raw = user.displayName ?? ''
-    const parsedName = parseDisplayName(raw)
-    if (stale()) return
-    setParsed(parsedName)
+      const next = snapshot.data() as UserProfile
 
-    const ref = doc(db, 'users', user.uid)
-    let snapshot
-    try {
-      snapshot = await getDoc(ref)
-    } catch (error: unknown) {
-      /* **조회 실패는 `noProfile`이 아니다.** 문서가 없는 것(`exists() === false`)과
-         읽지 못한 것(`permission-denied`·네트워크·규칙 미게시)을 같게 다루면
-         오프라인이나 규칙 오류일 때 활성 부원이 가입 신청 화면으로 튕긴다.
-         판정을 확정하지 않고(`loading`) 이유만 `errorCode`로 넘긴다 —
-         스플래시 3초 타임아웃(§8.1.5)과 오류 화면은 W-06이 붙인다. */
-      const code = (error as { code?: string })?.code ?? 'firestore/get-profile-failed'
-      setErrorCode(code)
-      if (stale()) return
-      setProfile(null)
-      setStatus('loading')
-      return
-    }
-    if (stale()) return
-
-    if (!snapshot.exists()) {
-      setProfile(null)
-      setStatus('noProfile')
-      return
-    }
-
-    const next = snapshot.data() as UserProfile
-
-    /* DR-12 — 로그인할 때마다 재파싱해 표시 이름 변화를 따라간다.
-       DR-13: `manual` 계정은 제외한다. 수동 입력값을 자동 파싱이 덮으면 안 된다.
-       `PROFILE_SYNC` 감사 로그는 스키마·Rules가 없어 W-15 이후다(보고서 §8). */
-    if (next.nameSource !== 'manual' && next.displayNameRaw !== raw) {
-      try {
-        if (parsedName.ok) {
-          await updateDoc(ref, {
-            displayNameRaw: raw,
-            name: parsedName.name,
-            memberStudentNo: parsedName.memberStudentNo,
-            memberGrade: parsedName.memberGrade,
-            memberClassNo: parsedName.memberClassNo,
-            memberNumber: parsedName.memberNumber,
-            updatedAt: serverTimestamp(),
-          })
-          next.displayNameRaw = raw
-          next.name = parsedName.name
-          next.memberStudentNo = parsedName.memberStudentNo
-          next.memberGrade = parsedName.memberGrade
-          next.memberClassNo = parsedName.memberClassNo
-          next.memberNumber = parsedName.memberNumber
-        } else {
-          /* 파싱이 실패한 표시 이름으로 기존 이름을 지우지 않는다.
-             원문만 갱신해 롤오버 감지가 가능하게 두고, 이름 재입력은 W-06 S2가 다룬다. */
-          console.warn('[auth] 표시 이름 파싱 실패 — 원문만 갱신한다:', parsedName.reason)
-          await updateDoc(ref, { displayNameRaw: raw, updatedAt: serverTimestamp() })
-          next.displayNameRaw = raw
+      /* DR-12 — 로그인할 때마다 재파싱해 표시 이름 변화를 따라간다.
+         DR-13: `manual` 계정은 제외한다. 수동 입력값을 자동 파싱이 덮으면 안 된다.
+         `PROFILE_SYNC` 감사 로그는 스키마·Rules가 없어 W-15 이후다(보고서 §8). */
+      if (next.nameSource !== 'manual' && next.displayNameRaw !== raw) {
+        try {
+          if (parsedName.ok) {
+            await updateDoc(ref, {
+              displayNameRaw: raw,
+              name: parsedName.name,
+              memberStudentNo: parsedName.memberStudentNo,
+              memberGrade: parsedName.memberGrade,
+              memberClassNo: parsedName.memberClassNo,
+              memberNumber: parsedName.memberNumber,
+              updatedAt: serverTimestamp(),
+            })
+            next.displayNameRaw = raw
+            next.name = parsedName.name
+            next.memberStudentNo = parsedName.memberStudentNo
+            next.memberGrade = parsedName.memberGrade
+            next.memberClassNo = parsedName.memberClassNo
+            next.memberNumber = parsedName.memberNumber
+          } else {
+            /* 파싱이 실패한 표시 이름으로 기존 이름을 지우지 않는다.
+               원문만 갱신해 롤오버 감지가 가능하게 두고, 이름 재입력은 W-06 S2가 다룬다. */
+            console.warn('[auth] 표시 이름 파싱 실패 — 원문만 갱신한다:', parsedName.reason)
+            await updateDoc(ref, { displayNameRaw: raw, updatedAt: serverTimestamp() })
+            next.displayNameRaw = raw
+          }
+        } catch (error: unknown) {
+          const code = (error as { code?: string })?.code ?? 'firestore/profile-sync-failed'
+          console.warn('[auth] 프로필 동기화 실패 — 조회 값으로 진행한다:', code)
+          setErrorCode(code)
         }
-      } catch (error: unknown) {
-        const code = (error as { code?: string })?.code ?? 'firestore/profile-sync-failed'
-        console.warn('[auth] 프로필 동기화 실패 — 조회 값으로 진행한다:', code)
-        setErrorCode(code)
+        if (stale()) return
       }
-      if (stale()) return
-    }
 
-    /* PRD DR-10 — MVP 유보(W-04 결정).
-       교차 검증(이메일 입학 연도 ↔ 표시 이름 학년)은 이메일 로컬 파트를 분해해야 한다.
-       산출물이 아무도 읽지 않는 `console.warn` 하나이고, PRD가 유급·전입을 정당한 예외로
-       인정하므로 오탐이 기본값에 가깝다. 이득 0 대비 "로컬 파트를 분해하는 코드 경로"가
-       생기는 비용만 남는다 — 앞 2자리를 읽는 코드는 뒤 4자리(생일, DR-14·PR-05)로
-       확장하기 쉽다. 학번 신선도는 DR-12 재파싱이 이미 덮는다.
-       **되살리지 마라.** 되살리려면 W-04 결정을 먼저 뒤집어야 한다. */
+      /* PRD DR-10 — MVP 유보(W-04 결정).
+         교차 검증(이메일 입학 연도 ↔ 표시 이름 학년)은 이메일 로컬 파트를 분해해야 한다.
+         산출물이 아무도 읽지 않는 `console.warn` 하나이고, PRD가 유급·전입을 정당한 예외로
+         인정하므로 오탐이 기본값에 가깝다. 이득 0 대비 "로컬 파트를 분해하는 코드 경로"가
+         생기는 비용만 남는다 — 앞 2자리를 읽는 코드는 뒤 4자리(생일, DR-14·PR-05)로
+         확장하기 쉽다. 학번 신선도는 DR-12 재파싱이 이미 덮는다.
+         **되살리지 마라.** 되살리려면 W-04 결정을 먼저 뒤집어야 한다. */
 
-    setProfile(next)
-    setStatus(next.status)
-  }, [])
+      setProfile(next)
+      setStatus(next.status)
+    },
+    [],
+  )
 
   const signIn = useCallback(async () => {
     setErrorCode(null)
@@ -303,6 +334,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await firebaseSignOut(auth)
   }, [])
 
+  /**
+   * W-07 §3 — S2-1 승인 감지(수동 `승인 확인` + 30초 폴링)가 쓰는 재조회.
+   *
+   * **폴링 주기는 여기 두지 않는다.** 화면마다 정책이 다르므로 화면이 소유한다(§6.1).
+   */
+  const refresh = useCallback(async () => {
+    /* 규칙 5 — 미인증(`signedOut`·`domainRejected`)에서는 아무 것도 하지 않는다.
+       `currentUser`가 null인 것이 곧 그 두 상태다. 재인증을 유발하지 마라. */
+    const user = auth.currentUser
+    if (!user) return
+
+    /* 규칙 4 — 동시 호출은 1회만 돈다. */
+    if (refreshingRef.current) return
+    refreshingRef.current = true
+
+    try {
+      /* 진행 중이던 판정보다 이 재조회가 최신이다. 시퀀스를 올려 앞선 것을 무효화한다. */
+      const mine = ++seqRef.current
+      await resolve(user, () => mine !== seqRef.current, { silent: true })
+    } catch (error: unknown) {
+      /* 규칙 6 — `throw`하지 않는다. 호출부에 `catch`를 요구하지 않는 계약이다.
+         `resolve`는 내부에서 전부 잡으므로 여기 오면 예상 밖이다. 삼키지 말고 남긴다. */
+      console.warn('[auth] refresh 실패:', error)
+    } finally {
+      refreshingRef.current = false
+    }
+  }, [resolve])
+
   /** T-06 — 거절 칩 X. 배너·칩만 지우고 로그인 화면 기본 상태로 돌린다. */
   const clearRejection = useCallback(() => {
     rejectionRef.current = null
@@ -312,8 +371,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const value = useMemo<AuthContextValue>(
-    () => ({ status, profile, parsed, rejectedEmail, errorCode, signIn, signOut, clearRejection }),
-    [status, profile, parsed, rejectedEmail, errorCode, signIn, signOut, clearRejection],
+    () => ({
+      status,
+      profile,
+      parsed,
+      rejectedEmail,
+      errorCode,
+      signIn,
+      signOut,
+      clearRejection,
+      refresh,
+    }),
+    [status, profile, parsed, rejectedEmail, errorCode, signIn, signOut, clearRejection, refresh],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
