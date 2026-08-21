@@ -161,7 +161,9 @@ export default function Pending() {
           <span
             className="pend-badge"
             style={
-              rejected ? ({ '--pend-glow': 'rgba(192,57,43,0.10)' } as CSSProperties) : undefined
+              rejected
+                ? ({ '--pend-glow': 'var(--color-sundo-tint-danger-10)' } as CSSProperties)
+                : undefined
             }
           >
             {rejected ? <RejectedIcon /> : <HourglassIcon />}

@@ -3,6 +3,7 @@ import {
   useEffect,
   useId,
   useImperativeHandle,
+  useLayoutEffect,
   useRef,
   useState,
   type ReactNode,
@@ -14,6 +15,16 @@ export interface FieldProps {
   label: string
   value: string
   onChange: (v: string) => void
+  /**
+   * 입력 중 값을 **변형**한다(대문자화·구분자 자동 삽입 등). 순수 함수를 넘겨라.
+   *
+   * 제어 컴포넌트에서 값을 바꿔 다시 내려보내면 브라우저가 캐럿을 문자열 끝으로
+   * 민다 — 중간을 고치던 사용자는 커서가 튀는 것을 본다. 그래서 변형 결과와 함께
+   * **새 캐럿 위치**를 돌려받아 `Field`가 직접 복원한다(§7.3 · W-08 §2.2).
+   * 값 변형이 필요한 입력은 앞으로도 나오므로(S6 기타 사유 · S9 검색) 화면마다
+   * `input` 요소를 따로 만지지 않도록 여기서 한 번에 처리한다.
+   */
+  transform?: (raw: string, caret: number) => { value: string; caret: number }
   /** null = 통과, string = 에러 문구. 주지 않으면 성공 상태가 없다. */
   validate?: (v: string) => string | null
   /** 서버 확인 중 → 상태 6 */
@@ -36,6 +47,14 @@ export interface FieldHandle {
   /** 제출 시 폼이 호출한다. */
   validate: () => boolean
   focus: () => void
+  /**
+   * 성공·실패 표시를 지우고 **검증 이전 상태**로 되돌린다. 값은 건드리지 않는다.
+   *
+   * 서버 조회가 **실패**했을 때 쓴다 — 통과도 실패도 아닌 "판정 없음"을 표시할
+   * 방법이 필요하다. 조회 실패를 실패 판정으로 그리면 정상 값에 에러가 붙고,
+   * 그대로 두면 blur가 켜 둔 성공 체크가 거짓말이 된다(W-08 §3.1).
+   */
+  reset: () => void
 }
 
 /* design/index.html 원문 SVG. 전부 장식이므로 aria-hidden이다(§15.3). */
@@ -94,6 +113,7 @@ export function Field({
   label,
   value,
   onChange,
+  transform,
   validate,
   checking = false,
   readOnly = false,
@@ -118,6 +138,8 @@ export function Field({
   const errorRef = useRef<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const shakeRef = useRef<HTMLDivElement>(null)
+  /* 변형이 돌아간 입력에서만 채워진다. 복원 후 즉시 비운다. */
+  const caretRef = useRef<number | null>(null)
 
   /* allowSuccess는 blur에서만 켠다. 값이 바뀔 때마다 도는 재검사에서 켜면 타이핑 도중
      성공 체크가 떠서 §5.5(blur 후 통과 시 표시)를 어긴다.
@@ -149,9 +171,28 @@ export function Field({
     () => ({
       validate: () => runValidate(value),
       focus: () => inputRef.current?.focus(),
+      reset: () => {
+        errorRef.current = null
+        setError(null)
+        setOk(false)
+      },
     }),
     [runValidate, value],
   )
+
+  /* 캐럿 복원. 그리기 전에 끝나야 커서가 한 프레임 튀지 않으므로 layout 효과다.
+     의존성 배열이 없는 것이 의도다 — 변형 결과가 직전 값과 같으면 React가
+     리렌더를 건너뛸 수 있고, 그때는 아래 `el.value` 되돌리기가 유일한 복구 경로다. */
+  useLayoutEffect(() => {
+    const caret = caretRef.current
+    if (caret === null) return
+    caretRef.current = null
+    const el = inputRef.current
+    if (!el) return
+    /* 버려진 입력(9자 초과 등)은 상태가 그대로라 DOM에만 원문이 남는다. */
+    if (el.value !== value) el.value = value
+    el.setSelectionRange(caret, caret)
+  })
 
   /* CSS 애니메이션 재시작. className은 React가 관리하지 않는 전용 래퍼에 붙인다. */
   useEffect(() => {
@@ -163,7 +204,13 @@ export function Field({
     el.classList.add('ff-shake')
   }, [errorSeq])
 
-  const handleChange = (v: string) => {
+  const handleChange = (raw: string, caret: number) => {
+    let v = raw
+    if (transform) {
+      const next = transform(raw, caret)
+      v = next.value
+      caretRef.current = next.caret
+    }
     onChange(v)
     /* 성공은 "blur 후 통과" 상태다. 값이 바뀌면 해제하고 다음 blur에서 다시 판단한다. */
     if (ok) setOk(false)
@@ -191,7 +238,7 @@ export function Field({
             ref={inputRef}
             id={inputId}
             value={value}
-            onChange={(e) => handleChange(e.target.value)}
+            onChange={(e) => handleChange(e.target.value, e.target.selectionStart ?? e.target.value.length)}
             onBlur={() => runValidate(value, true)}
             /* 라벨 부상을 CSS만으로 처리하려면 placeholder가 항상 비어 있지 않아야 한다. */
             placeholder={placeholder ?? ' '}

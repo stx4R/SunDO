@@ -32,6 +32,11 @@
   --color-sundo-tint-10: rgba(31, 81, 56, 0.1);
   --color-sundo-tint-12: rgba(31, 81, 56, 0.12);
 
+  /* danger 10% 틴트. `.s1-banner` 배경(W-06) · `.pend-badge` B 글로우(W-07) ·
+     `.s2-banner` 배경(W-08) **3곳**이 같은 값을 쓴다 — W-03B §3 기준(2곳 이상)을
+     넘겼으므로 승격했다. 리터럴로 다시 적지 마라. */
+  --color-sundo-tint-danger-10: rgba(192, 57, 43, 0.1);
+
   --color-sundo-ink-45: rgba(20, 53, 38, 0.45);
   --color-sundo-ink-60: rgba(20, 53, 38, 0.6);
   --color-sundo-ink-70: rgba(20, 53, 38, 0.7);
@@ -968,7 +973,7 @@
     gap: 9px;
     border-radius: var(--radius-12);
     padding: 11px 13px;
-    background: rgba(192, 57, 43, 0.1);
+    background: var(--color-sundo-tint-danger-10);
   }
 
   /* design 12c 원문. 44px 터치 타깃은 칩이 아니라 **행**이 갖는다. */
@@ -1078,6 +1083,112 @@
      회전만 여기서 주고 색은 SVG가 갖는다(§8 — 트랙 색이 달라 토큰 승격 안 함). */
   .pend-spin {
     animation: spin 0.8s linear infinite;
+  }
+
+  /* ==========================================================
+     S2 가입 신청 — design `13a`~`13e` (R-02 적용본) · `20d`·`20e`
+     ========================================================== */
+
+  /* 좌상단 뒤로 버튼. 시각 38px을 유지한 채 44×44 터치 타깃은 **행**이 갖는다
+     (S1 거절 칩 X와 같은 방식 — §15.1). 눌림은 design `13a`의 `scale(0.97)`이
+     아니라 PRD §8.2.2가 명시한 `scale(0.92)`다(보고서 §5). */
+  .s2-back {
+    display: flex;
+    width: 44px;
+    height: 44px;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    margin-left: -3px;
+    transition: transform 0.15s;
+  }
+
+  .s2-back:active {
+    transform: scale(0.92);
+  }
+
+  .s2-back > span {
+    display: flex;
+    width: 38px;
+    height: 38px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: var(--color-sundo-control);
+    backdrop-filter: blur(18px) saturate(160%);
+    border: 1px solid rgba(255, 255, 255, 0.75);
+    box-shadow:
+      0 6px 18px rgba(20, 53, 38, 0.08),
+      var(--highlight-top);
+  }
+
+  /* 신원 카드 아바타. 사진이 아니라 **이름 첫 글자**다(NG-13). */
+  .s2-avatar {
+    display: flex;
+    width: 48px;
+    height: 48px;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: var(--gradient-primary);
+  }
+
+  /* `학교 계정 확인됨`. 터치 대상이 아니라 높이만 26px로 고정한다.
+     `.chip`(padding 6px 12px)과 규격이 달라 재사용하지 않는다. */
+  .s2-chip {
+    display: flex;
+    height: 26px;
+    flex: none;
+    align-items: center;
+    gap: 5px;
+    border-radius: var(--radius-pill);
+    padding: 0 10px;
+    background: var(--color-sundo-tint-10);
+  }
+
+  /* EC-39 재가입 안내(design `20e`). 정보 배너라 danger가 아니라 녹색 틴트다. */
+  .s2-rejoin {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    border-radius: var(--radius-12);
+    padding: 11px 13px;
+    background: var(--color-sundo-tint-08);
+  }
+
+  /* T-06 제출 실패 · ER-01 조회 실패 배너. `.s1-banner`와 같은 형태지만
+     화면별 클래스 규약(`.s1-*`·`.pend-*`)을 따라 따로 둔다 — S1의 배너가
+     2줄 변형을 갖고 있어 한쪽을 고치면 다른 화면이 함께 움직인다. */
+  .s2-banner {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    border-radius: var(--radius-12);
+    padding: 11px 13px;
+    background: var(--color-sundo-tint-danger-10);
+  }
+
+  /* ER-14 이름 폴백 안내(design `20d`). 카드 밖 본문 줄이라 배경이 없다. */
+  .s2-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  /* §8.2.2 #7 — **값 텍스트만** 자간 0.1em + 대문자 + tabular-nums.
+     라벨(`.ff label`)은 대상이 아니므로 `input`만 고른다.
+     `.ff-num`은 inputMode가 숫자일 때만 붙는데 가입 코드는 영문+숫자라 못 쓴다. */
+  .s2-code input {
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* 변형 E — 카드 전체가 0.6이라 `Field`의 `submitting`(0.6)을 함께 쓰면
+     0.36으로 겹쳐 필드만 더 흐려진다. 커서만 여기서 세운다. */
+  .s2-busy input {
+    caret-color: transparent;
   }
 
   /* ==========================================================

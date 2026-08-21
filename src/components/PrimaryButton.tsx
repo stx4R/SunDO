@@ -26,6 +26,9 @@ export function PrimaryButton({
       onClick={onClick}
       /* 로딩 중 재탭 차단도 여기서 함께 처리한다. */
       disabled={disabled || loading}
+      /* 네이티브 `disabled`를 보조 기술에 그대로 반영한다(§8 · W-07 §5-7의 `NeuButton`과 같은 줄).
+         값을 새로 만들지 않으므로 부작용이 없다. */
+      aria-disabled={disabled || loading || undefined}
       aria-busy={loading || undefined}
       /* 로딩 중에는 텍스트가 없으므로 접근 가능한 이름을 여기서 유지한다. */
       aria-label={label}
