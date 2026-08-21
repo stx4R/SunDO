@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router'
 import { BrandLogo } from '../components/BrandLogo'
 import { Footer } from '../components/Footer'
 import { GlassCard } from '../components/GlassCard'
-import { OfflineBanner } from '../components/OfflineBanner'
 import { useToast } from '../components/Toast'
 import { useAuth } from '../contexts/AuthProvider'
 import { useOnline } from '../lib/useOnline'
@@ -128,7 +127,8 @@ export default function Login() {
       aria-labelledby="scr-s1"
       className="flex min-h-full flex-col"
     >
-      {!online && <OfflineBanner />}
+      {/* W-09 — 오프라인 배너는 `AppShell`이 전역 1개로 그린다. 여기서 다시 그리면
+          `.ofb`가 2개가 된다. `online`은 버튼 상태와 안내 줄에 계속 쓴다(§4.1). */}
 
       {/* design 12a — `flex:1`로 남는 공간을 먹고 그 안에서 세로 중앙 정렬한다.
           Footer는 흐름의 마지막이라 늘 최하단이다. */}
