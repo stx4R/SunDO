@@ -39,6 +39,12 @@ export interface RouteHandle {
   allow?: readonly AuthStatus[]
   /** 하단 독을 노출하는 라우트(§6.2 — S3·S7·S8·S9·S10) */
   hasDock?: boolean
+  /**
+   * 인증 판정(N-05 스플래시)을 기다리지 않고 바로 렌더하는 라우트.
+   * **정책 3종뿐이다**(EC-44 · W-06 §0.1-3). 다른 라우트에 붙이지 마라 —
+   * 로그인 화면이 한 프레임 깜빡이는 것이 N-05가 막으려던 것이다.
+   */
+  skipsAuthGate?: boolean
 }
 
 export function RequireAuth() {

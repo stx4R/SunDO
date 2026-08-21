@@ -74,14 +74,24 @@ function RootLayout() {
 /**
  * N-05 — 판정 전에는 스플래시만 남기고 **어떤 화면도 렌더하지 않는다.**
  * `<Outlet />`을 조건 없이 그리면 로그인 화면이 한 프레임 깜빡인다.
+ *
+ * **예외는 정책 3종뿐이다**(EC-44 · W-06 §0.1-3). EC-44의 목적은 "정책 문서는
+ * 언제나 도달 가능해야 한다"인데, 로그인된 계정이 오프라인이면 판정이 3초 뒤
+ * 오류 화면으로 끝나 정책 문서에 영영 닿지 못한다. 스플래시가 가드가 아니어도
+ * 결과적으로 도달을 막으면 EC-44 위반과 구분되지 않는다.
  */
 function AuthGate({ onRetry }: { onRetry: () => void }) {
   const { status, profile, errorCode } = useAuth()
+  const matches = useMatches()
 
   /* §9.3.1 — 활성 계정만, 1시간 스로틀. */
   useLastActiveAt(status === 'active' ? (profile?.uid ?? null) : null)
 
-  if (status === 'loading') return <Splash errorCode={errorCode} onRetry={onRetry} />
+  const skipsGate = matches.some((m) => (m.handle as RouteHandle | undefined)?.skipsAuthGate)
+
+  if (status === 'loading' && !skipsGate) {
+    return <Splash errorCode={errorCode} onRetry={onRetry} />
+  }
   return <Outlet />
 }
 
@@ -154,10 +164,12 @@ export const router = createBrowserRouter([
     path: '/',
     element: <RootLayout />,
     children: [
-      /* EC-44 — 정책 3종은 가드 **바깥**이다. 미인증 상태로 직접 URL 진입해도
-         정상 렌더해야 한다. S1 Footer에서 들어오는 경로이기 때문이다. */
+      /* EC-44 — 정책 3종은 가드 **바깥**이고 인증 판정도 기다리지 않는다.
+         미인증이든 판정 중이든 직접 URL 진입에 정상 렌더해야 한다.
+         S1 Footer에서 들어오는 경로이기 때문이다. */
       {
         element: <ScreenTransition />,
+        handle: { skipsAuthGate: true } satisfies RouteHandle,
         children: [
           { path: 'policy/privacy', element: <PolicyPrivacy /> },
           { path: 'policy/terms', element: <PolicyTerms /> },

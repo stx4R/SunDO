@@ -48,6 +48,8 @@
   --shadow-glass: 0 8px 26px rgba(20, 53, 38, 0.09);
   --shadow-primary: 0 10px 24px rgba(31, 81, 56, 0.35);
   --shadow-neu: 7px 7px 16px rgba(20, 53, 38, 0.1), -7px -7px 16px rgba(255, 255, 255, 0.95);
+  /* 84px 브랜드 로고. Splash와 S1이 `BrandLogo` 하나를 공유한다(W-06 §4). */
+  --shadow-logo: 0 12px 26px rgba(31, 81, 56, 0.25);
 
   /* --- 그라디언트 (§7.1) ---
      Tailwind v4가 인식하는 네임스페이스가 아니므로 유틸리티는 생성되지 않는다.
@@ -68,6 +70,12 @@
   --text-h1--letter-spacing: -0.01em;
   --text-h2: 1.5rem; /* 24px */
   --text-h2--letter-spacing: -0.01em;
+  /* 브랜드 타이틀 `자율생활부`와 그 부제. §7.2 스케일에 없는 값이지만
+     Splash와 S1이 **같은 값을 공유**한다(W-05 §5.3 · W-06 §3).
+     PRD §7.2 반영은 st4R가 v1.4에서 한다. `--text-h1`(28px)로 대체하지 마라. */
+  --text-brand: 1.6875rem; /* 27px */
+  --text-brand--letter-spacing: -0.01em;
+  --text-subtitle: 0.8125rem; /* 13px */
   --text-sheet: 1.1875rem; /* 19px */
   --text-grade: 1.3125rem; /* 21px */
   --text-classno: 1.4375rem; /* 23px */
@@ -823,9 +831,10 @@
     justify-content: center;
   }
 
-  /* design 10a 원문: 84px 흰 원 + `0 12px 26px rgba(31,81,56,0.25)`.
-     §7.1에 없는 그림자라 인라인 리터럴로 둔다(보고서 §5). */
-  .splash-logo {
+  /* 84px 브랜드 로고. design `10a`(스플래시)와 `12a`(S1)가 **같은 값**이라
+     `BrandLogo` 컴포넌트 하나로 공유한다(W-06 §4). 그림자는 §7.1에 없어
+     `--shadow-logo`로 승격했다. */
+  .brand-logo {
     display: flex;
     width: 84px;
     height: 84px;
@@ -833,25 +842,26 @@
     justify-content: center;
     border-radius: 50%;
     background: #fff;
-    box-shadow: 0 12px 26px rgba(31, 81, 56, 0.25);
+    box-shadow: var(--shadow-logo);
     overflow: hidden;
   }
 
-  /* 27px·13px은 §7.2 타입 스케일에 없는 값이다. PRD §8.1.2가 두 값을 명시하고
-     S1(W-06)이 같은 27px 타이틀을 다시 쓰므로 그때 토큰 승격을 판단한다.
-     AC-05를 위해 px가 아니라 rem으로 적는다. */
-  .splash-title {
+  /* 브랜드 타이틀·부제. **Splash(`10a`)와 S1(`12a`)이 공유한다** —
+     크기·색·간격이 두 화면에서 같다. 글자별 스태거 지연과 부제 **문구**만 다르고
+     그것은 호출부가 준다(W-06 §4).
+     W-06 §3에서 `--text-brand`·`--text-subtitle`로 승격했다. 리터럴을 되살리지 마라. */
+  .brand-title {
     margin-top: 16px;
     display: flex;
-    font-size: 1.6875rem; /* 27px */
+    font-size: var(--text-brand);
     font-weight: 700;
-    letter-spacing: -0.01em;
+    letter-spacing: var(--text-brand--letter-spacing);
     color: var(--color-sundo-900);
   }
 
-  .splash-sub {
+  .brand-sub {
     margin-top: 6px;
-    font-size: 0.8125rem; /* 13px */
+    font-size: var(--text-subtitle);
     font-weight: 500;
     color: var(--color-sundo-ink-70);
   }
@@ -885,6 +895,110 @@
     flex-direction: column;
     align-items: center;
     text-align: center;
+  }
+
+  /* ==========================================================
+     오프라인 배너 — PRD §6.4(z 70) + design `12d`
+     **콘텐츠를 밀어내지 않는다.** design 12d는 흐름 안에서 밀어내지만
+     §6.4가 "상단 고정"으로 규정하므로 오버레이로 띄운다(보고서 §5).
+     상단 오프셋 16px은 독의 `bottom` 16px을 위아래로 뒤집은 값이다 —
+     design 12d의 54px은 목업 프레임의 상태 표시줄을 포함한 값이라 그대로 쓸 수 없다.
+     ========================================================== */
+  .ofb {
+    position: absolute;
+    top: calc(env(safe-area-inset-top) + 16px);
+    left: 18px;
+    right: 18px;
+    z-index: 70;
+    box-sizing: border-box;
+    display: flex;
+    height: 40px;
+    align-items: center;
+    gap: 8px;
+    border-radius: var(--radius-14);
+    padding: 0 16px;
+    background: rgba(20, 53, 38, 0.88);
+    backdrop-filter: blur(12px);
+    /* `.ovl-root`가 pointer-events:none이다. 이 배너에는 상호작용이 없어
+       되돌리지 않는다 — 되돌리면 뒤의 화면 탭이 막힌다. */
+  }
+
+  /* ==========================================================
+     S1 로그인 — design `12a`~`12e`
+     Google 버튼은 단일 사용이라 컴포넌트로 빼지 않고 클래스만 둔다(지시서 §6.2).
+     ========================================================== */
+
+  /* design 12a 원문. 흰 버튼에는 `shine`을 쓰지 않는다(R-01 명시). */
+  .gbtn {
+    box-sizing: border-box;
+    display: flex;
+    width: 100%;
+    height: 54px;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    border-radius: var(--radius-15);
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(18px);
+    border: 1px solid rgba(20, 53, 38, 0.1);
+    box-shadow: 0 8px 20px rgba(20, 53, 38, 0.1);
+    transition: transform 0.15s;
+  }
+
+  /* 비활성(B 인증 중 · D 오프라인)에서는 눌림도 없어야 한다. */
+  .gbtn:not(:disabled):active {
+    transform: scale(0.97);
+  }
+
+  /* design 12b 원문. `.ff-spin`과 색은 같고 크기만 18px이다.
+     트랙 색 `rgba(46,107,76,0.22)`가 2번째 사용처가 됐다 — W-09 승격 대기. */
+  .gbtn-spin {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 2px solid rgba(46, 107, 76, 0.22);
+    border-top-color: var(--color-sundo-700);
+    animation: spin 0.8s linear infinite;
+  }
+
+  /* design 12c·12e 원문. 2줄(C)은 `items-start`, 1줄(E)은 `items-center`로
+     호출부가 갈라 준다 — 아이콘 정렬이 줄 수에 따라 달라진다. */
+  .s1-banner {
+    display: flex;
+    gap: 9px;
+    border-radius: var(--radius-12);
+    padding: 11px 13px;
+    background: rgba(192, 57, 43, 0.1);
+  }
+
+  /* design 12c 원문. 44px 터치 타깃은 칩이 아니라 **행**이 갖는다. */
+  .s1-chiprow {
+    display: flex;
+    height: 44px;
+    align-items: center;
+  }
+
+  .s1-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border-radius: var(--radius-pill);
+    padding: 6px 12px;
+    background: rgba(20, 53, 38, 0.06);
+  }
+
+  /* X는 시각 20px을 유지한 채 투명 패딩으로 44×44를 만든다.
+     Footer 링크와 같은 방식이다(§15.1). 음수 마진이 없으면 칩이 부푼다. */
+  .s1-chip-x {
+    display: flex;
+    height: 20px;
+    width: 20px;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    padding: 12px;
+    margin: -12px;
+    box-sizing: content-box;
   }
 
   /* ==========================================================

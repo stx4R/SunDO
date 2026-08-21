@@ -1,4 +1,5 @@
 import { useEffect, useState, type CSSProperties } from 'react'
+import { BrandLogo } from './BrandLogo'
 import { NeuButton } from './NeuButton'
 
 /**
@@ -35,6 +36,9 @@ const TIMEOUT_MS = 3000
 const ER_01 = '네트워크에 연결할 수 없습니다'
 const ER_09 = '요청이 너무 많습니다. 잠시 후 다시 시도해 주세요'
 const ER_10 = '세션이 만료되었습니다. 다시 로그인해 주세요'
+/* W-06 §0.1-1 — EC-13·EC-42 원문. §8.10.3에 재수록되지 않은 것은 사전의 누락이지
+   문구의 부재가 아니다(§8 머리말). PRD v1.4에서 `ER-20`으로 등재된다. */
+const ER_20 = '권한이 없습니다'
 
 const ERROR_TEXT: Readonly<Record<string, string>> = {
   /* 판정이 `loading`에 머무는 경로는 `AuthProvider`의 `users/{uid}` 조회 실패
@@ -46,6 +50,7 @@ const ERROR_TEXT: Readonly<Record<string, string>> = {
   'auth/redirect-failed': ER_01,
   'resource-exhausted': ER_09,
   unauthenticated: ER_10,
+  'permission-denied': ER_20,
 }
 
 interface SplashProps {
@@ -53,11 +58,9 @@ interface SplashProps {
   errorCode: string | null
   /** 오류 화면의 `다시 시도`. 인증 판정을 처음부터 다시 돌린다. */
   onRetry: () => void
-  /** 자산이 생기면 넘긴다. 없으면 §8.1.2 폴백(`자` 이니셜 원형)이다. Footer와 같다. */
-  logoSrc?: string
 }
 
-export function Splash({ errorCode, onRetry, logoSrc }: SplashProps) {
+export function Splash({ errorCode, onRetry }: SplashProps) {
   const [timedOut, setTimedOut] = useState(false)
 
   /* 타이머는 이 컴포넌트의 수명과 같다. `loading`을 벗어나면 호출부가
@@ -71,9 +74,7 @@ export function Splash({ errorCode, onRetry, logoSrc }: SplashProps) {
     return (
       <div className="splash">
         <div className="splash-err" role="alert" aria-live="assertive">
-          <span className="splash-logo" aria-hidden="true">
-            <Logo logoSrc={logoSrc} />
-          </span>
+          <BrandLogo />
           <p className="mt-4.5 text-body font-medium text-sundo-900">
             {(errorCode && ERROR_TEXT[errorCode]) || ER_01}
           </p>
@@ -87,11 +88,9 @@ export function Splash({ errorCode, onRetry, logoSrc }: SplashProps) {
 
   return (
     <div className="splash">
-      <span className="splash-logo rise">
-        <Logo logoSrc={logoSrc} />
-      </span>
+      <BrandLogo className="rise" />
 
-      <h1 className="splash-title">
+      <h1 className="brand-title">
         {TITLE.map(({ ch, delay }) => (
           <span
             key={ch}
@@ -104,7 +103,7 @@ export function Splash({ errorCode, onRetry, logoSrc }: SplashProps) {
       </h1>
 
       {/* design 10a 원문 지연 0.5s. */}
-      <p className="splash-sub blur-in" style={{ '--blur-in-delay': '0.5s' } as CSSProperties}>
+      <p className="brand-sub blur-in" style={{ '--blur-in-delay': '0.5s' } as CSSProperties}>
         대전대신고등학교
       </p>
 
@@ -118,17 +117,5 @@ export function Splash({ errorCode, onRetry, logoSrc }: SplashProps) {
         ))}
       </div>
     </div>
-  )
-}
-
-/** §8.1.2 — 로고 자산이 없거나 로드에 실패하면 `자` 이니셜 원형이다. */
-function Logo({ logoSrc }: { logoSrc?: string }) {
-  if (logoSrc) return <img src={logoSrc} alt="" className="h-full w-full object-cover" />
-  /* Footer 폴백과 같은 색·굵기다. 크기는 §7.2 스케일에서 84px 원에 가장 가까운
-     `text-h1`(28px)을 골랐다. PRD에 폴백 글자 크기 규격이 없다(보고서 §4). */
-  return (
-    <span className="text-h1 font-bold text-sundo-800" aria-hidden="true">
-      자
-    </span>
   )
 }
