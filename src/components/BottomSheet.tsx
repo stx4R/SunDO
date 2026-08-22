@@ -1,4 +1,4 @@
-import { useContext, useEffect, useId, useRef, type ReactNode } from 'react'
+import { useContext, useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router'
 import { cn } from '../lib/cn'
@@ -8,6 +8,13 @@ import { OverlayRootContext } from './AppShell'
 
 /** §7.4 시트 모션 0.38s. 닫힘 대기도 같은 값을 쓴다. */
 const SHEET_MS = 380
+
+/**
+ * 아래 스와이프 닫힘 임계값(px). §8.6.2 #2·T-08이 「드래그로 아래로 스와이프 시 닫힘」을
+ * 규정하지만 **거리는 규격에도 design에도 없다**(보고서 §4). 시트 높이의 비율로 잡으면
+ * 내용이 짧은 시트에서 조금만 끌어도 닫히므로 절대값으로 둔다.
+ */
+const SWIPE_CLOSE_PX = 80
 
 /** `location.state`에 얹는 표식의 키. 라우터 상태를 통째로 쓰지 않고 이 키만 본다. */
 interface SheetState {
@@ -19,6 +26,11 @@ interface BottomSheetProps {
   onClose: () => void
   /** 있으면 그랩 핸들 아래 19px/700 제목. `aria-labelledby`로 연결된다. */
   title?: string
+  /**
+   * 닫힘 모션까지 끝나 DOM에서 빠진 뒤 1회. `onClose`(닫기 **요청**)와 다르다.
+   * 호출부가 시트가 떠 있는 동안 잠가 둔 것을 푸는 지점이다(S5 행 탭 빗장 — W-12 §3.6).
+   */
+  onClosed?: () => void
   children: ReactNode
 }
 
@@ -32,7 +44,7 @@ interface BottomSheetProps {
  * history를 소유하고 있어 내부 상태와 어긋난다. 같은 경로에 `state`만 얹어
  * 한 단계를 쌓고, 그 표식이 사라지면 닫는다.
  */
-export function BottomSheet({ open, onClose, title, children }: BottomSheetProps) {
+export function BottomSheet({ open, onClose, title, onClosed, children }: BottomSheetProps) {
   const overlayRoot = useContext(OverlayRootContext)
   const sheetRef = useRef<HTMLDivElement>(null)
   const titleId = useId()
@@ -96,6 +108,61 @@ export function BottomSheet({ open, onClose, title, children }: BottomSheetProps
   /* 마운트 전에는 ref가 비어 있다. `open`만 보고 걸면 첫 프레임에 아무것도 못 잡는다. */
   useFocusTrap({ open: open && mounted, ref: sheetRef, onEscape: requestClose })
 
+  /* 닫힘 **완료** 통지. 콜백이 렌더마다 새로 만들어져도 효과가 다시 돌면 안 된다. */
+  const closedRef = useRef(onClosed)
+  useEffect(() => {
+    closedRef.current = onClosed
+  })
+  const wasMountedRef = useRef(mounted)
+  useEffect(() => {
+    if (wasMountedRef.current && !mounted) closedRef.current?.()
+    wasMountedRef.current = mounted
+  }, [mounted])
+
+  /* ---- 아래 스와이프 닫기 (§8.6.2 #2 · T-08) ----
+     그랩 핸들에서만 시작한다. 시트 전체에 걸면 `기타` 입력의 캐럿 드래그·
+     세그먼트 탭과 뒤엉킨다. 손가락을 따라가는 동안에는 전이를 끄고(`none`),
+     놓는 순간 다시 켜서 CSS가 마무리하게 둔다. */
+  const [dragY, setDragY] = useState(0)
+  const [dragging, setDragging] = useState(false)
+  const dragStartRef = useRef<{ pointerId: number; y: number } | null>(null)
+
+  /* 닫힘이 시작되면 인라인 transform을 걷어 CSS의 `translateY(110%)`가 이긴다.
+     손을 뗀 위치에서 이어져 내려간다. */
+  useEffect(() => {
+    if (shown) return
+    setDragY(0)
+    setDragging(false)
+    dragStartRef.current = null
+  }, [shown])
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (dragStartRef.current) return
+    dragStartRef.current = { pointerId: e.pointerId, y: e.clientY }
+    e.currentTarget.setPointerCapture(e.pointerId)
+    setDragging(true)
+  }
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const start = dragStartRef.current
+    if (!start || start.pointerId !== e.pointerId) return
+    /* 위로 끄는 동작은 무시한다. 시트가 화면 밖으로 솟아오르면 안 된다. */
+    setDragY(Math.max(0, e.clientY - start.y))
+  }
+
+  const endDrag = (e: React.PointerEvent<HTMLDivElement>) => {
+    const start = dragStartRef.current
+    if (!start || start.pointerId !== e.pointerId) return
+    dragStartRef.current = null
+    setDragging(false)
+    if (e.clientY - start.y >= SWIPE_CLOSE_PX) {
+      /* 🔴 딤 탭·ESC와 **같은 경로**다. 여기서 직접 닫지 마라(§3.5). */
+      requestClose()
+      return
+    }
+    setDragY(0)
+  }
+
   if (!mounted || !overlayRoot) return null
 
   return createPortal(
@@ -113,8 +180,20 @@ export function BottomSheet({ open, onClose, title, children }: BottomSheetProps
         aria-labelledby={title ? titleId : undefined}
         /* 포커스 가능한 자식이 없는 시트도 있다. 그때는 컨테이너가 받는다. */
         tabIndex={-1}
+        style={
+          dragY > 0
+            ? { transform: `translateY(${dragY}px)`, transition: dragging ? 'none' : undefined }
+            : undefined
+        }
       >
-        <div className="sheet-handle" aria-hidden="true" />
+        <div
+          className="sheet-handle"
+          aria-hidden="true"
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={endDrag}
+          onPointerCancel={endDrag}
+        />
         {title && (
           <div id={titleId} className="sheet-title">
             {title}

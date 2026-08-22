@@ -58,6 +58,10 @@
   --shadow-neu: 7px 7px 16px rgba(20, 53, 38, 0.1), -7px -7px 16px rgba(255, 255, 255, 0.95);
   /* 84px 브랜드 로고. Splash와 S1이 `BrandLogo` 하나를 공유한다(W-06 §4). */
   --shadow-logo: 0 12px 26px rgba(31, 81, 56, 0.25);
+  /* W-09 승격 대기 목록에 있던 값. `.ff`(입력 필드 v2)에 이어 W-12의 `.seg`가
+     **두 번째 컴포넌트**가 되어 W-03B §3 기준(서로 다른 컴포넌트 2곳)을 넘겼다.
+     값은 한 글자도 바뀌지 않았다 — `inset 0 1px 3px rgba(20,53,38,0.05)`. */
+  --shadow-inset-soft: inset 0 1px 3px rgba(20, 53, 38, 0.05);
 
   /* --- 그라디언트 (§7.1) ---
      Tailwind v4가 인식하는 네임스페이스가 아니므로 유틸리티는 생성되지 않는다.
@@ -317,7 +321,7 @@
     border-radius: var(--radius-14);
     background: var(--color-sundo-glass);
     border: 1px solid rgba(255, 255, 255, 0.8);
-    box-shadow: inset 0 1px 3px rgba(20, 53, 38, 0.05);
+    box-shadow: var(--shadow-inset-soft);
     /* PRD §7.3이 padding을 "컨테이너" 행에 적었다. 실제 여백은 .ff input이
        만들지만(design 원문), 컨테이너 규격이므로 여기에도 명시한다.
        자식이 전부 absolute라 이 padding 자체는 레이아웃에 영향이 없다. */
@@ -382,7 +386,7 @@
     background: var(--color-sundo-line-surface);
     box-shadow:
       inset 0 0 0 1.5px var(--color-sundo-700),
-      inset 0 1px 3px rgba(20, 53, 38, 0.05),
+      var(--shadow-inset-soft),
       0 0 0 3px rgba(46, 107, 76, 0.12);
   }
 
@@ -424,7 +428,7 @@
   .ff-ok {
     box-shadow:
       inset 0 0 0 1.5px var(--color-sundo-700),
-      inset 0 1px 3px rgba(20, 53, 38, 0.05);
+      var(--shadow-inset-soft);
     animation: settleY 0.2s ease-out both;
   }
 
@@ -438,7 +442,7 @@
   .ff-err {
     box-shadow:
       inset 0 0 0 1.5px var(--color-sundo-danger),
-      inset 0 1px 3px rgba(20, 53, 38, 0.05);
+      var(--shadow-inset-soft);
   }
 
   .ff-err label,
@@ -449,7 +453,7 @@
   .ff-err:focus-within {
     box-shadow:
       inset 0 0 0 1.5px var(--color-sundo-danger),
-      inset 0 1px 3px rgba(20, 53, 38, 0.05),
+      var(--shadow-inset-soft),
       0 0 0 3px rgba(192, 57, 43, 0.12);
   }
 
@@ -1547,8 +1551,14 @@
      `.ovl-root`(스테이지 기준 absolute · pointer-events none)에 명령형으로 붙는다.
      소유자가 없어 화면 전환을 가로질러 550ms를 살아남는다(`lib/sparkle.ts`).
      ========================================================== */
+  /* 🔴 `z-index`가 없으면 시트(z 50)·딤(z 40) **뒤로 숨는다** — `.ovl-root`는
+     `z-index: auto`라 스태킹 문맥을 만들지 않고, 파티클은 `z-index: auto`
+     포지션 요소로서 양수 z 형제보다 **먼저** 그려진다. 세그먼트 위에서 터진
+     파티클이 보여야 하므로 시트 위, 모달(55)·토스트(60) 아래에 둔다.
+     `.ovl-root`의 `pointer-events: none`은 되돌리지 않는다(W-06 §5-3). */
   .spark {
     position: absolute;
+    z-index: 51;
     pointer-events: none;
   }
 
@@ -1564,13 +1574,15 @@
   }
 
   /* design 원문 `border-radius:2px;background:#2E6B4C;animation:sparkle .5s ease-out forwards`.
-     밝은 배경 위이므로 `#2E6B4C`다(주 버튼 위 `#fff`는 S6 사유 칩이 쓴다 — 이번 범위 밖). */
+     `--spark-color`는 `spawnSparkle(root, x, y, color)`가 **줄 때만** 선언된다.
+     주지 않으면 선언 자체가 없어 폴백(`--color-sundo-700` = `#2E6B4C`)이 그대로 산다 —
+     기존 호출부(S3·S4·S5)는 무변경이다. S6 사유 세그먼트가 `'#fff'`로 부른다(§7.4). */
   .spark i {
     display: block;
     width: 100%;
     height: 100%;
     border-radius: 2px;
-    background: var(--color-sundo-700);
+    background: var(--spark-color, var(--color-sundo-700));
     animation: sparkle 0.5s ease-out forwards;
   }
 
@@ -1658,12 +1670,23 @@
     transform: translateY(0);
   }
 
+  /* 아래 스와이프 닫기(§8.6.2 #2 · T-08)의 드래그 손잡이다. 38×4.5는 너무 좁아
+     `::before`로 히트 영역만 넓힌다 — 레이아웃은 한 칸도 움직이지 않는다.
+     `touch-action: none`이 없으면 브라우저가 제스처를 스크롤로 가져간다. */
   .sheet-handle {
+    position: relative;
     width: 38px;
     height: 4.5px;
     margin: 0 auto 14px;
     border-radius: var(--radius-pill);
     background: rgba(20, 53, 38, 0.18);
+    touch-action: none;
+  }
+
+  .sheet-handle::before {
+    content: "";
+    position: absolute;
+    inset: -14px -60px;
   }
 
   .sheet-title {
@@ -1776,6 +1799,257 @@
       0 10px 24px rgba(192, 57, 43, 0.32),
       inset 0 1px 0 rgba(255, 255, 255, 0.28);
     color: #fff;
+  }
+
+  /* ==========================================================
+     S6 기록 작성 시트 — PRD §8.6 · design `17a`~`17d` 원문.
+     시트 표면(`.sheet`)·딤·제목은 W-03C가 이미 갖고 있다. 여기는 내용물뿐이다.
+     🔴 시트 안에 `overflow-y: auto`를 만들지 않는다 — 스크롤 소유자는 `AppShell` 하나다.
+     ========================================================== */
+
+  /* §8.6.5 에러 인라인 배너. `.s1-banner`·`.s2-banner`와 값이 같지만 화면별
+     클래스 규약을 따라 따로 둔다(`.s2-banner` 주석의 이유 그대로). */
+  .rs-banner {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin-top: 14px;
+    border-radius: var(--radius-12);
+    padding: 11px 13px;
+    background: var(--color-sundo-tint-danger-10);
+  }
+
+  /* #4 학생 요약 카드 — design 원문 `margin-top:14px;gap:12px;padding:13px 16px;
+     border-radius:15px;background:rgba(31,81,56,0.08)`. */
+  .rs-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 14px;
+    padding: 13px 16px;
+    border-radius: var(--radius-15);
+    background: var(--color-sundo-tint-08);
+  }
+
+  .rs-avatar {
+    width: 34px;
+    height: 34px;
+    flex: none;
+    border-radius: var(--radius-11);
+    background: var(--gradient-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--text-subtitle);
+    font-weight: 700;
+    color: #fff;
+  }
+
+  .rs-name {
+    display: block;
+    font-size: var(--text-body);
+    font-weight: 700;
+    color: var(--color-sundo-900);
+  }
+
+  .rs-meta {
+    display: block;
+    margin-top: 1px;
+    font-size: var(--text-label);
+    font-weight: 500;
+    color: var(--color-sundo-ink-70);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* #5 · #9 라벨 — `적발 사유` · `일시` 공용. */
+  .rs-label {
+    margin-top: 16px;
+    font-size: var(--text-label);
+    font-weight: 700;
+    color: var(--color-sundo-ink-70);
+  }
+
+  /* ---- #6 사유 세그먼트 (공용 `Segmented`) ----
+     design 원문 `margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;padding:5px;
+     border-radius:16px;background:rgba(255,255,255,0.6);
+     border:1px solid rgba(255,255,255,0.85);box-shadow:inset 0 1px 3px rgba(20,53,38,0.05)`.
+     🔴 `flex-wrap`과 항목의 `min-width: 6.5em`이 AC-11의 200% 2행(2+1)을 만든다.
+     미디어 쿼리로 분기하지 않는다 — `em`이 커지면 레이아웃이 스스로 접는다. */
+  .seg {
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+    padding: 5px;
+    border-radius: var(--radius-16);
+    background: var(--color-sundo-control);
+    border: 1px solid rgba(255, 255, 255, 0.85);
+    box-shadow: var(--shadow-inset-soft);
+  }
+
+  /* 🔴 선택 배경은 항목이 아니라 **인디케이터 1개**가 갖는다(T-02 가로 슬라이드).
+     `left/top`이 아니라 `transform`으로 옮긴다 — 합성만으로 끝나 스크롤과 겹쳐도
+     레이아웃이 다시 계산되지 않는다. */
+  .seg-ind {
+    position: absolute;
+    left: 0;
+    top: 0;
+    border-radius: var(--radius-12);
+    background: var(--gradient-primary);
+    box-shadow: 0 6px 14px rgba(31, 81, 56, 0.3);
+    transition:
+      transform 0.22s var(--ease-sundo),
+      width 0.22s var(--ease-sundo),
+      height 0.22s var(--ease-sundo);
+    pointer-events: none;
+  }
+
+  .seg-item {
+    position: relative;
+    flex: 1 1 0;
+    /* design 원문. 라벨을 어떤 경우에도 축약하지 않기 위한 하한이다(AC-11). */
+    min-width: 6.5em;
+    height: 46px;
+    border-radius: var(--radius-12);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--text-subtitle);
+    font-weight: 500;
+    color: var(--color-sundo-ink-70);
+  }
+
+  .seg-item-on {
+    font-weight: 700;
+    color: #fff;
+  }
+
+  .seg-item:disabled {
+    /* §8.6.5 로딩 — 탭 차단. 선택 표시는 그대로 남는다. */
+    pointer-events: none;
+  }
+
+  /* ---- #7 기타 사유 입력 (T-03 / T-04) ----
+     높이 0→auto는 `.ff-msgwrap`과 같은 `grid-template-rows` 0fr→1fr로 낸다.
+     펼침 0.24s는 `-open` 쪽 선언이, 접힘 0.18s는 기본 선언이 갖는다 —
+     전이 시간은 **도착 상태**에서 읽히므로 방향마다 다른 값이 자동으로 걸린다.
+     `margin`/`padding`의 3px은 레이아웃이 아니다: `overflow`가 패딩 상자에서
+     자르므로 `.ff:focus-within`의 `0 0 0 3px` 링이 잘리지 않도록 클립 상자만
+     넓히고 같은 크기의 음수 마진으로 주변 간격을 원문(10px)으로 되돌린다. */
+  .rs-etc {
+    display: grid;
+    grid-template-rows: 0fr;
+    overflow: hidden;
+    margin: 7px -3px 0;
+    padding: 3px 3px 0;
+    opacity: 0;
+    transform: translateY(-6px);
+    transition:
+      grid-template-rows 0.18s var(--ease-sundo),
+      opacity 0.18s var(--ease-sundo),
+      transform 0.18s var(--ease-sundo);
+  }
+
+  .rs-etc-open {
+    grid-template-rows: 1fr;
+    opacity: 1;
+    transform: translateY(0);
+    transition-duration: 0.24s;
+  }
+
+  .rs-etc-row {
+    min-height: 0;
+  }
+
+  /* #8 힌트 — design 원문 `margin-top:6px;font-size:11px;font-weight:500;
+     line-height:1.45;color:rgba(20,53,38,0.70);text-wrap:pretty`.
+     🔴 `17d`에서는 힌트 자리를 에러 문구가 **대신한다**. `Field`가 에러를 소유하므로
+     그 노드가 열렸는지를 보고 힌트를 접는다. */
+  .rs-hint {
+    margin-top: 6px;
+    font-size: var(--text-micro);
+    font-weight: 500;
+    line-height: 1.45;
+    color: var(--color-sundo-ink-70);
+    text-wrap: pretty;
+  }
+
+  .rs-etc-row:has(.ff-msgwrap-open) .rs-hint {
+    display: none;
+  }
+
+  /* 글자 수 카운터 — `.ff-end` 안에서 상태 아이콘 앞에 선다(design `17c`·`17d`). */
+  .rs-count {
+    font-size: var(--text-micro);
+    font-weight: 500;
+    color: var(--color-sundo-ink-70);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .rs-count-warn {
+    color: var(--color-sundo-danger);
+  }
+
+  /* ---- #10 일시 읽기 전용 행 ---- */
+  .rs-when {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 8px;
+    padding: 13px 16px;
+    border-radius: var(--radius-15);
+    background: var(--color-sundo-control);
+    border: 1px solid rgba(255, 255, 255, 0.85);
+  }
+
+  /* 14px은 §7.2 스케일에 없다(가장 가까운 것이 `--text-row` 14.5px).
+     이 한 곳뿐이라 W-03B §3 기준(서로 다른 컴포넌트 2곳)에 미달해 리터럴로 둔다.
+     🔴 14.5px으로 맞추지 마라 — design 원문은 `14`다. */
+  .rs-when-text {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--color-sundo-900);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .rs-when-badge {
+    flex: none;
+    padding: 4px 9px;
+    border-radius: var(--radius-pill);
+    background: var(--color-sundo-tint-10);
+    font-size: var(--text-micro);
+    font-weight: 700;
+    color: var(--color-sundo-700);
+  }
+
+  /* ---- #11 저장 버튼 · #12 하단 안내 ---- */
+  .rs-save {
+    margin-top: 20px;
+  }
+
+  .rs-note {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    margin-top: 12px;
+  }
+
+  .rs-dot {
+    width: 6px;
+    height: 6px;
+    flex: none;
+    border-radius: 50%;
+    background: var(--color-sundo-700);
+    animation: pulseDot 1.6s ease infinite;
+  }
+
+  .rs-note-text {
+    font-size: var(--text-micro);
+    font-weight: 500;
+    color: var(--color-sundo-ink-70);
   }
 }
 
@@ -2018,8 +2292,25 @@
   /* AC-07이 `pulseDot`을 **정지** 대상으로 명시한다. 스피너와 갈리는 지점이다 —
      스플래시 점은 "진행 중"을 알리는 유일한 수단이 아니다(로고·타이틀이 이미 있다). */
   .splash-dot,
-  .pend-dot {
+  .pend-dot,
+  .rs-dot {
     animation: none;
+  }
+
+  /* AC-07 — 「기타 펼침도 0.01s로 줄이되 **최종 상태는 같다**」(W-12 §3.12).
+     `transition: none`으로 지우지 않는 이유는, 지속시간만 줄이면 도착 상태
+     (`grid-template-rows: 1fr` · `opacity: 1` · `translateY(0)`)가 그대로 유지되기
+     때문이다. 🔴 검증 실패의 색·아이콘·문구는 여기서 건드리지 않는다. */
+  .rs-etc,
+  .rs-etc-open {
+    transition-duration: 0.01s;
+  }
+
+  /* AC-07 목록이 만들어진 시점에 세그먼트 인디케이터는 존재하지 않았다(보고서 §4·§7).
+     0.22s 가로 슬라이드는 「화면 전환·시트」도 `sparkle`도 아니지만 명백한 이동
+     모션이라 같은 기준으로 줄인다. 선택 위치라는 **결과**는 그대로다. */
+  .seg-ind {
+    transition-duration: 0.01s;
   }
 
   /* §7.4 마지막 문단이 `sparkle`을 **정지** 대상으로 명시한다.

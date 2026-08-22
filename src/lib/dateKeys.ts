@@ -31,6 +31,37 @@ export function toDateKey(d: Date): string {
 }
 
 /**
+ * KST `YYYY-MM` (§9.3.5 `monthKey` · DR-05 · §12.1 「이번 달」 카운터).
+ *
+ * `toDateKey`와 **같은 `toKst()`를 통과한다.** 월 경계를 따로 계산하지 않는 것이
+ * 핵심이다 — 세 함수가 서로 다른 경로로 KST를 구하면 자정 전후에 세 키가
+ * 서로 다른 날을 가리킬 수 있다(W-12 지시서 §3.9).
+ */
+export function toMonthKey(d: Date): string {
+  const k = toKst(d)
+  return `${k.getUTCFullYear()}-${pad2(k.getUTCMonth() + 1)}`
+}
+
+/** KST 요일 표기. `getUTCDay()`는 `toKst()` 이후이므로 KST 요일이다. */
+const WEEKDAY_KO = ['일', '월', '화', '수', '목', '금', '토'] as const
+
+/**
+ * BR-47 화면 표기 형식 `{M}월 {D}일 ({요일}) {HH}:{mm}` (S6 일시 행 · §8.6.2 #10).
+ *
+ * **여기 두는 이유**: 같은 `toKst()`를 쓰기 위해서다. 화면 쪽에 따로 만들면
+ * KST 변환이 네 벌째가 되고, 그 순간 표시된 일시와 저장된 `dateKey`가
+ * 자정 전후에 갈릴 수 있다. `toKst`를 export해 밖에서 쓰게 하는 쪽은
+ * 「이후 UTC 접근자로만 읽어야 한다」는 제약이 호출부로 새어 나가 더 위험하다.
+ */
+export function formatDateTimeKst(d: Date): string {
+  const k = toKst(d)
+  const month = k.getUTCMonth() + 1
+  const date = k.getUTCDate()
+  const weekday = WEEKDAY_KO[k.getUTCDay()]
+  return `${month}월 ${date}일 (${weekday}) ${pad2(k.getUTCHours())}:${pad2(k.getUTCMinutes())}`
+}
+
+/**
  * KST ISO-8601 주차 `YYYY-Www` (DR-06 · BR-46 — **월요일 시작**).
  *
  * ISO 주차의 정의는 「그 주의 **목요일**이 속한 해가 주차연도」다. 그래서 연말·연초에

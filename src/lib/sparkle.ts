@@ -39,8 +39,16 @@ function prefersReduced(): boolean {
  * @param root `.ovl-root` 노드(`OverlayRootContext`). `null`이면 아무 것도 하지 않는다.
  * @param clientX 탭 지점의 뷰포트 좌표
  * @param clientY 〃
+ * @param color §7.4 「밝은 배경 위 `#2E6B4C`, 주 버튼 위 `#fff`」. **주지 않으면
+ *   `.spark i`의 기본값(`--color-sundo-700` = `#2E6B4C`)이 그대로 쓰인다** —
+ *   기존 호출부(S3·S4·S5)는 한 글자도 바뀌지 않는다. S6 사유 세그먼트가 `'#fff'`로 부른다.
  */
-export function spawnSparkle(root: HTMLElement | null, clientX: number, clientY: number): void {
+export function spawnSparkle(
+  root: HTMLElement | null,
+  clientX: number,
+  clientY: number,
+  color?: string,
+): void {
   if (!root) return
   /* §7.4 마지막 문단 — reduce에서 sparkle은 **정지**다. 아예 만들지 않는다.
      CSS로 `animation: none`만 걸면 `from{opacity:1}`이 적용되지 않아 막대가
@@ -53,6 +61,9 @@ export function spawnSparkle(root: HTMLElement | null, clientX: number, clientY:
   container.className = 'spark'
   container.style.left = `${clientX - bounds.left}px`
   container.style.top = `${clientY - bounds.top}px`
+  /* 커스텀 속성은 자식 `.spark i`가 `var(--spark-color, …)`로 읽는다.
+     주지 않으면 선언 자체가 없어 CSS 폴백이 그대로 산다. */
+  if (color) container.style.setProperty('--spark-color', color)
 
   for (let i = 0; i < SPARK_COUNT; i++) {
     const spoke = document.createElement('span')

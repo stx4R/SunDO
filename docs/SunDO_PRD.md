@@ -14,7 +14,7 @@
 | --- | --- |
 | 제품명 | 자율생활부 앱 (SunDO) |
 | 대상 조직 | 대전대신고등학교 자율생활부(선도부) |
-| 문서 버전 | **v1.0 (확정 — 개발 착수 기준)** |
+| 문서 버전 | **v1.4 (확정 — 개발 착수 기준)** |
 | 작성일 | 2026-08-18 |
 | 담당 | PM 겸 테크리드 |
 | 개발 방식 | Claude(프롬프트 설계) + Claude Code(구현) |
@@ -3133,6 +3133,169 @@ SunDO/
 6. **인증 관련 작업(W-04·W-06)에서는 `email_verified` 검사와 비밀번호 관련 코드를 절대 생성하지 않도록** 명시한다. 학습 데이터의 관성으로 되살아나기 쉬운 항목이다.
 
 ---
+
+# W-08 §3 시딩 — Firebase 콘솔 수동 작업
+
+프로젝트: **`sundo-dev-8ef38`** (콘솔 표시명 `sundo-dev`)
+DB: Cloud Firestore `(default)`
+
+> 정본 프로젝트 판별 근거: 이 프로젝트의 규칙 탭에 W-04 §5 임시 규칙이 그대로 올라가 있다.
+> 나머지 두 프로젝트(`sundo-c5095`, `sundo-dev`)는 **Firestore 미생성** 상태다 — 건드리지 말 것.
+
+---
+
+## 진행 상황
+
+| # | 문서 | 상태 |
+| --- | --- | --- |
+| ① | `departments/dshs-jayul` | ✅ **완료** |
+| ② | `users/SWfvnKEfs3dSqJICiKDnCOxcTn63` | ⬜ 미완 |
+| ③ | `departments/dshs-jayul/inviteCodes/{코드}` | ⬜ 미완 (코드 값 미정) |
+| ④ | ①의 `activeInviteCodeId` 갱신 | ⬜ ③ 이후 |
+
+---
+
+## ① `departments/dshs-jayul` — 완료 (검증용 기록)
+
+| 필드 | 타입 | 값 |
+| --- | --- | --- |
+| `name` | string | `자율생활부` |
+| `schoolName` | string | `대전대신고등학교` |
+| `headUid` | string | `SWfvnKEfs3dSqJICiKDnCOxcTn63` |
+| `academicYear` | int64 | `2026` |
+| `classCountByGrade` | map | `{1: 10, 2: 10, 3: 10}` (각 int64) |
+| `maxNumberPerClass` | int64 | `37` |
+| `patrolTime` | string | `07:50` |
+| `patrolPlace` | string | `중앙 현관` |
+| `memberCount` | int64 | `0` |
+| `activeInviteCodeId` | null | — (③ 생성 후 ④에서 코드 문자열로 교체) |
+| `updatedAt` | timestamp | `2026-08-21 오전 09:00:00` |
+
+---
+
+## ② `users/SWfvnKEfs3dSqJICiKDnCOxcTn63`
+
+**문서 ID = uid = `SWfvnKEfs3dSqJICiKDnCOxcTn63`**
+
+부장 시드 계정. Auth에 이미 존재하는 유일한 계정(`25_yij1029@dshs.kr`, Google 제공업체)이다.
+
+| 필드 | 타입 | 값 |
+| --- | --- | --- |
+| `uid` | string | `SWfvnKEfs3dSqJICiKDnCOxcTn63` |
+| `email` | string | `25_yij1029@dshs.kr` |
+| `name` | string | `유이준` |
+| `nameSource` | string | `parsed` |
+| `displayNameRaw` | string | `26_20723유이준` |
+| `memberStudentNo` | string | `20723` |
+| `memberGrade` | int64 | `2` |
+| `memberClassNo` | int64 | `7` |
+| `memberNumber` | int64 | `23` |
+| `role` | string | `head` |
+| `status` | string | `active` |
+| `departmentId` | string | `dshs-jayul` |
+| `inviteCodeId` | null | — |
+| `notificationPrefs` | map | `{duty: true, approval: true}` (각 boolean) |
+| `approvedBy` | null | — |
+| `approvedAt` | null | — |
+| `rejectReason` | null | — |
+| `withdrawnAt` | null | — |
+| `anonymizedAt` | null | — |
+| `lastActiveAt` | null | — |
+| `recordCount` | int64 | `0` |
+| `createdAt` | timestamp | `2026-08-21 오전 09:00:00` |
+| `updatedAt` | timestamp | `2026-08-21 오전 09:00:00` |
+
+### 판단 근거 2건
+
+- **`status: 'active'`는 PRD에 명시된 값이 아니라 결정 사항이다.** §9.7은 "Dev가 대상 계정의 `role`을 `head`로 직접 설정"만 규정하고 `status`는 침묵한다. `pending`으로 두면 부장 본인이 S2-1 승인 대기 화면에 갇혀 자기 자신을 승인할 수 없다. st4R 승인 완료.
+- **`memberGrade`·`memberClassNo`·`memberNumber`는 `20723`에서 DR-02로 역파생한 값**이다 (2학년 / 7반 / 23번). 전교생 명단에서 `20723 = 유이준`으로 교차 확인했다.
+
+---
+
+## ③ `departments/dshs-jayul/inviteCodes/{코드}`
+
+> 🔴 **코드 값이 아직 정해지지 않았다.** 아래 `{코드}` 자리를 채운 뒤 진행할 것.
+> 형식: `^[A-Z]{4}-[0-9]{4}$` — 9자 고정, 혼동 문자 `I`·`O` 제외 (§9.3.3).
+
+**문서 ID = 코드 문자열 그대로** (예: `inviteCodes/DJSN-2691`). 임의 ID 금지 — W-08 §2-1 규칙이
+`request.resource.data.code == codeId`를 강제하므로 ID와 `code` 필드가 반드시 일치해야 한다.
+
+| 필드 | 타입 | 값 |
+| --- | --- | --- |
+| `code` | string | `{코드}` — **문서 ID와 동일해야 함** |
+| `issuedBy` | string | `SWfvnKEfs3dSqJICiKDnCOxcTn63` |
+| `issuedAt` | timestamp | `2026-08-21 오전 09:00:00` |
+| `expiresAt` | timestamp | `2026-09-04 오전 09:00:00` (발급 + 14일, BR-13) |
+| `isActive` | boolean | `true` |
+| `revokedAt` | null | — |
+| `useCount` | int64 | `0` |
+| `maxUses` | int64 | `30` |
+
+### `useCount`는 당분간 `0`에서 움직이지 않는다
+
+지시서 §0.2 결정 1(안 2)로 증가 시점이 **부장 승인(OP-09)** 으로 옮겨졌다. S2는 `inviteCodes`에
+한 글자도 쓰지 않는다. 승인 쪽 증가는 **W-11(S8 관리)** 이 붙인다.
+그때까지 한도 초과 판정(BR-14)은 실질적으로 동작하지 않으며, 이는 버그가 아니다.
+**`maxUses`를 임시로 낮춰 시험하지 말 것** — 낮추면 정상 가입이 막힌다.
+
+---
+
+## ④ ①의 `activeInviteCodeId` 갱신
+
+③을 만든 뒤 `departments/dshs-jayul`을 열어 `activeInviteCodeId`를
+**null → string `{코드}`** 로 바꾼다. 타입도 함께 바꿔야 한다.
+
+---
+
+## 콘솔 입력 시 주의
+
+- **timestamp 필드**는 날짜와 시간을 따로 받는다. 시간 칸은 `오전/오후`가 첫 세그먼트라
+  칸을 클릭한 뒤 `↑`를 눌러 `오전`을 먼저 세우고, `→`로 넘어가 `090000`을 입력한다.
+  세 세그먼트가 다 차기 전까지 `시간이 잘못되었습니다` 경고가 떠 있는 게 정상이다.
+- **map 필드**는 유형을 `map`으로 바꾼 뒤 안쪽에 별도의 `필드 추가`가 생긴다.
+  `classCountByGrade`의 키 `1`·`2`·`3`은 **문자열 키에 int64 값**이다.
+- **int64 필드**는 값 칸이 `0`으로 미리 채워져 있다. 트리플클릭으로 전체 선택 후 덮어쓸 것.
+- 필드를 하나 추가할 때마다 다이얼로그가 아래로 늘어나므로, 스크롤 후 좌표를 다시 확인할 것.
+
+---
+
+## 시딩과 별개로 처리해야 할 것
+
+### 1. PRD D-03·D-04 확정 반영
+
+전교생 명단(`2026_전교생_통합명단_학년별.xlsx`)에서 산출한 실측값:
+
+| 학년 | 반 수 | 재적 | 반별 최대 번호 |
+| --- | --- | --- | --- |
+| 1학년 | 10 | 354명 | 35~37 |
+| 2학년 | 10 | 346명 | 35~37 |
+| 3학년 | 10 | 333명 | 33~34 |
+| **계** | **30개 반** | **1,033명** | 전체 최대 **37** |
+
+- **D-03 `classCountByGrade` = `{1:10, 2:10, 3:10}`** — PRD 잠정값과 일치
+- **D-04 `maxNumberPerClass` = `37`** — st4R 결정. PRD 잠정값 `40`에서 변경
+
+두 값 모두 PRD에 `[결정 필요]`로 남아 있으므로 **v1.4에 확정값으로 반영 필요**.
+
+> ⚠ `37`은 검증 *상한*이다. 전입생이 38번으로 배정되면 학생 등록이 막힌다.
+> 학기 중 전입이 발생하면 이 값을 올려야 한다는 점을 운영 메모로 남겨 둘 것.
+
+### 2. PRD 이름 길이 규칙 위반 학생 1명
+
+`2학년 9반 · 학번 20912 · PAK VITALII` — **11자**.
+
+PRD §9.3.4가 학생 `name`을 **2~10자**로 규정하므로, §9.7 학생 명부 CSV 임포트를 돌리면
+**이 학생만 조용히 누락된다.** 정규식 `^[가-힣a-zA-Z\s]+$` 자체는 통과하고 길이에서만 걸린다.
+
+W-08 범위 밖이지만 PRD 수정이 필요한 건이다. 선택지:
+- `name` 상한을 10자 → 20자 등으로 완화 (외국인 성명은 공백 포함 길이가 쉽게 넘는다)
+- 또는 임포터에 길이 초과 시 **실패 로그를 남기는** 경로를 추가 (조용한 누락 방지)
+
+### 3. 학번 열이 템플릿이라는 점
+
+명단의 학번 열은 반마다 1~40이 **전부 채워진 템플릿**이다(총 1,200행).
+이름이 있는 행만 실제 재적(1,033명)이다. CSV 임포트 시 **이름 공란 행을 건너뛰지 않으면
+빈 학생 167명이 생성된다.**
 
 **문서 끝.** v1.0은 개발 착수 기준 문서다. §19.2의 잔여 항목은 해당 시점에 확정해 문서에 반영한다.
 > `| v1.1 | 2026-08-19 | PM | §20 협업·운영 규약 신설. Claude Code 작업 프로토콜·커밋 규칙·폴더 구조 확정 |`

@@ -5,6 +5,7 @@ import { CenterNotice } from '../components/CenterNotice'
 import { Chip } from '../components/Chip'
 import { LoadErrorIcon, RosterEmptyIcon } from '../components/icons'
 import { NeuButton } from '../components/NeuButton'
+import { RecordSheet } from '../components/RecordSheet'
 import { useToast } from '../components/Toast'
 import { useAuth } from '../contexts/AuthProvider'
 import { fetchStudents, type Student, type StudentsResult } from '../lib/roster'
@@ -17,9 +18,9 @@ import { fetchDepartment, type DeptResult } from '../lib/stats'
  *
  * **여백·배너·오라·스크롤 요소를 만들지 마라.** 전부 `AppShell` 소유다(W-09 §5 · W-10 §5-1).
  *
- * 🔴 **행 탭은 `sparkle`만 재생하고 아무 것도 열지 않는다.** S6 기록 작성 시트는 **W-12**다.
- * 「준비 중」 같은 토스트를 만들지 마라 — §8.10 사전에 없는 새 문구다.
- * W-12가 붙을 자리는 `handleStudent()` 안, `spawnSparkle(...)` 바로 다음 줄이다.
+ * 🔴 **행 탭은 `sparkle` 다음 줄에서 S6 기록 작성 시트를 연다**(W-12 §3.6).
+ * §8.5.4 T-02가 `sparkle` → 딤 0.3s + 시트 0.38s를 **같은 트리거**로 규정한다.
+ * 교사 계정은 행이 `<button>`이 아니라 `<div>`라 T-04(교사 행 탭 = 무동작)가 자동으로 지켜진다.
  */
 
 /* §8.5.2 · §8.10 — 확정 문안이다. 새로 짓지 마라. */
@@ -54,6 +55,11 @@ export default function ClassStudents() {
 
   const [dept, setDept] = useState<DeptResult | null>(null)
   const [roster, setRoster] = useState<StudentsResult | null>(null)
+
+  /* S6 시트. `open`과 내용물을 따로 든다(W-12 §3.5). */
+  const [sheetOpen, setSheetOpen] = useState(false)
+  const [sheetStudent, setSheetStudent] = useState<Student | null>(null)
+  const [sheetKey, setSheetKey] = useState(0)
 
   const titleRef = useRef<HTMLHeadingElement>(null)
   /* §3.5 — 연속 탭 차단. 행 탭이 아직 아무 것도 열지 않아도 `sparkle` 5연발을 막는다. */
@@ -107,16 +113,27 @@ export default function ClassStudents() {
   /* §8.5.2 #4 — 로딩·에러는 `-명`이다. `0명`으로 뭉개지 마라. */
   const countLabel = roster?.kind === 'ok' ? `${students.length}명` : '-명'
 
-  const handleStudent = (event: React.MouseEvent<HTMLButtonElement>) => {
+  const handleStudent = (student: Student, event: React.MouseEvent<HTMLButtonElement>) => {
     if (tappingRef.current) return
     tappingRef.current = true
-    /* T-02 — `sparkle`(녹색)까지가 이번 회차다. **시트는 W-12가 여기에 붙인다.** */
+    /* T-02 — `sparkle`(녹색)과 시트 오픈이 **같은 트리거**다. */
     spawnSparkle(overlayRoot, event.clientX, event.clientY)
-    /* 빗장을 놓아 준다. `navigate`가 없어 화면이 언마운트되지 않으므로
-       W-10의 「눌린 채 끝난다」 패턴을 그대로 두면 두 번째 학생을 못 고른다. */
-    window.setTimeout(() => {
-      tappingRef.current = false
-    }, 0)
+    /* 🔴 `key`를 올려 `RecordSheet`를 새로 마운트한다. `occurredAt`·`clientRecordId`·
+       사유·기타 입력값 초기화가 전부 마운트 한 곳에서 일어난다(W-12 §3.5). */
+    setSheetStudent(student)
+    setSheetKey((k) => k + 1)
+    setSheetOpen(true)
+    /* 🔴 빗장은 여기서 풀지 않는다. 열린 시트 뒤의 다른 행이 눌리면 안 되므로
+       **시트가 완전히 닫힐 때**(`onClosed`) 푼다 — W-11 §4-7의 재정의다. */
+  }
+
+  /* 닫기 **요청**. 실제 닫힘·히스토리 되감기는 `BottomSheet`가 소유한다(N-02). */
+  const handleSheetClose = () => setSheetOpen(false)
+
+  /* 닫힘 모션 0.38s까지 끝난 뒤. `student`는 그때까지 비우지 않는다 —
+     비우면 닫히는 동안 시트 내용이 사라진다(W-12 §3.5). */
+  const handleSheetClosed = () => {
+    tappingRef.current = false
   }
 
   return (
@@ -204,7 +221,7 @@ export default function ClassStudents() {
                     key={student.id}
                     type="button"
                     className="srow"
-                    onClick={handleStudent}
+                    onClick={(event) => handleStudent(student, event)}
                   >
                     <span className="srow-no">{student.studentNo}</span>
                     <span className="srow-name">{student.name}</span>
@@ -230,6 +247,19 @@ export default function ClassStudents() {
               )}
         </div>
       )}
+
+      {/* S6 — 오버레이라 레이아웃에 관여하지 않는다. `AppShell`은 손대지 않는다. */}
+      <RecordSheet
+        key={sheetKey}
+        open={sheetOpen}
+        onClose={handleSheetClose}
+        onClosed={handleSheetClosed}
+        student={sheetStudent}
+        grade={grade}
+        classNo={classNo}
+        /* 명부가 그려진 시점에는 부서 조회가 이미 성공해 있다(`load()` 참조). */
+        academicYear={dept?.kind === 'ok' ? dept.academicYear : 0}
+      />
     </main>
   )
 }

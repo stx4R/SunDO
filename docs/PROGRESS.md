@@ -1,7 +1,7 @@
 # SunDO Progress
 
 ## 현재 버전
-v0.3.0
+v0.4.0
 
 ## 완료한 작업
 - [x] W-01 프로젝트 스캐폴딩
@@ -32,25 +32,75 @@ v0.3.0
       아이콘 2종. 🔴 **착수 전 확인 1건(QA-11-01)** — `1f` 원문이 `sticky`와 양립하지 않아 멈추고 물었고
       **유리 헤더 띠**로 확정됐다. `AppShell` **diff 0줄** · 기존 화면 변경은 클래스 이름 승격뿐(회귀 0칸).
       보고서 `reports/W-11.md` · 인덱스 요청서 `database_ToDo/W-11.md`
+- [x] W-12 S6 기록 작성 시트 + 저장 로직 — **DoD 35개 중 33개 통과 · 2개 미측정**
+      🔴 **앱이 처음으로 데이터를 만든다.** 지금까지는 전부 읽기였다.
+      신규 3종(`RecordSheet` · `Segmented`(공용) · `lib/records.ts`) + 확장 4종
+      (`dateKeys.toMonthKey`/`formatDateTimeKst` · `spawnSparkle(color?)` · `Field(counter?)` ·
+      `BottomSheet(onClosed?, 아래 스와이프)`). `AppShell` **diff 0줄** · 기존 화면 변경은 `ClassStudents.tsx` 하나뿐.
+      **의존성 추가 0**(UUID는 `crypto.randomUUID()`) · 실 Firestore 쓰기 **0건** · 콘솔 조작 **0건**.
+      착수 전 확인 2건(`Field` 카운터 API 형태 · 아래 스와이프 소유자) — 둘 다 승인.
+      **미측정 2건**: ER-17(UI 도달 불가 — §4-8) · 「인덱스 없이 실제로 동작」(실 접속 0 제약 — §1-4).
+      보고서 `reports/W-12.md` · 콘솔 요청서 `database_ToDo/W-12.md`
 
 ## 진행 중
-- 없음. **W-11까지 커밋 완료**(`SunDO v0.3.0`).
+- 없음. **W-12까지 커밋 완료**(`SunDO v0.4.0`).
 
 ## 다음 작업
-- **W-12 (S6 기록 작성 바텀시트)** — 지시서 대기
-  착수 전 **`reports/W-11.md` §5(컴포넌트 API) · §8(넘길 전제 5건)** 을 읽는다.
-  🔴 **여백·오라·배너·스크롤 요소를 만들지 마라.** `AppShell`이 전부 소유한다(W-09 §5 · W-10 §5-1).
-  🔴 **시트를 붙일 자리는 `ClassStudents.tsx`의 `handleStudent`, `spawnSparkle(...)` 바로 다음 줄이다.**
-  지금은 인자가 이벤트 하나뿐이라 `(student, event)`로 넓히고 호출부도 함께 고쳐야 한다(§8-1).
-  🔴 **행 탭 빗장(`tappingRef`)의 해제 시점을 다시 정해야 한다.** 지금은 `setTimeout(…, 0)`이고,
-  시트가 생기면 **시트가 닫힐 때** 푸는 것이 맞다.
-  🔴 **`toDateKey`/`toWeekKey`를 반드시 같은 함수로 써라**(`lib/dateKeys.ts`). 화면 집계와 기록 쓰기가
-  다른 규칙으로 키를 만들면 카운트가 영원히 어긋난다. **`toMonthKey`는 아직 없다 — 같은 KST 규칙으로 추가한다.**
-  🔴 **IX-06(`studentDocId, reasonCode, occurredAt DESC`)이 미생성이다.** BR-13 30분 중복 검사가 이걸 쓴다 —
-  **착수 전에 `database_ToDo`로 요청하라.**
-  🔴 **교사 계정 행은 `<button>`이 아니라 `<div>`다.** `isTeacher` 분기를 그대로 두면 T-04가 자동으로 지켜진다.
+- **W-13 (S7 기록 조회)** — 지시서 대기
+  착수 전 **`reports/W-12.md` §5(컴포넌트 API — `RecordSheet`·`Segmented`·`records.ts`·「쓰지 않는 5필드」 계약) ·
+  §8(넘길 전제 7건)** 을 읽는다.
+  🔴 **IX-01 ~ IX-05가 전부 미생성인데 이제 `records`에 문서가 실제로 쌓인다.**
+  S7의 정렬(`occurredAt DESC`)·필터(`reasonCode`) 질의는 인덱스 없이 `failed-precondition`으로 죽는다.
+  **착수 전에 `database_ToDo/W-12.md` §1을 처리해야 한다.** S3의 카운트 2종은 등식뿐이라 지금도 돈다.
+  🔴 **「쓰지 않는 5필드」**(`updatedBy`·`updatedAt`·`deletedBy`·`deletedAt`·`deleteReason`)는
+  **키 자체가 없다.** `?? null`로 읽어라. `'updatedAt' in data`로 「수정된 적 있음」을 판정하면
+  W-12가 만든 문서와 W-13이 수정한 문서가 다르게 보인다. 반대로 `reasonText`는 **항상 존재**하고
+  `ETC`가 아니면 명시적 `null`이다.
+  🔴 **`Segmented`는 공용이다.** 사유 변경 시트(§8.7.4 T-06)가 그대로 물려받는다. design `18c`·`18d`의
+  세그먼트 선언이 `17a`와 **완전히 동일**함을 확인했다. BR-07a — `ETC`를 벗어나면 `reasonText`를 `null`로 비워라.
+  🔴 **`recordCount` 감소(OP-07)를 붙이지 마라.** 아무도 올리지 않으므로 값이 영원히 `0`이고,
+  감소만 붙이면 음수가 된다. `database_ToDo/W-12.md` §3의 A/B/C 결정이 먼저다.
+  🔴 **조회 실패를 「기록 없음」으로 읽지 마라.** §8.7.2가 실패를 ER-02, 빈 상태를 EM-02로 따로 규정한다.
+  ⚠ **시트 위에 모달을 얹으면 포커스 트랩이 중첩된다.** 지금은 ESC가 둘 다 닫는다(W-12 §4-11).
 
 ## 확정된 결정
+- 🔴 **W-12는 `records` 문서 1건만 쓴다. `users.recordCount`를 올리지 않는다.** (W-12 §0.2 결정 1)
+  §9.6·부록 B의 본인 자기 갱신 허용 키에 `recordCount`가 **없다.** 지금 넣으면 W-04 임시 catch-all 덕에
+  통과하다가 **W-15가 §9.6 본편을 배포하는 순간 기록 저장이 통째로 막힌다.**
+  → **`recordCount`는 영원히 `0`이며 이것은 버그가 아니다.** 규칙 개정 요청은 `database_ToDo/W-12.md` §3.
+  ⚠ 저장 경로 밖에서 `users/{uid}.lastActiveAt` 쓰기 1건이 관측되는데, 그것은 W-07 `useLastActiveAt`(DR-12)다.
+- 🔴 **`setDoc`을 `await`하지 않는다.** (W-12 §1-3 실측)
+  `persistentLocalCache`가 켜져 있으면 `setDoc`의 promise는 **서버 확인까지 resolve되지 않는다** —
+  오프라인에서 `disableNetwork()` 뒤 8초가 지나도 `PENDING`이고, 같은 문서를 즉시 `getDoc`하면 11ms에
+  `hasPendingWrites: true`로 돌아온다. SDK 원문도 「resolved once the write was acked/rejected by the backend」다.
+  기다리면 음영 구간에서 스피너가 영원히 돈다(W-08에서 실제로 터진 실패).
+  `lib/records.ts`의 `writeRecord()`는 **`void`를 반환한다** — 호출부가 실수로 기다릴 방법이 없다.
+  **그래서 서버 거부(규칙 위반·시각 위조)는 이 계층에서 관측되지 않는다.** W-17이 이어받는다.
+- 🔴 **30분 중복 검사는 등식(`in` 포함) 질의뿐이다. IX-06을 쓰지 않는다.** (W-12 §1-4)
+  `where('studentDocId','==',…)` + `where('dateKey','in',[어제, 오늘])`. `orderBy`·범위 조건 **0개**라
+  미생성 인덱스에 의존하지 않는다. 나머지 판정(30분 창·사유·`reasonText`·`status`)은 전부 클라이언트다.
+  **항상 2일치를 읽는다** — 00:10 작성 시 30분 창이 전날 23:40까지 걸치는데, 분기하면 경계 버그가 생긴다.
+  §8.6.3의 MD-05 판정도 **같은 결과 집합**을 쓴다(추가 질의 0회).
+- 🔴 **중복 조회 실패는 「중복 없음」이 아니다.** (W-12 §3.8)
+  `permission-denied`·`unavailable`·`failed-precondition`에서 **저장은 진행하고 MD-05는 띄우지 않는다.**
+  기록 누락(P-02)이 중복보다 비싸고 재전송 중복은 멱등키(BR-02)가 흡수한다. `DuplicateVerdict`에
+  `unknown` 갈래를 따로 뒀다 — `none`과 뭉개지 마라. 실패는 콘솔 경고 1건으로 남는다.
+- 🔴 **`clientRecordId`는 시트 1회 오픈당 1개다.** (BR-02)
+  마운트 시점의 `crypto.randomUUID()`이고 **MD-05 확인·차단 후 재시도에도 같은 값**이다(실측 5회 동일).
+  시트 초기화는 `useEffect`가 아니라 **`key` 재마운트**가 한다 — `occurredAt`·`clientRecordId`·사유·기타 입력값이
+  한 곳에서 초기화된다.
+- 🔴 **세그먼트 선택 배경은 절대 위치 인디케이터 1개가 갖는다.** (W-12 §5-2)
+  항목마다 배경을 토글하면 T-02의 0.22s 가로 슬라이드가 물리적으로 불가능하다.
+  200% 2행(2+1)은 미디어 쿼리가 아니라 **`flex-wrap: wrap` + 항목 `min-width: 6.5em`**이 만든다(design 원문).
+- **`.spark`에 `z-index: 51`이 붙었다.** (W-12 §4-5)
+  `.ovl-root`는 스태킹 문맥을 만들지 않아(z auto·transform none·…) 파티클이 딤(40)·시트(50) **뒤로 깔렸다.**
+  시트 위, 모달(55)·토스트(60) 아래다. **모달 위에서 파티클을 터뜨리는 화면이 생기면 이 값을 다시 봐야 한다.**
+  `.ovl-root`의 `pointer-events: none`은 되돌리지 않았다.
+- **바텀시트에 아래 스와이프 닫기와 `onClosed`가 생겼다.** (W-12 §4-2 · 착수 전 승인)
+  그랩 핸들에서만 시작하고(시트 전체에 걸면 캐럿 드래그·세그먼트 탭과 뒤엉킨다), 임계값 **80px**는 **신규 값**이다.
+  닫힘은 기존 `requestClose()` **한 경로**로 들어간다. S5 행 탭 빗장은 `onClosed`에서 푼다.
+- **`--shadow-inset-soft`가 승격됐다** — `inset 0 1px 3px rgba(20,53,38,0.05)`.
+  `.ff`에 이어 `.seg`가 두 번째 컴포넌트가 되어 W-03B §3 기준을 넘겼다. **§7.1 보완 토큰은 10개다.**
 - 🔴 **S5 헤더는 `sticky` + 유리 띠다.** (W-11 §4-1 · QA-11-01 st4R 승인)
   `position:sticky; top:0; background: rgba(255,255,255,0.6); backdrop-filter: blur(22px) saturate(170%)`.
   **리스트에 자체 `overflow`를 걸지 마라** — 스크롤 요소는 `AppShell` 하나다(DoD 16).
@@ -334,9 +384,26 @@ v0.3.0
 화면이 늘면 화면마다 다른 escape hatch가 생긴다.
 
 **지금 고치지 않는다** — 실사용 소비자가 S2 하나뿐이라 설계할 근거가 부족하다.
-**S6 회차에 소비자 2개를 놓고 `Field` 계약을 정리한다.**
+~~S6 회차에 소비자 2개를 놓고 `Field` 계약을 정리한다.~~
+
+🔴 **W-12에서 검토했고 전제가 성립하지 않아 다시 미뤘다**(`reports/W-12.md` §4-15).
+S6의 `기타 사유`는 **완전히 동기적**이다 — 서버 조회가 없고 `checking`도 `reset()`도 쓰지 않는다.
+즉 **두 번째 소비자가 그 구멍(비동기 「판정 없음」)을 재현하지 않아** 설계 근거가 여전히 S2 한 건뿐이다.
+W-12가 넓힌 `counter?`는 표시 슬롯이라 `validate` 2값 문제와 무관하다.
+→ **비동기 판정을 실제로 쓰는 두 번째 소비자**(S8 학생 임포트 검증 또는 S9 검색)가 생기는 회차로 옮긴다.
 
 ## 막힌 지점 / 사용자 확인 필요
+- 🔴 **`records` 인덱스 5건(IX-01~IX-05)이 전부 미생성인데 이제 문서가 쌓이기 시작했다.**
+  (`database_ToDo/W-12.md` §1) **W-13(S7 기록 조회) 착수 전에 배포해야 한다.**
+  W-12 자신은 등식 전용 질의라 인덱스가 **0건 필요**하지만, 그 사실을 실 Firestore에서 확인하지는 못했다
+  (쓰기 0건 제약). 명부 시딩 후 실기기 저장 1회로 확인 요청.
+- 🔴 **`users.recordCount` 규칙 개정 판단이 필요하다.** (`database_ToDo/W-12.md` §3)
+  A안(§9.6 허용 키에 추가 + 「+1만」 조건) / B안(프로파일 B) / C안(필드 삭제). **추천 A안.**
+  결정 전까지 값은 `0`이고, **S7의 감소(OP-07)도 붙이면 안 된다.**
+- 🔴 **학생 명부 시딩 — 없으면 S6에 실기기로 도달할 수 없다.** (`database_ToDo/W-12.md` §6)
+  `students`가 비어 S5가 빈 상태(EM-01)이고, 행이 없으면 시트를 열 트리거가 없다.
+  **최소 1개 반**(문서 ID `{academicYear}_{studentNo}`)이 필요하다. §9.7 `[결정 필요 D-05]`가 열려 있다.
+  W-13은 「기록이 실제로 쌓인 상태」를 요구하는데 그 기록을 만들 유일한 입구가 S6이고 S6의 입구가 명부다.
 - 🔴 **Firebase 규칙 3건 — 「미반영」으로 확정됐다.** (W-11 §0.3 실측 · `database_ToDo/W-11.md` §4)
   `inviteCodes` 단건 `get` · 필수 조건 2/BR-30a 예외 · `users` update 재신청 예외.
   판정 근거는 **PRD에 없는 임의 컬렉션(`zzruleprobe`)이 읽힌다**는 것 — W-04 §5의 catch-all이 살아 있다.
@@ -387,6 +454,17 @@ v0.3.0
 - `README.md`·`LICENSE`(MIT)를 원격에 복구할지, 복구한다면 어느 작업 단계에 넣을지 미정.
 
 ## 해소된 항목
+- ~~S4 빈 상태에 아이콘이 없다 (시안 필요 여부)~~ → **W-12 지시서 §0.1-5에서 「아이콘 없음이 정본」으로 닫혔다.**
+  시안을 요청하지 않는다. §8.10.2 EM-07이 규정하는 것도 문구뿐이다.
+  **PRD 반영 대기가 38건 → 37건이 됐다**(W-12 신규 9건을 더해 현재 **46건** — `reports/W-12.md` §7).
+- ~~S6 기록 작성 시트를 여는 자리(W-11 §8-1)~~ → **W-12에서 붙였다.**
+  `handleStudent(student, event)` 안, `spawnSparkle(...)` 바로 다음 줄. 행 탭 빗장은
+  `setTimeout(…, 0)`이 아니라 **시트가 완전히 닫힐 때**(`BottomSheet.onClosed`) 푼다.
+- ~~`toMonthKey`가 없다~~ → **W-12에서 `dateKeys.ts`에 추가했다.** `formatDateTimeKst`(BR-47 표기)도 함께다.
+  **둘 다 기존 `toKst()`를 통과한다** — KST 변환을 복사하지 마라.
+- ~~IX-06을 W-12 착수 전에 요청해야 한다(W-11 §8-4)~~ → **필요 없어졌다.**
+  등식 `in` 질의로 대체해 W-12가 요구하는 인덱스가 **0건**이다. IX-06이 필요해지는 시점은
+  서버 중복 검사 전환 또는 S7 학생별 이력이다(`database_ToDo/W-12.md` §2).
 - ~~오프라인 배너와 상단 헤더의 겹침~~ → **W-09에서 밀어내기로 해소했다.**
   `AppShell`이 배너를 직접 소유하고(포털·컨텍스트 없음) 콘텐츠를 **56px** 민다.
   S2 실측: 배너 하단 `56` · 뒤로 버튼 `88.25` · 제목 `82` — 겹침 0.
@@ -463,6 +541,14 @@ v0.3.0
 - **순수 함수 실측 방법(W-04).** 테스트 러너가 없어 Node의 타입 스트리핑으로 `src/lib/*.ts`를
   직접 import해 실행했다. 확장자 없는 상대 import는 `module.register` 해석 훅으로 `.ts`를 붙였다.
   소스를 복사하지 않으므로 실측 대상과 저장소 파일이 어긋나지 않는다. 스크립트는 스크래치패드에 있다.
+- **W-12 검증 방법.** 스텁 `firestore`가 `where(..., 'in', [...])`를 해석하고 질의 키를 기록한다.
+  `setDoc`은 오프라인 모드에서 **로컬 반영 즉시 + promise 영원히 pending**으로 흉내 낸다 —
+  화면이 `await`했다면 여기서 타임아웃 난다. 시각은 `Page.addScriptToEvaluateOnNewDocument`로
+  앱보다 먼저 `Date`를 덮어 주입했다(**화면 코드에 시각 주입 훅을 만들지 않았다**).
+  `clientRecordId`는 React fiber(`__reactFiber$…`)의 `useState` 체인에서 직접 읽었다.
+  🔴 **히스토리 검증은 앱 내비게이션으로 화면에 들어가야 한다** — `Page.navigate`로 바로 꽂으면
+  이전 엔트리가 `about:blank`라 뒤로가기 1회에 타깃이 detach된다.
+  🔴 **쓰기 카운트는 `records/` 경로만 세라** — `useLastActiveAt`(DR-12)가 `users`를 상시로 쓴다.
 - **최소 지원 폭은 360px이다.** (W-03C 지시서 §0.2) 320px에서 독 간격이 0이 되는 것은 지원 범위 밖이다.
 - **토큰화 기준(W-03B 지시서 §3)**: 서로 다른 컴포넌트 2개 이상에서 쓰이면 토큰.
   같은 컴포넌트의 상태 변형 반복은 CSS 기계적 중복이지 토큰 수요가 아니다.
@@ -474,7 +560,10 @@ v0.3.0
 
 ## 다음 세션이 먼저 읽어야 할 파일
 - CLAUDE.md, docs/SunDO_PRD.md, prompts/{다음 작업}.md
-- **reports/W-11.md §5(컴포넌트 API — `roster` · `CenterNotice` · `.skel`/`.back` 승격) · §8(W-12 전제 5건)**
+- **reports/W-12.md §5(컴포넌트 API — `RecordSheet` · `Segmented` · `records.ts` · 🔴 「쓰지 않는 5필드」 계약) ·
+  §8(W-13 전제 7건) · §6(검증 환경 — 스텁 확장 3종과 측정 함정 4건)**
+- **database_ToDo/W-12.md** — 인덱스 5건 · `recordCount` 결정 · 규칙 재검증 시나리오 10건 · 명부 시딩
+- reports/W-11.md §5(컴포넌트 API — `roster` · `CenterNotice` · `.skel`/`.back` 승격) · §8(W-12 전제 5건)
 - reports/W-10.md §5(`ScrollRootContext` · 신규 훅 3종 · `lib` 2종)
 - reports/W-09.md §5(`AppShell` 신규 계약 · 스테이지 구조도)
 - **reports/W-06.md §1(`AppShell` API 15항목 — W-09 §5가 1·2번을 갱신했다) · §9(W-07 전제)**

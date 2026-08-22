@@ -39,6 +39,15 @@ export interface FieldProps {
   placeholder?: string
   /** 있으면 좌측 기준선 44px */
   leadingIcon?: ReactNode
+  /**
+   * 우측 안쪽 슬롯(`.ff-end`)에서 상태 아이콘 **앞**에 놓이는 부가 표시.
+   * S6 기타 사유의 글자 수 카운터가 첫 사용처다(design `17c`·`17d` — 카운터와
+   * 아이콘이 같은 `right:16px` 묶음 안에서 `gap:8px`로 나란히 선다).
+   *
+   * **문구·색·`aria-live`는 호출부가 소유한다.** 임계값(18자)이 필드 규격이 아니라
+   * 화면 규격이라서다(§8.6.2 #7 · §15.3). `Field`에는 새 로직이 들어가지 않는다.
+   */
+  counter?: ReactNode
   id?: string
   ref?: Ref<FieldHandle>
 }
@@ -122,6 +131,7 @@ export function Field({
   inputMode,
   placeholder,
   leadingIcon,
+  counter,
   id,
   ref,
 }: FieldProps) {
@@ -258,6 +268,7 @@ export function Field({
           )}
 
           <span className="ff-end">
+            {counter}
             {readOnly ? (
               <LockIcon />
             ) : checking ? (
