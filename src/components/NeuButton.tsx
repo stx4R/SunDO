@@ -8,7 +8,8 @@ interface NeuButtonProps {
    * 인자를 **넓히기만** 하는 변경이라 기존 호출부는 그대로 둔다.
    */
   onClick?: (event: MouseEvent<HTMLButtonElement>) => void
-  radius?: 22 | 20
+  /** W-11 — `다시 시도`(design `6k`)가 15를 쓴다. 넓히기만 한 변경이다. */
+  radius?: 22 | 20 | 15
   disabled?: boolean
   className?: string
 }
@@ -16,10 +17,11 @@ interface NeuButtonProps {
 const RADIUS: Record<NonNullable<NeuButtonProps['radius']>, string> = {
   22: 'rounded-22',
   20: 'rounded-20',
+  15: 'rounded-15',
 }
 
 /**
- * PRD §7.3 `neu`. 학년 버튼(22) · 반 버튼(20) · 코드 재발급 버튼.
+ * PRD §7.3 `neu`. 학년 버튼(22) · 반 버튼(20) · 코드 재발급 버튼 · `다시 시도`(15).
  * `:active`(inset 반전 + scale 0.98)는 CSS가 이미 갖고 있다.
  */
 export function NeuButton({

@@ -181,7 +181,7 @@ export default function Home() {
           )
         ) : (
           <>
-            {HELLO}, <span className="s3-skel" aria-hidden="true" />님
+            {HELLO}, <span className="skel" aria-hidden="true" />님
           </>
         )}
       </p>
@@ -240,7 +240,7 @@ export default function Home() {
                 <span className="s3-grade-title block">{grade}학년</span>
                 <span className="s3-grade-sub block">
                   {lastClass === undefined ? (
-                    <span className="s3-skel" aria-hidden="true" />
+                    <span className="skel" aria-hidden="true" />
                   ) : (
                     `1반 ~ ${lastClass}반`
                   )}
@@ -296,7 +296,7 @@ function StatCard({
         {failed ? (
           '-'
         ) : value === null ? (
-          <span className="s3-skel" aria-hidden="true" />
+          <span className="skel" aria-hidden="true" />
         ) : (
           <>
             {formatCount(value)}

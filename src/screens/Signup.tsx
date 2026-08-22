@@ -236,7 +236,7 @@ export default function Signup() {
   return (
     <main data-screen="S2" aria-labelledby="scr-s2" className="flex min-h-full flex-col">
       <div className={cn('flex items-center', submitting && 'opacity-60')}>
-        <button type="button" className="s2-back" aria-label={BACK_LABEL} onClick={handleSignOut}>
+        <button type="button" className="back" aria-label={BACK_LABEL} onClick={handleSignOut}>
           {/* design 13a 원문 — 왼쪽 화살표 13px. */}
           <span>
             <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">

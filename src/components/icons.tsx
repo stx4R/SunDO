@@ -128,3 +128,43 @@ export function ToastCheckIcon({ className }: IconProps) {
     </svg>
   )
 }
+
+/**
+ * 빈 상태 — 학생 없음. design `6e` 원문(viewBox `0 0 28 28`, stroke 2.1).
+ * 원문은 `stroke="rgba(31,81,56,0.45)"`를 직접 칠하지만 여기서는 `currentColor`로
+ * 바꿔 색을 `.cnote-icon`이 제어한다(독 아이콘과 같은 규칙).
+ */
+export function RosterEmptyIcon({ className }: IconProps) {
+  return (
+    <svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true" className={className}>
+      <circle cx="11" cy="9.4" r="3.9" stroke="currentColor" strokeWidth="2.1" />
+      <path
+        d="M4.2 22.6c0-3.5 3-6 6.8-6s6.8 2.5 6.8 6"
+        stroke="currentColor"
+        strokeWidth="2.1"
+        strokeLinecap="round"
+      />
+      <path
+        d="M19 6.2a3.6 3.6 0 010 6.6M21.4 22.6c0-2.6-.9-4.6-2.4-5.7"
+        stroke="currentColor"
+        strokeWidth="2.1"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
+/**
+ * 에러 상태. design `6j`·`6k`가 **같은 글리프**를 쓴다 — §20.7이 「에러 상태 = `6j`,
+ * `6k`」로 화면을 가리지 않고 채택하므로 앱 공용 글리프다. 원문 stroke `#C0392B`는
+ * `currentColor`로 바꿔 `.cnote-icon-danger`가 칠한다.
+ */
+export function LoadErrorIcon({ className }: IconProps) {
+  return (
+    <svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true" className={className}>
+      <circle cx="14" cy="14" r="10.4" stroke="currentColor" strokeWidth="2.1" />
+      <path d="M14 8.6v7" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" />
+      <path d="M14 19.2v.1" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+    </svg>
+  )
+}

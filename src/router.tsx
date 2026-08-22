@@ -114,7 +114,9 @@ function ScreenTransition() {
 /**
  * N-04 파라미터 검증 — **형식만** 한다.
  *
- * `classNo ≤ classCountByGrade[grade]` 범위 검증은 부서 문서를 읽어야 하므로 W-08이다.
+ * `classNo ≤ classCountByGrade[grade]` 상한 검증은 부서 문서를 읽어야 하므로 **S5가 한다**
+ * (`screens/ClassStudents.tsx` — W-11 §3.4). 여기로 끌어올리지 마라: 가드가 부서 문서를
+ * 기다리면 `/grade/1/class/1` 정상 경로까지 조회가 끝날 때까지 아무 것도 못 그린다.
  *
  * **PRD 내부 충돌**: N-04는 `grade`·`classNo` 오류를 모두 S3으로 보내라 하고,
  * §8.5.3은 반 범위 초과를 S4로 보낸다. N-01(뒤로가기는 항상 한 단계 상위)의
@@ -145,7 +147,8 @@ function ClassGuard() {
   const { grade, classNo } = useParams()
   const toast = useToast()
   const value = toIndex(classNo)
-  /* 상한은 W-08이다. 여기서는 "정수 1 이상"만 본다. */
+  /* 상한은 S5가 본다(§8.5.3 · W-11 §3.4). 여기서는 "정수 1 이상"만 본다.
+     S5도 **같은 문구(TS-13) · 같은 이동 방식(`/grade/{g}`로 `replace`)** 을 쓴다. */
   const denied = value === null || value < 1
 
   useEffect(() => {
