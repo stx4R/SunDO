@@ -211,3 +211,22 @@ export function FilterEmptyIcon({ className }: IconProps) {
     </svg>
   )
 }
+
+/**
+ * 빈 상태 — 순찰 일정 없음(EM-06). design `6h` 원문(viewBox `0 0 28 28`, stroke 2.1).
+ * 다른 빈 상태 글리프와 같은 규칙으로 `stroke="rgba(31,81,56,0.45)"`를 `currentColor`로
+ * 바꿔 색을 `.cnote-icon`이 제어한다.
+ */
+export function DutyEmptyIcon({ className }: IconProps) {
+  return (
+    <svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true" className={className}>
+      <rect x="3.8" y="6" width="20.4" height="18.2" rx="3.4" stroke="currentColor" strokeWidth="2.1" />
+      <path
+        d="M3.8 11.6h20.4M9.4 3.6v4.4M18.6 3.6v4.4"
+        stroke="currentColor"
+        strokeWidth="2.1"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}

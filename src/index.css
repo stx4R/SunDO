@@ -2330,6 +2330,207 @@
   .s7-allbtn:active {
     transform: scale(0.97);
   }
+
+  /* ==========================================================
+     S9 선도 일정 — design `1j`(채택본 · **`舊 version.`**) · `6h` · `6j`
+     ⚠ `.rrow`(S7) · `.gh`(S7) · `.rs-*`(S6) · `.srow`(S5)를 재사용하지 않았다.
+     `.drow`는 **§8.9.2 #5가 지은 이름**이고 그래서 화면 접두사가 없다.
+     🔴 `1j`의 행 스타일은 `{{ d.rowStyle }}`·`{{ d.dayStyle }}` **템플릿 바인딩이라 원문 값이
+     없다**(OV-04). 값의 출처를 칸마다 아래에 적었다 — 지어낸 값이 아니다.
+     ========================================================== */
+
+  /* `1j` 원문 `display:flex;align-items:baseline;justify-content:space-between;margin-bottom:16px`.
+     ⚠ `1j`에는 `일정 편집` 버튼이 **그려져 있지 않다**(§8.9.2 #3은 있다고 적는다).
+     MVP는 편집이 제외라 진입점을 만들지 않았고, 그래서 이 줄은 제목 + 주차 표기 2칸 그대로다. */
+  .d-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  /* `1j` 원문 `font-size:28px;font-weight:800;letter-spacing:-0.01em`(색 선언 없음 → 본문색 상속).
+     ⚠ 굵기 **800**은 §7.2 H1(28px/**700**)과 다르다 — 크기·자간은 같다. `1j` 원문을 따랐고
+     보고서 §3·§7에 올렸다. 28px·-0.01em은 `--text-h1` 토큰과 같은 값이다. */
+  .d-title {
+    font-size: var(--text-h1);
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    color: var(--color-sundo-900);
+    outline: none;
+  }
+
+  /* `1j` 원문 `font-size:12px;font-weight:700;color:rgba(20,53,38,0.5)`.
+     §8.9.2 #2의 `12px/700`과 일치한다. 알파 0.5는 `.s5-hint`·`.s3-stat-label`과 같은
+     선례가 이미 있다(AC-01 목록과의 관계는 보고서 §7에 묶어 올렸다). */
+  .d-week {
+    flex: none;
+    font-size: var(--text-label);
+    font-weight: 700;
+    color: rgba(20, 53, 38, 0.5);
+  }
+
+  /* `1j` 원문 `padding:20px;border-radius:22px;background:linear-gradient(160deg,#2E6B4C,#1F5138);
+     color:#fff;box-shadow:0 14px 34px rgba(31,81,56,0.35),inset 0 1px 0 rgba(255,255,255,0.25);
+     margin-bottom:16px`.
+     그림자는 `--shadow-primary`(`0 10px 24px …0.35`)와 값이 달라 토큰화하지 않고 원문을 쓴다. */
+  .dcard {
+    margin-bottom: 16px;
+    border-radius: var(--radius-22);
+    padding: 20px;
+    background: var(--gradient-primary);
+    box-shadow:
+      0 14px 34px rgba(31, 81, 56, 0.35),
+      inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    color: #fff;
+  }
+
+  /* `1j` 원문 `font-size:11.5px;font-weight:700;opacity:0.75;letter-spacing:0.06em`. */
+  .dcard-top {
+    font-size: var(--text-caption);
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    opacity: 0.75;
+  }
+
+  /* `1j` 원문 `display:flex;gap:8px;margin-top:12px`.
+     🔴 `flex-wrap: wrap`은 원문에 없는 추가 선언이다 — 200% 확대에서 담당자 칩이 줄바꿈되지 않으면
+     가로 스크롤이 생긴다(AC-05). 100%에서는 칩 2~4개가 한 줄에 들어가 발동하지 않는다. */
+  .dcard-chips {
+    display: flex;
+    margin-top: 12px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  /* `1j` 원문 `padding:8px 14px;border-radius:999px;background:rgba(255,255,255,0.16);
+     border:1px solid rgba(255,255,255,0.25);font-size:13px;font-weight:700;
+     backdrop-filter:blur(8px)`. 13px는 `--text-subtitle`과 같은 값이다.
+     -webkit- 접두사를 손으로 적지 않는다(W-03B §4-1). */
+  .dchip {
+    border-radius: var(--radius-pill);
+    padding: 8px 14px;
+    background: rgba(255, 255, 255, 0.16);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    backdrop-filter: blur(8px);
+    font-size: var(--text-subtitle);
+    font-weight: 700;
+  }
+
+  /* `1j` 원문 `font-size:11px;opacity:0.65;margin-top:12px`.
+     ⚠ 원문 텍스트는 `등교 지도 07:50 · 중앙 현관`인데 **`등교 지도 ` 접두사는 §8.10 사전에도
+     §8.9.2 #4에도 없다.** 규격이 `{순찰 시간} · {장소}`라 접두사를 빼고 그렸다(보고서 §3). */
+  .dcard-foot {
+    margin-top: 12px;
+    font-size: var(--text-micro);
+    opacity: 0.65;
+  }
+
+  /* 로딩 카드. 🔴 **S9 전용 스켈레톤 시안이 없다**(§20.7의 `6a`~`6d`는 다른 화면이다).
+     그라디언트 카드 위에 `.skel`(어두운 회색 그라디언트)을 얹으면 읽히지 않으므로
+     같은 자리·같은 크기의 **유리 표면**으로 대체했다. 새 디자인을 지어낸 것이 아니라
+     기존 `.glass` + `.dcard`의 기하만 재사용한 것이다. 보고서 §7 신규 항목. */
+  .dcard-skel {
+    margin-bottom: 16px;
+    padding: 20px;
+  }
+
+  /* `1j` 원문 `border-radius:22px;padding:4px 0` + 유리.
+     원문 그림자는 `0 8px 26px rgba(20,53,38,0.08)`인데 `--shadow-glass`는 `…0.09`다.
+     `.glass`는 6화면이 공유하는 토큰이라 이 한 화면 때문에 0.08로 낮추지 않는다(W-13 §3 어긋난 칸 3과 같은 판단). */
+  .dlist {
+    padding: 4px 0;
+  }
+
+  /* 🔴 `1j`가 `{{ d.rowStyle }}`로 숨긴 자리다. 값의 출처:
+     세로·가로 패딩과 구분선은 **같은 구조의 채택본** `20f`의 기록 행(`.rrow` — `13px 16px` +
+     `1px solid rgba(20,53,38,0.06)` + `gap 12`)에서 가져왔다. 두 화면 모두 컨테이너가
+     `radius 22|20` 유리 카드 + `padding: 4px 0`으로 **동일**하다. */
+  .drow {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 13px 16px;
+    border-bottom: 1px solid var(--color-sundo-divider);
+  }
+
+  .drow:last-child {
+    border-bottom: none;
+  }
+
+  /* §8.9.2 #6 「배경 틴트」. `1j`가 값을 숨기고 있어 §7.1 틴트 4종(06·08·10·12) 중
+     **가장 옅은 값**을 골랐다 — 행 전체를 덮는 면이라 배지(그라디언트)·`오늘` 칩과 겹쳐
+     과해지면 안 된다. 신규 값이 아니라 기존 토큰이다. */
+  .drow-today {
+    background: var(--color-sundo-tint-06);
+  }
+
+  /* 🔴 요일 배지. `1j`는 `{{ d.dayStyle }}`로 숨겼지만 **같은 앱의 채택본 `19a`**(§20.7
+     「순찰 일정 편집 시트 = `19a`~`19c`」)가 같은 요소를 원문으로 갖고 있다 —
+     `width:34px;height:34px;flex:none;border-radius:12px;background:rgba(31,81,56,0.08)`
+     + `span font-size:13px;font-weight:700;color:#1F5138`.
+     0.08은 `--color-sundo-tint-08`, 12는 `--radius-12`, 13px는 `--text-subtitle`과 같은 값이다.
+     ⚠ `19a`는 v1.1 편집 시트이지만 **이 배지만은 조회 화면과 같은 요소**라 값을 빌렸다.
+     시트 자체는 구현하지 않았다. */
+  .dbadge {
+    display: flex;
+    width: 34px;
+    height: 34px;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-12);
+    background: var(--color-sundo-tint-08);
+    font-size: var(--text-subtitle);
+    font-weight: 700;
+    color: var(--color-sundo-800);
+  }
+
+  /* §8.9.2 #6 「배지 그라디언트」. `19a` 원문의 선택 배지
+     `background:linear-gradient(160deg,#2E6B4C,#1F5138);box-shadow:0 6px 14px rgba(31,81,56,0.28)`
+     + `color:#fff` 그대로다. */
+  .drow-today .dbadge {
+    background: var(--gradient-primary);
+    box-shadow: 0 6px 14px rgba(31, 81, 56, 0.28);
+    color: #fff;
+  }
+
+  /* `1j` 원문 `flex:1;font-size:14px;font-weight:600`.
+     ⚠ 14px는 §7.2 스케일에 없다(`--text-row`는 14.5px). W-12가 S6 일시에서 같은 공백을
+     보고했고(§7 이월 항목) 이번이 **두 번째 사용처**다 — 승격 판단은 §7.2 소유자(PM)에게 넘긴다.
+     `min-width: 0`은 긴 이름 목록이 배지·칩을 밀어내지 않게 한다. */
+  .drow-name {
+    min-width: 0;
+    flex: 1;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--color-sundo-900);
+  }
+
+  /* `1j` 원문 `font-size:10.5px;font-weight:800;color:#1F5138;background:rgba(31,81,56,0.12);
+     padding:4px 9px;border-radius:999px`. 0.12는 `--color-sundo-tint-12`와 같은 값이다.
+     10.5px는 §7.2 스케일에 없어 리터럴로 둔다(사용처 1곳 — W-03B §3 승격 기준 미달).
+     🔴 AC-03 — 오늘을 색만으로 전달하지 않는다. 이 칩의 **텍스트**가 그 역할이다. */
+  .dtoday {
+    flex: none;
+    border-radius: var(--radius-pill);
+    padding: 4px 9px;
+    background: var(--color-sundo-tint-12);
+    font-size: 10.5px;
+    font-weight: 800;
+    color: var(--color-sundo-800);
+  }
+
+  /* `1j` 원문 `font-size:11px;color:rgba(20,53,38,0.42);margin-top:12px;text-align:center`.
+     `.s5-hint`(W-11)와 크기·알파가 같다 — 두 화면이 같은 값을 쓰지만 마진·정렬이 달라
+     승격하지 않았다(W-03B §3은 「값이 같고 역할이 같은」 경우를 본다). */
+  .d-hint {
+    margin-top: 12px;
+    font-size: var(--text-micro);
+    color: rgba(20, 53, 38, 0.42);
+    text-align: center;
+  }
 }
 
 /* design/index.html 원문 그대로 — 수정 금지 */
