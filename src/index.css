@@ -196,10 +196,15 @@
     color: var(--color-sundo-800);
   }
 
-  /* 기록 조회 필터 칩. 비활성/활성 모두 design/index.html에서 이식. */
+  /* 기록 조회 필터 칩. 비활성/활성 모두 design/index.html에서 이식.
+     🔴 `min-height: 44px` · `padding: 12px 14px`는 **§15.1의 조치**이고
+     design `20f`의 `padding:8px 14px`(높이 약 33)와 갈린다. §15.1이 그 미달을
+     명시적으로 지목해 상향을 지시하므로 design보다 우선한다(W-13 §3.4).
+     폭은 좌우 14로 같아 한 줄 배치(§8.7.3)가 영향을 받지 않는다. */
   .fchip {
+    min-height: 44px;
     border-radius: var(--radius-pill);
-    padding: 8px 14px;
+    padding: 12px 14px;
     white-space: nowrap;
     background: var(--color-sundo-control);
     border: 1px solid rgba(255, 255, 255, 0.8);
@@ -2051,6 +2056,280 @@
     font-weight: 500;
     color: var(--color-sundo-ink-70);
   }
+
+  /* ==========================================================
+     S7 기록 조회 — design `20f`(채택본) · `18e` · `6b` · `6l`
+     ⚠ `.rs-*`(S6 전용 접두사)를 재사용하지 않았다. 같은 모양이어도 이름을
+     빌리면 한쪽을 고칠 때 다른 화면이 함께 깨진다(W-12 §8-7).
+     클래스 이름 중 `.sync`·`.gh`·`.rrow`·`.rid`·`.rby`·`.rt`는 **PRD가 지은
+     이름**이다(§8.7.2 · AC-01 목록). 화면 접두사를 붙이지 않은 이유가 그것이다.
+     ========================================================== */
+
+  /* design `20f` 원문 `display:flex;align-items:center;gap:6px;padding:6px 12px;
+     border-radius:999px;background:rgba(31,81,56,0.10)` + 라벨 `11.5px/700 #1F5138`.
+     알파 0.10은 `--color-sundo-tint-10`과 같은 값이라 토큰을 쓴다.
+     ⚠ 굵기 700은 §7.2 Caption(11.5/500)과 다르다 — design 원문을 따랐다(보고서 §3). */
+  .sync {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 6px;
+    border-radius: var(--radius-pill);
+    padding: 6px 12px;
+    background: var(--color-sundo-tint-10);
+    font-size: var(--text-caption);
+    font-weight: 700;
+    color: var(--color-sundo-800);
+  }
+
+  /* §7.4 `pulseDot 1.6s ease`. design `20f`는 `ease-in-out`이지만 §7.4가 정본이고
+     W-05 §5.2에서 이미 같은 판단을 했다(프로젝트 전역 규칙). */
+  .sync-dot {
+    width: 6px;
+    height: 6px;
+    flex: none;
+    border-radius: 50%;
+    background: var(--color-sundo-700);
+    animation: pulseDot 1.6s ease infinite;
+  }
+
+  /* §3.2 오프라인·지연 — 점이 **정지**한다. 색은 design `6l`의 `rgba(20,53,38,0.30)`.
+     정지를 색으로도 이중 표시한다(AC-03의 정신 — 모션만으로 상태를 전하지 않는다). */
+  .sync-dot-still {
+    background: rgba(20, 53, 38, 0.3);
+    animation: none;
+  }
+
+  /* design `20f` 원문 `display:flex;gap:8px;margin-top:16px`. */
+  .s7-stats {
+    display: flex;
+    margin-top: 16px;
+    gap: 8px;
+  }
+
+  /* design `20f` 원문 `flex:1;padding:12px 14px;border-radius:16px` + glass.
+     반경 16은 §7.3 스케일에 있다(`--radius-16`). */
+  .s7-stat {
+    flex: 1;
+    min-width: 0;
+    padding: 12px 14px;
+  }
+
+  /* design `20f` 원문 `font-size:11.5px;font-weight:500;color:rgba(20,53,38,0.70)`.
+     ⚠ S3(`.s3-stat-label` 11px/600 알파 0.5)과 값이 다르다 — 화면이 다르고
+     AC-01(0.70 이상)을 만족하는 쪽이 이쪽이다. 통합하지 마라. */
+  .s7-stat-label {
+    font-size: var(--text-caption);
+    font-weight: 500;
+    color: var(--color-sundo-ink-70);
+  }
+
+  /* design `20f` 원문 `font-size:20px;font-weight:700;color:#1F5138;
+     font-variant-numeric:tabular-nums`.
+     ⚠ §7.2 「Stat number 24px/700」과 다르다 — §7.2는 S3 카드(`--text-stat`)가
+     쓰는 값이고 S7 채택본은 3분할이라 20px이다. 보고서 §3 대조표·§7에 올렸다.
+     20px은 §7.2 스케일에 없어 리터럴로 둔다(승격 기준 미달 — 사용처 1곳). */
+  .s7-stat-value {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--color-sundo-800);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* design `6b` 원문 `margin-top:5px;width:40px;height:22px`. 폭은 `.skel` 기본값. */
+  .s7-stat-value .skel {
+    height: 22px;
+    margin-top: 5px;
+  }
+
+  /* design `20f` 원문 `display:flex;gap:6px;margin-top:16px`.
+     🔴 `flex-wrap: wrap`은 200% 확대 대비다(AC-05 — 가로 스크롤 0). 100%에서는
+     4개가 한 줄에 들어가므로 줄바꿈이 일어나지 않는다. `overflow-x`를 주지 않는다. */
+  .fchips {
+    display: flex;
+    margin-top: 16px;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  /* design `20f` 원문 `margin-top:18px;font-size:12px;font-weight:700;
+     color:rgba(20,53,38,0.70)`.
+     ⚠ 크기는 **§8.7.2 #6의 11px**을 따랐다(PRD가 클래스 이름과 함께 규격을 적은
+     유일한 자리다). design의 12px과 갈리는 지점이라 보고서 §3·§7에 올렸다.
+     알파 0.70은 AC-01이 `.gh`를 직접 지목한 값이다. */
+  .gh {
+    margin-top: 18px;
+    font-size: var(--text-micro);
+    font-weight: 700;
+    color: var(--color-sundo-ink-70);
+  }
+
+  /* design `20f` 원문 `margin-top:10px;border-radius:20px;padding:4px 0` + glass.
+     첫 그룹의 상단 간격은 `.gh`의 margin-top 18이 만든다. */
+  .rgroup {
+    margin-top: 10px;
+    padding: 4px 0;
+  }
+
+  /* design `20f` 원문 `display:flex;align-items:center;gap:12px;padding:13px 16px;
+     border-bottom:1px solid rgba(20,53,38,0.06)`. 0.06은 `--color-sundo-divider`다. */
+  .rrow {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 13px 16px;
+    border-bottom: 1px solid var(--color-sundo-divider);
+  }
+
+  .rrow:last-child {
+    border-bottom: none;
+  }
+
+  /* T-03 — 실시간 수신 행. §8.7.4가 `rise` **0.3s**로 적는다(§7.4의 0.5s가 아니다).
+     키프레임은 그대로 공유한다. */
+  .rrow-new {
+    animation: rise 0.3s ease both;
+  }
+
+  /* design `20f` 원문 `font-size:15px;font-weight:700;color:#14352A`.
+     ⚠ 크기는 **§7.2 Row title 14.5px**을 따랐다 — §7.2가 그 줄을 「기록 행 이름」으로
+     못 박고 §8.7.2 #7도 14.5로 적는다. 보고서 §3·§7. */
+  .rname {
+    font-size: var(--text-row);
+    font-weight: 700;
+    color: var(--color-sundo-900);
+  }
+
+  /* design `20f` 원문 `font-size:12px;font-weight:500;color:rgba(20,53,38,0.70);
+     font-variant-numeric:tabular-nums`.
+     ⚠ 크기는 **§8.7.2 #7의 11.5**(= §7.2 Caption 「학번 보조」)를 따랐다. */
+  .rid {
+    font-size: var(--text-caption);
+    font-weight: 500;
+    color: var(--color-sundo-ink-70);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* design `20f` 원문 `margin-top:2px;font-size:11.5px;font-weight:500;
+     color:rgba(20,53,38,0.70)`. */
+  .rby {
+    margin-top: 2px;
+    font-size: var(--text-caption);
+    font-weight: 500;
+    color: var(--color-sundo-ink-70);
+  }
+
+  /* 🔴 BR-58 · §8.7.2 #8-2 — 탈퇴 작성자. design `20f` 원문
+     `color:rgba(20,53,38,0.45);text-decoration:line-through;
+      text-decoration-thickness:1px`.
+     **기록 본문·사유·시각은 건드리지 않는다.** 취소선만으로 구분하지 않도록
+     `aria-label`에 `(탈퇴한 부원)`을 붙이는 것은 화면이 한다(AC-14). */
+  .rby-out {
+    color: var(--color-sundo-ink-45);
+    text-decoration: line-through;
+    text-decoration-thickness: 1px;
+  }
+
+  /* 🔴 §8.7.2 #8-1 기타 기입 문구가 있는 행. design `20f` 원문
+     `margin-top:2px;display:flex;align-items:center;gap:6px;min-width:0`.
+     구분선 좌우 6px은 이 `gap`이 만든다 — 마진을 따로 주지 마라. */
+  .rbyline {
+    display: flex;
+    min-width: 0;
+    margin-top: 2px;
+    align-items: center;
+    gap: 6px;
+  }
+
+  /* `.rbyline` 안의 `.rby`는 마진을 flex gap이 대신한다. */
+  .rbyline .rby {
+    flex: none;
+    margin-top: 0;
+  }
+
+  /* design `20f` 원문 `flex:none;width:1px;height:9px;background:rgba(20,53,38,0.18)`.
+     0.18은 §7.1에 없고 사용처가 여기뿐이라 리터럴로 둔다(승격 기준 미달). */
+  .rsep {
+    width: 1px;
+    height: 9px;
+    flex: none;
+    background: rgba(20, 53, 38, 0.18);
+  }
+
+  /* design `20f` 원문 `font-size:11px;font-weight:500;color:rgba(20,53,38,0.70);
+     white-space:nowrap;overflow:hidden;text-overflow:ellipsis` — **1줄 말줄임**. */
+  .rtext {
+    overflow: hidden;
+    font-size: var(--text-micro);
+    font-weight: 500;
+    color: var(--color-sundo-ink-70);
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  /* design `20f` 원문 `flex:none;font-size:12px;font-weight:500;
+     color:rgba(20,53,38,0.70);font-variant-numeric:tabular-nums`. */
+  .rt {
+    flex: none;
+    font-size: var(--text-label);
+    font-weight: 500;
+    color: var(--color-sundo-ink-70);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* T-02 — 필터 전환 시 목록만 0.2s 크로스페이드. `key={filter}`가 노드를 갈아
+     끼우므로 애니메이션이 처음부터 돈다(`.blur-in`과 같은 구조). */
+  .s7-list {
+    animation: fadeIn 0.2s ease both;
+  }
+
+  /* §8.7.2 #9 — 하단 스피너 자리이자 `IntersectionObserver`의 관찰 대상이다.
+     비어 있어도 높이를 남겨야 센티널이 실제로 교차한다. */
+  .s7-more {
+    display: flex;
+    height: 44px;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* `.ff-spin`과 구성이 같고 크기만 18px이다. `spin` 키프레임을 공유한다. */
+  .s7-spinner {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 2px solid rgba(46, 107, 76, 0.22);
+    border-top-color: var(--color-sundo-700);
+    animation: spin 0.8s linear infinite;
+  }
+
+  .s7-more-failed {
+    font-size: var(--text-label);
+    font-weight: 500;
+    color: var(--color-sundo-ink-70);
+  }
+
+  /* EM-03 `전체 보기`. design `18e` 원문 `margin-top:16px;min-height:44px;
+     padding:0 20px;border-radius:999px;background:rgba(31,81,56,0.10)` +
+     라벨 `13px/700 #1F5138` + `transition:transform .15s` · active `scale(0.97)`.
+     `.cnote-retry`(design `6k`, neu 표면)와 표면이 달라 재사용하지 않았다. */
+  .s7-allbtn {
+    display: flex;
+    min-height: 44px;
+    margin-top: 16px;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-pill);
+    padding: 0 20px;
+    background: var(--color-sundo-tint-10);
+    font-size: var(--text-subtitle);
+    font-weight: 700;
+    color: var(--color-sundo-800);
+    transition: transform 0.15s;
+  }
+
+  .s7-allbtn:active {
+    transform: scale(0.97);
+  }
 }
 
 /* design/index.html 원문 그대로 — 수정 금지 */
@@ -2147,6 +2426,17 @@
   to {
     opacity: 0;
     transform: translateY(-19px) scaleY(0.25);
+  }
+}
+
+/* W-13 신규 — T-02 목록 크로스페이드(§8.7.4). `blurIn`에서 blur·이동을 뺀 형태다.
+   §7.4의 「크로스페이드」에 별도 키프레임이 없어 최소 형태로 새로 만들었다. */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
   }
 }
 
@@ -2293,8 +2583,21 @@
      스플래시 점은 "진행 중"을 알리는 유일한 수단이 아니다(로고·타이틀이 이미 있다). */
   .splash-dot,
   .pend-dot,
-  .rs-dot {
+  .rs-dot,
+  .sync-dot {
     animation: none;
+  }
+
+  /* 지시서 §3.12 — reduce에서 `rise`는 **정지**다. T-03의 신규 행은 등장 위치가
+     정보이지 이동이 정보가 아니다. `.rise`(0.01s로 줄임)와 갈리는 지점이라
+     따로 적는다 — 여기서 지속시간만 줄이면 24px 튀는 것이 여전히 보인다. */
+  .rrow-new {
+    animation: none;
+  }
+
+  /* AC-07 「화면 전환·시트는 0.01s」와 같은 범주다. 목록 교체라는 **결과**는 같다. */
+  .s7-list {
+    animation-duration: 0.01s;
   }
 
   /* AC-07 — 「기타 펼침도 0.01s로 줄이되 **최종 상태는 같다**」(W-12 §3.12).

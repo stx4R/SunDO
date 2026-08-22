@@ -1,12 +1,21 @@
 import {
   collection,
   doc,
+  documentId,
+  getCountFromServer,
   getDocs,
+  limit,
+  onSnapshot,
+  orderBy,
   query,
   serverTimestamp,
   setDoc,
+  startAfter,
   Timestamp,
   where,
+  type DocumentData,
+  type QueryConstraint,
+  type QueryDocumentSnapshot,
 } from 'firebase/firestore'
 import { db } from './firebase'
 import { toDateKey, toMonthKey, toWeekKey } from './dateKeys'
@@ -226,4 +235,300 @@ export function writeRecord(draft: RecordDraft): void {
       console.error('[records] 전송 실패', errorCode(error, 'unknown'), error)
     },
   )
+}
+
+/* ============================================================================
+   S7 기록 조회 (W-13) — 목록 구독 · 페이지네이션 · 카운터 · 작성자 상태
+   ==========================================================================*/
+
+/** §8.7.3 — 단일 선택. `ALL`은 `reasonCode` 조건을 **걸지 않는다**는 뜻이다. */
+export type RecordFilter = 'ALL' | ReasonCode
+
+/** §8.7.2 #9 — 30건 단위. 구독(첫 페이지)과 정적 페이지가 같은 값을 쓴다. */
+export const RECORD_PAGE_SIZE = 30
+
+/**
+ * `documentId() in [...]` 묶음 상한.
+ *
+ * 🔴 **클라이언트 SDK는 이 개수를 검증하지 않는다**(W-13 §1-3 P3 실측:
+ * 31개를 넣어도 `getDocs`가 던지지 않는다). 상한은 서버 규격이므로
+ * 넘긴 채로 실기기에 나가면 `invalid-argument`로 터진다. 여기서 잘라 둔다.
+ */
+const AUTHOR_CHUNK = 30
+
+/**
+ * §8.7.2 #7·#8-1·#8-2가 그리는 값 + 「쓰지 않는 5필드」.
+ *
+ * 🔴 **5필드는 W-12가 만든 문서에 키 자체가 없다**(W-12 §5-4). `?? null`로 읽고
+ * `'updatedAt' in data`로 「수정된 적 있음」을 판정하지 마라 — 그렇게 하면
+ * W-12가 만든 문서와 v1.1이 수정한 문서가 **다르게 보인다**.
+ * 반대로 `reasonText`는 항상 존재하고 `ETC`가 아니면 명시적 `null`이다.
+ */
+export interface RecordRow {
+  id: string
+  studentName: string
+  studentNo: string
+  reasonCode: ReasonCode
+  reasonText: string | null
+  occurredAt: Date
+  /** §3.5 날짜 그룹 · ST-04 카운터 증가 판정. 🔴 `Date` 산술로 다시 만들지 마라. */
+  dateKey: string
+  weekKey: string
+  monthKey: string
+  createdBy: string
+  createdByName: string
+  updatedBy: string | null
+  updatedAt: Date | null
+  deletedBy: string | null
+  deletedAt: Date | null
+  deleteReason: string | null
+}
+
+/**
+ * 무한 스크롤 커서. 화면은 `firebase/firestore`를 import하지 않으므로
+ * **불투명 값**으로만 들고 다닌다(§0.3 — `records.ts`가 유일한 통로다).
+ */
+export type RecordCursor = QueryDocumentSnapshot<DocumentData>
+
+export interface RecordPage {
+  rows: RecordRow[]
+  /** 이 페이지의 **마지막 문서**. `startAfter`에 그대로 넣는다. */
+  cursor: RecordCursor | null
+  hasMore: boolean
+}
+
+export type RecordPageResult = ({ kind: 'ok' } & RecordPage) | { kind: 'failed'; code: string }
+
+/** 구독 콜백 1회분. `fromCache`가 §3.2 동기화 칩의 유일한 근거다. */
+export interface RecordListenSnapshot extends RecordPage {
+  fromCache: boolean
+}
+
+function isReasonCode(v: unknown): v is ReasonCode {
+  return v === 'DRESS' || v === 'SLIPPER' || v === 'ETC'
+}
+
+interface StoredRecordFull extends StoredRecord {
+  studentName?: string
+  studentNo?: string
+  weekKey?: string
+  monthKey?: string
+  createdBy?: string
+  createdByName?: string
+  updatedBy?: string
+  updatedAt?: Timestamp
+  deletedBy?: string
+  deletedAt?: Timestamp
+  deleteReason?: string
+}
+
+function toRow(snap: QueryDocumentSnapshot<DocumentData>): RecordRow {
+  const data = snap.data() as StoredRecordFull
+  const occurredAt = data.occurredAt?.toDate?.() ?? new Date(0)
+  return {
+    id: snap.id,
+    studentName: data.studentName ?? '',
+    studentNo: data.studentNo ?? '',
+    /* §9.6 필수 조건 5가 값 3종을 강제하므로 규칙 배포 후에는 도달하지 않는다.
+       그래도 행을 버리지 않는다 — 기록 누락(P-02)이 오분류보다 비싸다. */
+    reasonCode: isReasonCode(data.reasonCode) ? data.reasonCode : 'ETC',
+    reasonText: data.reasonText ?? null,
+    occurredAt,
+    /* 저장된 키를 그대로 읽는다. 없으면 **같은 함수로** 만든다 — 화면과 집계가
+       다른 규칙으로 키를 만들면 카운트가 영원히 어긋난다(W-10 §1-4). */
+    dateKey: data.dateKey ?? toDateKey(occurredAt),
+    weekKey: data.weekKey ?? toWeekKey(occurredAt),
+    monthKey: data.monthKey ?? toMonthKey(occurredAt),
+    createdBy: data.createdBy ?? '',
+    createdByName: data.createdByName ?? '',
+    /* 🔴 5필드 — 부재를 `null`과 같게 읽는 것이 읽는 쪽의 책임이다(W-12 §5-4). */
+    updatedBy: data.updatedBy ?? null,
+    updatedAt: data.updatedAt?.toDate?.() ?? null,
+    deletedBy: data.deletedBy ?? null,
+    deletedAt: data.deletedAt?.toDate?.() ?? null,
+    deleteReason: data.deleteReason ?? null,
+  }
+}
+
+function toPage(docs: QueryDocumentSnapshot<DocumentData>[]): RecordPage {
+  return {
+    rows: docs.map(toRow),
+    cursor: docs.length > 0 ? docs[docs.length - 1] : null,
+    hasMore: docs.length === RECORD_PAGE_SIZE,
+  }
+}
+
+/**
+ * OP-05 원문 그대로. **시간 범위 조건을 걸지 않는다** —
+ * §8.7.3의 「기본 최근 30일」은 `limit(30)` 페이지네이션이 만족하고,
+ * 범위 조건을 걸면 무한 스크롤이 그 경계를 넘지 못한다(지시서 §2.4).
+ *
+ * 🔴 이 형태가 IX-01(`ALL`)·IX-02(사유 필터)를 요구한다. 둘 다 아직 미생성이라
+ * 실기기에서는 `failed-precondition`이 떨어진다 — 그 실패는 **ER-02**이지
+ * 「기록 없음」이 아니다(`database_ToDo/W-13.md` §1).
+ */
+function recordsQuery(academicYear: number, filter: RecordFilter, after: RecordCursor | null) {
+  const constraints: QueryConstraint[] = [
+    where('academicYear', '==', academicYear),
+    where('status', '==', 'active'),
+  ]
+  if (filter !== 'ALL') constraints.push(where('reasonCode', '==', filter))
+  constraints.push(orderBy('occurredAt', 'desc'))
+  if (after) constraints.push(startAfter(after))
+  constraints.push(limit(RECORD_PAGE_SIZE))
+  return query(collection(db, 'records'), ...constraints)
+}
+
+/**
+ * §3.7 — **구독은 첫 페이지 1개뿐이다.** 과거 페이지는 `fetchRecordPage`의 정적 배열이다.
+ *
+ * 🔴 `includeMetadataChanges: true`가 **필수다.** 기본값(`false`)에서는
+ * `QueryListener.shouldRaiseEvent`가 「문서 변화 0건 + 메타데이터만 변함」을
+ * 통째로 버린다 — `syncStateChanged`는 `includeMetadataChanges === true`일 때만
+ * 통과한다(SDK 원문, 보고서 §1-3 P4). 기본값으로 두면 캐시 스냅샷 이후
+ * `fromCache: true → false` 전환이 **콜백으로 오지 않고** §3.2의 동기화 칩이
+ * 영원히 「동기화 지연」에 머문다.
+ *
+ * 🔴 **반환한 해제 함수를 반드시 호출한다.** 독 이동은 `replace`라 화면이
+ * 언마운트되고, 해제하지 않으면 탭을 오갈 때마다 구독이 쌓인다 —
+ * 같은 질의에 건 구독 2개가 **둘 다** 콜백을 받는 것을 실측했다(보고서 §1-3 P2).
+ */
+export function subscribeRecords(
+  academicYear: number,
+  filter: RecordFilter,
+  onData: (snapshot: RecordListenSnapshot) => void,
+  onFailed: (code: string) => void,
+): () => void {
+  return onSnapshot(
+    recordsQuery(academicYear, filter, null),
+    { includeMetadataChanges: true },
+    (snapshot) => {
+      onData({ ...toPage(snapshot.docs), fromCache: snapshot.metadata.fromCache })
+    },
+    (error: unknown) => {
+      /* 🔴 실패를 빈 배열로 흘리지 마라. ER-02이고 EM-02가 아니다(§8.7.2). */
+      onFailed(errorCode(error, 'firestore/records-listen-failed'))
+    },
+  )
+}
+
+/**
+ * §3.7-2 — `더 보기` 정적 페이지. **구독하지 않는다.**
+ *
+ * 커서는 호출부가 고정해 둔 **첫 페이지의 마지막 문서**다(§3.7-4). 새 기록이
+ * 들어와 첫 페이지가 밀려도 커서가 움직이지 않으므로 구멍이 생기지 않고,
+ * 밀려난 문서는 호출부의 ID Map에 이미 남아 있다.
+ */
+export async function fetchRecordPage(
+  academicYear: number,
+  filter: RecordFilter,
+  after: RecordCursor | null,
+): Promise<RecordPageResult> {
+  try {
+    const snapshot = await getDocs(recordsQuery(academicYear, filter, after))
+    return { kind: 'ok', ...toPage(snapshot.docs) }
+  } catch (error: unknown) {
+    return { kind: 'failed', code: errorCode(error, 'firestore/records-page-failed') }
+  }
+}
+
+/* --- 카운터 3종 (§12.1 · §12.3) ------------------------------------------ */
+
+export type RecordCountsResult =
+  | { kind: 'ok'; today: number; week: number; month: number }
+  | { kind: 'failed'; code: string }
+
+/**
+ * §12.3 「화면 진입 시 1회 조회 후 세션 내 재사용」. 모듈 수준이다 —
+ * S7도 탭을 옮길 때마다 `ScreenTransition`의 `key`가 바뀌어 다시 마운트된다.
+ *
+ * 🔴 **`stats.ts`의 홈 캐시와 분리한다.** 묶으면 S7의 당겨서 새로고침이
+ * 홈 통계·부서·명부 카운트까지 버린다(W-11 §4-5가 `roster.ts`를 가른 이유와 같다).
+ */
+let countsCache: RecordCountsResult | null = null
+
+/** uid → 탈퇴 여부. **성공한 조회만** 담는다(실패를 「탈퇴 아님」으로 굳히지 않는다). */
+const authorWithdrawnCache = new Map<string, boolean>()
+
+/** T-07 당겨서 새로고침. 🔴 `clearHomeCache()`·`clearRosterCache()`와 별개다. */
+export function clearRecordsCache(): void {
+  countsCache = null
+  authorWithdrawnCache.clear()
+}
+
+/**
+ * §12.1 오늘·이번 주·이번 달 — `getCountFromServer` **3회**.
+ *
+ * 등식 2개뿐이라 인덱스가 필요 없다(IX-03·IX-04·IX-05가 미생성이어도 돈다 —
+ * W-10 실측 W10-1·W10-2 선례). `academicYear`를 붙이지 않는 이유도 같다:
+ * 세 키가 특정 일자·주차·월을 가리켜 학년도가 이미 결정되고, 설계된 인덱스에도 없다.
+ *
+ * 🔴 ST-03 — **사유 필터를 여기에 걸지 마라.** 필터는 목록만 바꾼다.
+ */
+export async function fetchRecordCounts(now: Date, force = false): Promise<RecordCountsResult> {
+  if (!force && countsCache) return countsCache
+
+  const records = collection(db, 'records')
+  const active = where('status', '==', 'active')
+  try {
+    const [today, week, month] = await Promise.all([
+      getCountFromServer(query(records, active, where('dateKey', '==', toDateKey(now)))),
+      getCountFromServer(query(records, active, where('weekKey', '==', toWeekKey(now)))),
+      getCountFromServer(query(records, active, where('monthKey', '==', toMonthKey(now)))),
+    ])
+    countsCache = {
+      kind: 'ok',
+      today: today.data().count,
+      week: week.data().count,
+      month: month.data().count,
+    }
+  } catch (error: unknown) {
+    /* 실패는 캐시하지 않는다. 다음 진입에서 다시 시도해야 한다. */
+    return { kind: 'failed', code: errorCode(error, 'firestore/record-counts-failed') }
+  }
+  return countsCache
+}
+
+/* --- 작성자 탈퇴 상태 (BR-58 · §8.7.2 #8-2) ------------------------------- */
+
+/**
+ * 🔴 **목록 30건에 질의 30회를 내지 않는다.** uid를 중복 제거해
+ * `documentId() in [...]` **묶음**으로 읽는다. 상한(30)을 넘으면 청크로 나눈다.
+ *
+ * ⚠ §9.6은 부원에게 `users`의 이름·역할만 노출한다. **여기서 읽는 값은 `status`
+ * 하나뿐이고** 이메일 등 다른 필드는 화면으로 나가지 않는다.
+ *
+ * 🔴 **조회 실패는 「탈퇴 아님」쪽으로 떨어진다.** 반대로 하면 멀쩡한 부원에게
+ * 취소선이 붙는다 — 실패를 캐시하지도 않는다(다음 조회에서 다시 시도한다).
+ */
+export async function fetchWithdrawnAuthors(
+  uids: readonly string[],
+): Promise<ReadonlySet<string>> {
+  const missing = [...new Set(uids)].filter((uid) => uid !== '' && !authorWithdrawnCache.has(uid))
+
+  for (let i = 0; i < missing.length; i += AUTHOR_CHUNK) {
+    const chunk = missing.slice(i, i + AUTHOR_CHUNK)
+    try {
+      const snapshot = await getDocs(
+        query(collection(db, 'users'), where(documentId(), 'in', chunk)),
+      )
+      const seen = new Set<string>()
+      for (const snap of snapshot.docs) {
+        seen.add(snap.id)
+        authorWithdrawnCache.set(
+          snap.id,
+          (snap.data() as { status?: string }).status === 'withdrawn',
+        )
+      }
+      /* 문서가 없는 uid도 「탈퇴 아님」으로 굳힌다 — 없는 계정에 취소선을 긋지 않는다. */
+      for (const uid of chunk) if (!seen.has(uid)) authorWithdrawnCache.set(uid, false)
+    } catch (error: unknown) {
+      console.warn('[records] 작성자 상태 조회 실패', errorCode(error, 'unknown'))
+      /* 삼킨다. 캐시에 아무것도 넣지 않으므로 이 uid들은 취소선 없이 그려진다. */
+    }
+  }
+
+  const withdrawn = new Set<string>()
+  for (const uid of new Set(uids)) if (authorWithdrawnCache.get(uid) === true) withdrawn.add(uid)
+  return withdrawn
 }

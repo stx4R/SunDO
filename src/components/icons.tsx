@@ -168,3 +168,46 @@ export function LoadErrorIcon({ className }: IconProps) {
     </svg>
   )
 }
+
+/**
+ * 빈 상태 — 기록 없음(EM-02). design `6f` 원문(viewBox `0 0 28 28`, stroke 2.1).
+ * `RosterEmptyIcon`과 같은 규칙으로 `stroke="rgba(31,81,56,0.45)"`를
+ * `currentColor`로 바꿔 색을 `.cnote-icon`이 제어한다.
+ */
+export function RecordsEmptyIcon({ className }: IconProps) {
+  return (
+    <svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true" className={className}>
+      <path
+        d="M7 3.6h9l5 5v15.8H7z"
+        stroke="currentColor"
+        strokeWidth="2.1"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M15.6 3.8v5.2h5.2M10.6 15h6.8M10.6 19.2h4.6"
+        stroke="currentColor"
+        strokeWidth="2.1"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
+/**
+ * 빈 상태 — 필터 결과 없음(EM-03). design `18e` 원문(깔때기, stroke 2.1).
+ * `6f`와 글리프가 다르다 — 「기록이 하나도 없다」와 「이 사유만 없다」는 다른 사실이다.
+ */
+export function FilterEmptyIcon({ className }: IconProps) {
+  return (
+    <svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true" className={className}>
+      <path
+        d="M4.4 5.6h19.2l-7.4 8.8v8.6l-4.4-2.4v-6.2z"
+        stroke="currentColor"
+        strokeWidth="2.1"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}

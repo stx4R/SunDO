@@ -62,6 +62,33 @@ export function formatDateTimeKst(d: Date): string {
 }
 
 /**
+ * BR-47 시각 표기 `HH:mm` (S7 기록 행 · §8.7.2 #7).
+ *
+ * `formatDateTimeKst`와 **같은 `toKst()`를 통과한다.** 화면에서
+ * `getHours()`로 다시 만들면 기기 시간대가 KST가 아닐 때 목록 시각과
+ * 날짜 그룹 헤더가 서로 다른 날을 가리킨다.
+ */
+export function formatTimeKst(d: Date): string {
+  const k = toKst(d)
+  return `${pad2(k.getUTCHours())}:${pad2(k.getUTCMinutes())}`
+}
+
+/**
+ * BR-47 날짜 표기 `{M}월 {D}일 ({요일})` — S7 날짜 그룹 헤더(§8.7.2 #6).
+ *
+ * 🔴 인자가 `Date`가 아니라 **`dateKey` 문자열**이다. `Date`를 받으면 호출부가
+ * 「오늘·어제」를 다시 `Date` 산술로 판정하고 싶어지는데, 그 순간 KST 경계가
+ * 어긋난다(지시서 §3.5). 판정은 `toDateKey(now)`와의 **문자열 비교**로 하고
+ * 표기는 이 함수가 한다 — 키 자체가 이미 KST 벽시계라 여기서는 시간대 변환이
+ * 일어나지 않는다(`Date.UTC`는 달력 계산일 뿐이다).
+ */
+export function formatDateKeyLabel(dateKey: string): string {
+  const [y, m, d] = dateKey.split('-').map(Number)
+  const weekday = WEEKDAY_KO[new Date(Date.UTC(y, m - 1, d)).getUTCDay()]
+  return `${m}월 ${d}일 (${weekday})`
+}
+
+/**
  * KST ISO-8601 주차 `YYYY-Www` (DR-06 · BR-46 — **월요일 시작**).
  *
  * ISO 주차의 정의는 「그 주의 **목요일**이 속한 해가 주차연도」다. 그래서 연말·연초에
