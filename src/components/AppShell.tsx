@@ -33,6 +33,18 @@ export const OverlayRootContext = createContext<HTMLElement | null>(null)
 export const DockRootContext = createContext<HTMLElement | null>(null)
 
 /**
+ * 세로 스크롤을 담당하는 요소. **노드만 노출하고 정책은 노출하지 않는다.**
+ *
+ * 스크롤 요소는 `AppShell`이 소유하지만(여백 단독 소유자라 패딩이 여기 붙는다)
+ * "당겨서 새로고침이 무엇을 다시 불러오는가"는 화면마다 다르다(W-07 §6.1).
+ * 그래서 `AppShell`에 `onRefresh` prop을 만들지 않고 이 컨텍스트로 노드만 준다 —
+ * `lib/usePullToRefresh`가 구독한다.
+ *
+ * 첫 렌더는 `null`이다. 위 두 컨텍스트와 같은 규칙이다.
+ */
+export const ScrollRootContext = createContext<HTMLElement | null>(null)
+
+/**
  * PRD §7.5 레이아웃 규격.
  * 스테이지는 430px 고정 폭 · 100dvh · overflow hidden이고, 세로 스크롤은 그 안쪽
  * 영역이 담당한다. 오라 블롭은 스크롤 영역 바깥에 있어 스크롤과 무관하게 고정된다.
@@ -52,6 +64,7 @@ export function AppShell({ children, hasDock = false, bottomGap }: AppShellProps
 
   const [overlayEl, setOverlayEl] = useState<HTMLElement | null>(null)
   const [dockEl, setDockEl] = useState<HTMLElement | null>(null)
+  const [scrollEl, setScrollEl] = useState<HTMLElement | null>(null)
 
   /**
    * 배너가 차지하는 세로는 상단 오프셋 `16px` + 높이 `40px` = **`56px`** 이고,
@@ -93,21 +106,24 @@ export function AppShell({ children, hasDock = false, bottomGap }: AppShellProps
 
         <DockRootContext.Provider value={dockEl}>
           <OverlayRootContext.Provider value={overlayEl}>
-            <div
-              className="relative min-h-0 flex-1 overflow-y-auto"
-              style={{ padding: `${padTop} 22px ${bottom}px` }}
-            >
-              {children}
-            </div>
+            <ScrollRootContext.Provider value={scrollEl}>
+              <div
+                ref={setScrollEl}
+                className="relative min-h-0 flex-1 overflow-y-auto"
+                style={{ padding: `${padTop} 22px ${bottom}px` }}
+              >
+                {children}
+              </div>
 
-            {/* 독 슬롯. 스크롤 영역의 형제이며 스타일이 없다(높이 0).
-                `position: static`이라 안에 들어온 `.dock`의 absolute는
-                스테이지를 기준으로 잡힌다 — 이게 이 노드의 존재 이유다. */}
-            <div ref={setDockEl} />
+              {/* 독 슬롯. 스크롤 영역의 형제이며 스타일이 없다(높이 0).
+                  `position: static`이라 안에 들어온 `.dock`의 absolute는
+                  스테이지를 기준으로 잡힌다 — 이게 이 노드의 존재 이유다. */}
+              <div ref={setDockEl} />
 
-            {/* 스크롤 영역의 형제다. 안에 두면 시트가 본문과 함께 스크롤된다.
-                루트 자체는 클릭을 통과시키고 딤·시트·모달만 되돌린다. */}
-            <div ref={setOverlayEl} className="ovl-root" />
+              {/* 스크롤 영역의 형제다. 안에 두면 시트가 본문과 함께 스크롤된다.
+                  루트 자체는 클릭을 통과시키고 딤·시트·모달만 되돌린다. */}
+              <div ref={setOverlayEl} className="ovl-root" />
+            </ScrollRootContext.Provider>
           </OverlayRootContext.Provider>
         </DockRootContext.Provider>
       </div>

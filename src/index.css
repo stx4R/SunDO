@@ -1201,6 +1201,146 @@
   }
 
   /* ==========================================================
+     S3 홈 · 학년 선택 — design `1d`(舊 version) + PRD §8.3.2(정본)
+     `1d`에서 가져온 것은 **색·간격·타입·반경**뿐이고 요소 목록·문구·상태는 §8.3이다.
+     `15e`는 독 데모 전용이라 근거로 쓰지 않는다(§20.7).
+     유리·뉴모피즘 처리는 이미 이식된 `.glass`·`.neu`를 그대로 쓴다 —
+     `1d`의 `blur(16px)`·`0 8px 24px/0.08`은 §7.1 토큰(`18px`·`0 8px 26px/0.09`)과
+     어긋나는 舊 version 값이다(보고서 §3-2).
+     ========================================================== */
+
+  /* design 1d 원문 `font-size:13px;color:rgba(20,53,38,0.55)`.
+     0.55는 §7.1에 없는 알파다. 사용처가 이 한 곳뿐이라 토큰화하지 않았다
+     (토큰화 기준: 서로 다른 컴포넌트 2개 이상 — W-03B §3). */
+  .s3-hello {
+    font-size: var(--text-subtitle);
+    color: rgba(20, 53, 38, 0.55);
+  }
+
+  /* design 1d 원문 `font-size:11px;font-weight:600;color:rgba(20,53,38,0.5)`.
+     11px는 `--text-micro`와 같은 값이라 토큰을 쓴다. */
+  .s3-stat-label {
+    font-size: var(--text-micro);
+    font-weight: 600;
+    color: rgba(20, 53, 38, 0.5);
+  }
+
+  /* design 1d 원문 `font-size:24px;font-weight:800;color:#1F5138`.
+     `tabular-nums`는 CountUp이 도는 동안 자릿수가 흔들리지 않게 한다(원문에도 있다). */
+  .s3-stat-value {
+    font-size: var(--text-stat);
+    font-weight: 800;
+    color: var(--color-sundo-800);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* design 1d 원문 `font-size:13px;font-weight:600;color:rgba(20,53,38,0.4)`.
+     §12.2 「S3은 수치 뒤 ` 건`(13px, 흐린색)」의 그 13px이다. 수치와 다른 스케일이다. */
+  .s3-stat-unit {
+    font-size: var(--text-subtitle);
+    font-weight: 600;
+    color: rgba(20, 53, 38, 0.4);
+  }
+
+  /* §8.3.5 「폭 40px 스켈레톤 바」의 시각 규격은 design `6d`(로딩 스켈레톤 채택본, §20.7)가 준다.
+     원문 `width:40px;height:22px;border-radius:8px;
+           background:linear-gradient(90deg,rgba(20,53,38,0.06) 30%,rgba(20,53,38,0.10) 50%,
+                                             rgba(20,53,38,0.06) 70%)`.
+     같은 3정지점 그라디언트가 `6a`~`6d` 전부에 쓰이므로 **W-11 이후 공용 `.skel`로 승격할 후보**다.
+     지금은 사용처가 S3 하나뿐이라 W-03B 토큰화 기준(컴포넌트 2개 이상)에 못 미쳐 여기 둔다.
+     반짝임 애니메이션을 넣지 마라 — design 원문이 정지 그라디언트이고 §7.4에도 없다.
+     높이 22px는 `6d`가 24px 수치 자리에 대해 준 값이라 통계 카드에만 건다.
+     인사말(13px) 자리에는 design 근거가 없어(`6d`에 인사말이 없다) `1em`으로 유도한다. */
+  .s3-skel {
+    display: inline-block;
+    width: 40px;
+    height: 1em;
+    vertical-align: middle;
+    border-radius: 8px;
+    background: linear-gradient(
+      90deg,
+      rgba(20, 53, 38, 0.06) 30%,
+      rgba(20, 53, 38, 0.1) 50%,
+      rgba(20, 53, 38, 0.06) 70%
+    );
+  }
+
+  .s3-stat-value .s3-skel {
+    height: 22px;
+  }
+
+  /* design 1d 원문 학년 버튼. 배경·그림자·눌림은 `.neu`가 이미 갖고 있다
+     (`1d`의 `inset 5px/12px`이 아니라 PRD §7.3의 `.neu:active`를 쓴다 — W-04 선례).
+     **`.gbtn`이라는 이름을 쓰지 마라.** S1의 흰 Google 버튼이 이미 그 이름이다. */
+  .s3-grade {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+    padding: 24px;
+    text-align: left;
+  }
+
+  /* design 1d 원문 `font-size:21px;font-weight:800`. 21px는 `--text-grade`. */
+  .s3-grade-title {
+    font-size: var(--text-grade);
+    font-weight: 800;
+    color: var(--color-sundo-900);
+  }
+
+  /* design 1d 원문 `font-size:12px;color:rgba(20,53,38,0.5);margin-top:3px`. */
+  .s3-grade-sub {
+    margin-top: 3px;
+    font-size: var(--text-label);
+    color: rgba(20, 53, 38, 0.5);
+  }
+
+  /* design 1d 원문 `width:34px;height:34px;border-radius:50%;background:rgba(31,81,56,0.10)`.
+     알파 0.10은 `--color-sundo-tint-10`과 같은 값이라 토큰을 쓴다. */
+  .s3-chev {
+    display: flex;
+    width: 34px;
+    height: 34px;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: var(--color-sundo-tint-10);
+  }
+
+  /* ==========================================================
+     `sparkle` 탭 파티클 — PRD §7.4 + design `spawnSpark()`
+     `.ovl-root`(스테이지 기준 absolute · pointer-events none)에 명령형으로 붙는다.
+     소유자가 없어 화면 전환을 가로질러 550ms를 살아남는다(`lib/sparkle.ts`).
+     ========================================================== */
+  .spark {
+    position: absolute;
+    pointer-events: none;
+  }
+
+  /* design 원문 `left:-1px;top:-14px;width:2.5px;height:9px;
+     transform-origin:1.25px 14px`. 회전각만 인라인으로 준다(`i * 51.4deg`). */
+  .spark > span {
+    position: absolute;
+    left: -1px;
+    top: -14px;
+    width: 2.5px;
+    height: 9px;
+    transform-origin: 1.25px 14px;
+  }
+
+  /* design 원문 `border-radius:2px;background:#2E6B4C;animation:sparkle .5s ease-out forwards`.
+     밝은 배경 위이므로 `#2E6B4C`다(주 버튼 위 `#fff`는 S6 사유 칩이 쓴다 — 이번 범위 밖). */
+  .spark i {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border-radius: 2px;
+    background: var(--color-sundo-700);
+    animation: sparkle 0.5s ease-out forwards;
+  }
+
+  /* ==========================================================
      오버레이 3종 — 토스트 · 바텀시트 · 확인 모달
      전부 AppShell 스테이지 안(`absolute`)에 뜬다. `fixed`로 두면 430px 밖
      화면에서 스테이지를 벗어난다(W-03B §4-9와 같은 이유).
@@ -1488,6 +1628,20 @@
   }
 }
 
+/* design/index.html 원문 그대로 — 탭 파티클(§7.4 `sparkle` 0.5s ease-out).
+   `@keyframes sparkle{from{opacity:1;transform:translateY(-4px) scaleY(1)}
+                       to{opacity:0;transform:translateY(-19px) scaleY(.25)}}` */
+@keyframes sparkle {
+  from {
+    opacity: 1;
+    transform: translateY(-4px) scaleY(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-19px) scaleY(0.25);
+  }
+}
+
 /* design/index.html 원문 그대로 — 동기화 점·스플래시 점. */
 @keyframes pulseDot {
   0%,
@@ -1632,6 +1786,16 @@
   .splash-dot,
   .pend-dot {
     animation: none;
+  }
+
+  /* §7.4 마지막 문단이 `sparkle`을 **정지** 대상으로 명시한다.
+     `lib/sparkle.ts`가 reduce에서 아예 생성하지 않으므로 이 규칙은 도달하지 않는다 —
+     명령형 생성 경로를 우회하는 호출이 생겨도 막히도록 남겨 두는 이중 잠금이다.
+     `animation: none`만 두면 `from{opacity:1}`이 적용되지 않아 막대가 그대로 떠 있으므로
+     투명도까지 함께 세운다. */
+  .spark i {
+    animation: none;
+    opacity: 0;
   }
 
   .toast {

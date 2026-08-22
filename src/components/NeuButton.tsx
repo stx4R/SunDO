@@ -1,9 +1,13 @@
-import type { ReactNode } from 'react'
+import type { MouseEvent, ReactNode } from 'react'
 import { cn } from '../lib/cn'
 
 interface NeuButtonProps {
   children: ReactNode
-  onClick?: () => void
+  /**
+   * W-10 — `sparkle`이 탭 **좌표**를 쓰므로 이벤트를 넘긴다(design `spawnSpark(x, y)`).
+   * 인자를 **넓히기만** 하는 변경이라 기존 호출부는 그대로 둔다.
+   */
+  onClick?: (event: MouseEvent<HTMLButtonElement>) => void
   radius?: 22 | 20
   disabled?: boolean
   className?: string
