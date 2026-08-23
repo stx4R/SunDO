@@ -224,9 +224,19 @@
   }
 
   /* 승인·거절·양도 */
+  /* 🔴 `min-height: 44px`는 **§15.1의 조치**다(「`.pill` 높이 약 30 — 미달」).
+     §7.3의 `padding 7px 13px`은 세로 7이라 44에 못 미친다. design `9a`가 이미
+     `min-height:44px;padding:0 13px` + flex 중앙 정렬로 같은 답을 내놓았으므로
+     **§15.1이 적은 `padding: 12px 14px` 대신 design 원문의 좌우 13**을 쓴다 —
+     조치의 목적(44×44 타깃)은 그대로 달성되고 가로 규격은 시안과 일치한다.
+     `.fchip`을 W-13이 올린 것과 같은 근거다. 보고서 §3에 이탈로 적었다. */
   .pill {
+    display: inline-flex;
+    min-height: 44px;
+    align-items: center;
+    justify-content: center;
     border-radius: var(--radius-pill);
-    padding: 7px 13px;
+    padding: 0 13px;
     font-size: var(--text-caption);
     font-weight: 700;
   }
@@ -2531,6 +2541,284 @@
     color: rgba(20, 53, 38, 0.42);
     text-align: center;
   }
+
+  /* ==========================================================
+     S8 관리 — design `9a`(부장 채택본) · `9b`·`9c`·`9d`(역할 변형) · `6i`(EM-04)
+     ⚠ `.rrow`(S7) · `.drow`(S9) · `.srow`(S5) · `.rs-*`(S6)를 재사용하지 않았다.
+     `.mrow`는 **§8.8.3 #6·#10·#14가 지은 이름**이라 화면 접두사가 없다.
+     그 밖은 `.adm-*`이다 — §8.8이 이름을 주지 않은 요소들이다.
+     ========================================================== */
+
+  /* `9a` 원문 `display:flex;align-items:center;gap:10px;margin-bottom:16px`. */
+  .adm-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  /* `9a` 원문 `font-size:28px;font-weight:700;letter-spacing:-0.01em;color:#14352A`.
+     §7.2 H1과 **정확히 일치한다** — S9(`1j`)가 800이었던 것과 갈리는 지점이다. */
+  .adm-title {
+    font-size: var(--text-h1);
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--color-sundo-900);
+    outline: none;
+  }
+
+  /* §8.8.3 #1 역할 배지 — 공통 기하는 4프레임이 같다
+     (`padding:5px 11px;border-radius:999px;font-size:10.5px;font-weight:700`).
+     ⚠ §8.8.3은 「그라디언트 배지」라고만 적는데 **design은 역할마다 표면이 다르다.**
+     4종 전부 원문을 따랐고 보고서 §3에 올렸다. 10.5px는 §7.2 스케일에 없어 리터럴이다
+     (`.dtoday`(S9)에 이은 두 번째 사용처 — 승격 판단은 §7.2 소유자에게 넘긴다). */
+  .adm-badge {
+    flex: none;
+    border-radius: var(--radius-pill);
+    padding: 5px 11px;
+    font-size: 10.5px;
+    font-weight: 700;
+  }
+
+  /* `9a` 원문 — 부장만 그라디언트 + 그림자다. */
+  .adm-badge-head {
+    background: var(--gradient-primary);
+    box-shadow: 0 6px 14px rgba(31, 81, 56, 0.28);
+    color: #fff;
+  }
+
+  /* `9b` 원문 `background:rgba(31,81,56,0.10);color:#1F5138`. */
+  .adm-badge-vice {
+    background: var(--color-sundo-tint-10);
+    color: var(--color-sundo-800);
+  }
+
+  /* `9c` 원문 `background:#fff;border:1px solid rgba(20,53,38,0.12);color:#2E6B4C`. */
+  .adm-badge-teacher {
+    background: #fff;
+    border: 1px solid rgba(20, 53, 38, 0.12);
+    color: var(--color-sundo-700);
+  }
+
+  /* `9d` 원문 `background:#14352A;color:#fff`. 라벨 `Dev`는 §8.10.6 고정 영문이다. */
+  .adm-badge-dev {
+    background: var(--color-sundo-900);
+    color: #fff;
+  }
+
+  /* `9a` 원문 `display:flex;flex-direction:column;gap:14px`.
+     ⚠ 원문의 카드 등장 모션(`rise .5s ease .05s/.1s/.15s/.2s both`)은 **섹션 수가
+     이번 회차에 2개**라 스태거가 두 칸뿐이다. 카드마다 지연을 손으로 박지 않고
+     `.rise` + `--rise-delay`(W-03B 계약)를 쓰는 편이 맞지만, ②가 들어오는 W-15B에서
+     지연 순서가 다시 바뀐다 — **이번 회차는 모션을 붙이지 않았다**(보고서 §4). */
+  .adm-sections {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  /* `9a` 원문 `padding:18px 20px;border-radius:20px` + 유리. */
+  .adm-card {
+    padding: 18px 20px;
+  }
+
+  /* `9a` 원문 `font-size:12px;font-weight:700;color:rgba(20,53,38,0.70)`. */
+  .adm-label {
+    font-size: var(--text-label);
+    font-weight: 700;
+    color: var(--color-sundo-ink-70);
+  }
+
+  /* `9a` 원문 승인 대기 헤더 `display:flex;align-items:center;gap:8px`. */
+  .adm-labelrow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* §8.8.3 #9 카운트 배지. `9a` 원문
+     `min-width:18px;height:18px;padding:0 6px;border-radius:999px;
+      background:rgba(31,81,56,0.10);font-size:10.5px;font-weight:700;color:#1F5138`. */
+  .adm-count {
+    display: flex;
+    min-width: 18px;
+    height: 18px;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-pill);
+    padding: 0 6px;
+    background: var(--color-sundo-tint-10);
+    font-size: 10.5px;
+    font-weight: 700;
+    color: var(--color-sundo-800);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* §8.8.3 #2 · `9a` 원문 `font-size:26px;font-weight:700;letter-spacing:0.22em;
+     color:#1F5138;font-variant-numeric:tabular-nums;margin-bottom:14px`.
+     라벨의 `margin-bottom:10px`을 여기 `margin-top`으로 옮겼다(요소가 조건부라 그쪽이 안전하다).
+     26px는 §7.2 스케일에 없다 — 사용처 1곳이라 리터럴로 둔다. */
+  .adm-code {
+    margin-top: 10px;
+    margin-bottom: 14px;
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: 0.22em;
+    color: var(--color-sundo-800);
+    font-variant-numeric: tabular-nums;
+    animation: blurIn 0.35s ease both;
+  }
+
+  /* §8.8.6 `----` 자리표시. 🔴 로딩과 「코드 없음」(§2.3-B)이 같은 자리표시를 쓰지만
+     **의미가 다르다** — 「없음」에서는 `재발급`이 활성이고 로딩에서는 아직 판정 전이다. */
+  .adm-code-dim {
+    color: var(--color-sundo-ink-45);
+  }
+
+  /* `9a` 원문 `display:flex;gap:8px`. */
+  .adm-btnrow {
+    display: flex;
+    gap: 8px;
+  }
+
+  /* `9a` 원문 `flex:1;text-align:center;padding:11px` + `span 13px/700 #1F5138`.
+     ⚠ 표면은 `.neu` 토큰을 쓴다 — 원문의 `5px 5px 12px`는 `--shadow-neu`(`7px 7px 16px`)와
+     다르지만 `.neu`는 S3·S4·`다시 시도`가 공유하는 표면이라 한 화면 때문에 바꾸지 않는다
+     (W-13 §3 칸 3 · W-14 칸 5와 같은 판단). 반경도 원문 13이 §7.3 스케일에 없어 15를 쓴다. */
+  .adm-btn {
+    flex: 1;
+    padding: 11px;
+    text-align: center;
+    font-size: var(--text-subtitle);
+    font-weight: 700;
+    color: var(--color-sundo-800);
+  }
+
+  /* §8.8.3 #5 코드 힌트 · #13 하단 힌트 — 둘 다 10.5px다.
+     `9a` 원문 양도 힌트 `margin-top:10px;font-size:10.5px;font-weight:500;
+      color:rgba(20,53,38,0.70)`에서 값을 빌렸다(같은 카드 안 보조 줄). */
+  .adm-note {
+    margin-top: 10px;
+    font-size: 10.5px;
+    font-weight: 500;
+    color: var(--color-sundo-ink-70);
+  }
+
+  /* 🔴 §7.5 — 「독이 있는 화면의 스크롤 하단 여백 최소 120px (**관리 화면 마지막 카드는 130px**)」.
+     `AppShell`이 주는 120px 위에 화면이 **10px을 더해** 130px을 만든다.
+     `AppShell`의 `bottomGap` prop을 쓰려면 `router.tsx`가 `handle`을 읽어 넘겨야 하는데
+     둘 다 이번 회차의 불가침 파일이다 — 여백 소유 계약(`AppShell`이 120을 준다)은 그대로 두고
+     **관리 화면에만 있는 10px 차이**만 화면이 갖는다. */
+  .adm-main {
+    padding-bottom: 10px;
+  }
+
+  /* §8.8.3 #13 하단 힌트. 카드 밖이라 중앙 정렬 + 위 여백만 다르다. */
+  .adm-hint {
+    margin-top: 14px;
+    font-size: 10.5px;
+    font-weight: 500;
+    color: var(--color-sundo-ink-70);
+    text-align: center;
+  }
+
+  /* §8.8.6 오프라인 행. 🔴 **위험색 인라인 배너 3벌과 다른 표면이다** —
+     기하(`radius 12` · `padding 11px 13px`)만 빌리고 배경은 중립 틴트를 쓴다.
+     오프라인은 오류가 아니라 상태이고, 위험색을 쓰면 W-13 §0.1-4가 예약한
+     `.banner` 승격 대상이 네 벌째가 된다(그 승격은 이 회차의 범위 밖이다).
+     문구 색·크기는 design `6l`의 오프라인 칩(`12px/700 #1F5138`)에서 빌렸다. */
+  .adm-off {
+    margin-bottom: 14px;
+    border-radius: var(--radius-12);
+    padding: 11px 13px;
+    background: var(--color-sundo-tint-10);
+    font-size: var(--text-label);
+    font-weight: 700;
+    color: var(--color-sundo-800);
+  }
+
+  /* §8.8.6 섹션 단위 에러. 값은 design `6j`의 제목(`15px/700 #14352A`)에서 빌렸다 —
+     중앙 블록이 아니라 카드 안 한 줄이라 `.cnote-title`의 마진은 가져오지 않는다. */
+  .adm-err {
+    margin-top: 10px;
+    font-size: var(--text-body);
+    font-weight: 700;
+    color: var(--color-sundo-900);
+  }
+
+  /* `다시 시도`는 `.cnote-retry`(design `6k`)와 같은 버튼이지만 카드 안이라 마진이 다르다. */
+  .adm-retry {
+    display: flex;
+    min-height: 44px;
+    margin-top: 12px;
+    align-items: center;
+    justify-content: center;
+    padding: 0 24px;
+    font-size: var(--text-subtitle);
+    font-weight: 700;
+    color: var(--color-sundo-800);
+  }
+
+  /* EM-04. design `6i`는 **전체 화면** 빈 상태(72px 원 + 글리프)인데 §8.8.6은
+     「섹션 내」로 규정한다 — 카드 한 줄에 72px 원이 들어갈 자리가 없다.
+     **아이콘 없이 문구만** 그렸다(W-11 §4-3 선례). 글자 값은 `6i` 원문
+     `font-size:15px;font-weight:700;color:#14352A;text-align:center` 그대로다. */
+  .adm-empty {
+    padding: 18px 0;
+    font-size: var(--text-body);
+    font-weight: 700;
+    color: var(--color-sundo-900);
+    text-align: center;
+  }
+
+  /* §8.8.3 #6·#10 — `9a` 원문 승인 대기 행
+     `display:flex;align-items:center;gap:8px;padding:11px 0;
+      border-bottom:1px solid rgba(20,53,38,0.06)`. 0.06은 `--color-sundo-divider`다.
+     🔴 카드가 이미 좌우 20px을 갖고 있어 행은 세로 패딩만 갖는다(`.rrow`·`.drow`와 갈리는 점). */
+  .mrow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 11px 0;
+    border-bottom: 1px solid var(--color-sundo-divider);
+  }
+
+  .mrow:last-child {
+    border-bottom: none;
+  }
+
+  /* `9a` 원문 `font-size:14px;font-weight:700;color:#14352A`.
+     ⚠ 14px는 §7.2 스케일에 없다. S6 일시·S9 요일 행에 이은 **세 번째 사용처**다 —
+     §4-3이 「세 번째가 나오면 승격하라」로 지시한 그 지점이라 보고서 §7에 승격을 요청했다.
+     🔴 토큰을 여기서 만들지 않은 이유: `--text-*`는 §7.2 스케일의 사본이고, 스케일에 없는
+     이름을 `lib/cn.ts`까지 등록하면 PRD가 모르는 스케일이 코드에만 생긴다(W-07 §5-6의 반대 방향). */
+  .mrow-name {
+    display: block;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--color-sundo-900);
+  }
+
+  /* `9a` 원문 `font-size:11px;font-weight:500;color:rgba(20,53,38,0.70)`. */
+  .mrow-sub {
+    display: block;
+    font-size: var(--text-micro);
+    font-weight: 500;
+    color: var(--color-sundo-ink-70);
+  }
+
+  /* T-07 신규 신청 실시간 수신 — `rise` **0.3s**(§8.8.5). §7.4의 0.5s가 아니다.
+     S7의 `.rrow-new`와 같은 값이지만 이름을 빌리지 않았다(§0.4 규약). */
+  .mrow-new {
+    animation: rise 0.3s ease both;
+  }
+
+  /* T-05·T-06 처리된 행 — **0.2s 페이드아웃**. 행을 실제로 지우는 것은 구독이다. */
+  .mrow-leave {
+    animation: fadeOut 0.2s ease both;
+    pointer-events: none;
+  }
 }
 
 /* design/index.html 원문 그대로 — 수정 금지 */
@@ -2638,6 +2926,16 @@
   }
   to {
     opacity: 1;
+  }
+}
+
+/* W-15A 신규 — T-05·T-06 처리된 행 페이드아웃(§8.8.5). `fadeIn`의 역방향이다. */
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
   }
 }
 
@@ -2787,6 +3085,20 @@
   .rs-dot,
   .sync-dot {
     animation: none;
+  }
+
+  /* W-15A — T-07 신규 행과 T-05·T-06 페이드아웃. 등장·소멸 **위치**가 정보이지
+     이동·투명도가 정보가 아니다. `.rrow-new`와 같은 판단이다.
+     🔴 `.mrow-leave`는 `animation: none`으로 두면 `to{opacity:0}`이 적용되지 않아
+     행이 그대로 남는다 — 처리된 행이 사라지는 것은 구독이 하므로 그래도 결과는 같다. */
+  .mrow-new,
+  .mrow-leave {
+    animation: none;
+  }
+
+  /* T-02 새 코드 표시. AC-07의 「화면 전환」과 같은 범주다 — 결과(새 코드)는 그대로다. */
+  .adm-code {
+    animation-duration: 0.01s;
   }
 
   /* 지시서 §3.12 — reduce에서 `rise`는 **정지**다. T-03의 신규 행은 등장 위치가

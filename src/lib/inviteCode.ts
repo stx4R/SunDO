@@ -72,3 +72,49 @@ export function formatInviteCode(raw: string, caret: number): CodeInput {
 export function isInviteCodeComplete(value: string): boolean {
   return INVITE_CODE_PATTERN.test(value)
 }
+
+/* ============================================================================
+   코드 생성 (W-15A) — OP-10 재발급
+   ==========================================================================*/
+
+/**
+ * 🔴 **혼동 문자 제외 규칙은 BR-17과 §9.3.3이 어긋난다.**
+ * BR-17은 `I`·`O`·**`0`·`1`** 넷을 빼라 하고, §9.3.3은 「혼동 문자 `I O` 제외 **알파벳**」만 적는다.
+ * **둘 다 만족하는 쪽으로 간다** — 알파벳 24종(`I`·`O` 제외) + 숫자 8종(`0`·`1` 제외).
+ * `INVITE_CODE_PATTERN`(`^[A-Z]{4}-[0-9]{4}$`)은 그대로 만족한다. 보고서 §7 신규 항목.
+ */
+const CODE_ALPHA = 'ABCDEFGHJKLMNPQRSTUVWXYZ'
+const CODE_DIGIT = '23456789'
+
+/**
+ * 균등 난수 1개. 🔴 **모듈로 편향을 제거한다.**
+ *
+ * `byte % n`을 그대로 쓰면 `256 % n !== 0`인 n에서 앞쪽 값이 더 자주 나온다
+ * (알파벳 24종이 정확히 그 경우다 — `256 = 24×10 + 16`이라 앞 16글자가 11/256, 뒤 8글자가 10/256).
+ * 상한 `256 - (256 % n)` 이상인 바이트를 **버리고 다시 뽑는다**(거부 표집).
+ * 숫자 8종은 `256 % 8 === 0`이라 상한이 256이 되어 버려지는 바이트가 없다 — 같은 코드로 처리된다.
+ */
+function pick(charset: string): string {
+  const n = charset.length
+  const limit = 256 - (256 % n)
+  const buf = new Uint8Array(1)
+  for (;;) {
+    /* 🔴 `Math.random()`을 쓰지 마라. 예측 가능한 코드는 초대 코드의 의미를 없앤다. */
+    crypto.getRandomValues(buf)
+    if (buf[0] < limit) return charset[buf[0] % n]
+  }
+}
+
+/**
+ * §9.3.3 `code` — `XXXX-9999` 9자. **순수 함수이고 Firestore·DOM을 참조하지 않는다.**
+ *
+ * 이 파일에 둔 이유: `INVITE_CODE_PATTERN`·`formatInviteCode`와 **같은 형식 규격**을 공유한다.
+ * 생성과 검증이 갈라지면 한쪽만 고쳐지는 날이 온다.
+ */
+export function generateInviteCode(): string {
+  let alpha = ''
+  for (let i = 0; i < 4; i += 1) alpha += pick(CODE_ALPHA)
+  let digit = ''
+  for (let i = 0; i < 4; i += 1) digit += pick(CODE_DIGIT)
+  return `${alpha}-${digit}`
+}
