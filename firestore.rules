@@ -1,0 +1,357 @@
+// ============================================================================
+//  SunDO — Firestore Security Rules
+//  PRD §9.6(요약표 + 필수 조건 8항) · 부록 B(스켈레톤 정본) · W-08 §2(3건) ·
+//  W-13 결정 R-a(`recordCount`) · W-14 결정 3(§9.6 각주) · W-15B §3~§4
+//
+//  🔴 이 파일이 W-04 임시 catch-all(`@dshs.kr`이면 전부 허용)을 **전량 교체**한다.
+//     한 조건이라도 좁으면 그 화면이 배포 순간 죽는다. 되돌리는 절차는
+//     `database_ToDo/W-16.md` §3, 되돌릴 원본은 `firestore.rules.catchall`이다.
+//
+//  🔴 **주석을 지우지 마라.** 「왜 이 조건인가」가 사라지면 다음 사람이 되돌린다.
+// ============================================================================
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ========================================================================
+    //  공통 판정
+    // ========================================================================
+
+    // §9.6 필수 조건 1 · §14.5 4-3.
+    // 🔴 **정규식 끝의 `$` 앵커를 지우지 마라.** 다만 **실제로 막고 있는 주체는 `$`가 아니다.**
+    //    W-16 Q-5 실측 — Rules의 `matches()`는 **문자열 전체 일치**다. `$`를 빼도
+    //    `attacker@dshs.kr.evil.com`은 **그대로 거부된다**(역검증 `no-dollar-anchor`가
+    //    아무것도 빨갛게 만들지 못한 것이 그 증거다). 실제로 뚫리는 형태는 **끝에 `.*`가
+    //    붙었을 때**이고, 그때만 위 주소가 통과한다(역검증 `domain-suffix-open` → SEC-4a).
+    //    → `$`는 「이 표현식이 언젠가 부분 일치 API로 옮겨 가거나 뒤에 무엇이 덧붙는
+    //      순간」을 대비한 이중 방어다. §9.6 필수 조건 1이 요구하므로 **유지한다.**
+    //
+    // 🔴 **`email_verified`를 검사하지 않는다** (§9.6 필수 조건 8 · C4).
+    //    Google Provider 토큰은 항상 검증 상태이고, 리다이렉트 직후 토큰 갱신 타이밍에
+    //    따라 정상 사용자가 거부되는 사고를 만든다. **되살리지 마라.**
+    function isSignedIn() {
+      return request.auth != null
+        && request.auth.token.email.matches('.*@dshs[.]kr$');
+    }
+
+    // §9.6 필수 조건 3 — 역할 판정은 서버가 저장한 문서에서 읽는다.
+    // **클라이언트가 보낸 역할 값은 신뢰하지 않는다.**
+    //
+    // ⚠ `users/{uid}` 문서가 없으면(S2 가입 전) `get()`이 null을 돌려주고 평가가 실패해
+    //   거부로 떨어진다. **그것이 옳은 결과다** — 프로필이 없는 계정은 `active`가 아니다.
+    //   S2 경로(`users` create · `approvalRequests` create · `inviteCodes` get)는
+    //   이 함수를 부르지 않도록 짜여 있다. 그 셋에 `isActive()`를 추가하지 마라.
+    //
+    // 💰 **W-16 Q-4 실측 — 규칙 안 `get()`은 문서 읽기로 과금되고 상한이 있다.**
+    //    ① 한 연산의 평가 안에서 **같은 문서는 몇 번 봐도 1회**다(같은 문서 15회 참조 통과).
+    //       그래서 `isActive()`·`role()`·`isHead()`를 한 규칙에서 몇 번 부르든 **1읽기**다.
+    //    ② **서로 다른** 문서는 **연산당 10건**이 상한이다(11번째에서 `Service call error`).
+    //    ③ 상한은 **연산마다** 적용된다 — 4연산 배치 × 6건(합계 24)도 통과했다.
+    //    ⇒ 가장 무거운 승인 4연산 배치가 **4읽기**, S6 저장 2연산은 **1읽기**다
+    //      (본인 `users` update는 `request.auth.uid == uid`에서 갈려 `get()`을 돌지 않는다).
+    //      부원 40명 규모에서는 무시 가능하다.
+    function me() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isActive()  { return isSignedIn() && me().status == 'active'; }
+    function role()      { return me().role; }
+    function isVice()    { return isActive() && role() in ['vice', 'head', 'dev']; }
+    function isHead()    { return isActive() && role() in ['head', 'dev']; }
+    function isDev()     { return isActive() && role() == 'dev'; }
+    function isTeacher() { return isActive() && role() == 'teacher'; }
+
+    // §9.6 필수 조건 5 · C5 — 사유 3종 + `기타` 조건부 자유 기입(2~20자).
+    // §14.5 7·8번이 이 함수의 양방향을 점검한다.
+    function validReason(data) {
+      return data.reasonCode in ['DRESS', 'SLIPPER', 'ETC']
+        && (data.reasonCode == 'ETC'
+              ? (data.reasonText is string
+                 && data.reasonText.size() >= 2
+                 && data.reasonText.size() <= 20)
+              : data.reasonText == null);
+    }
+
+    // ========================================================================
+    //  users
+    // ========================================================================
+
+    // §9.6 필수 조건 7 · C7 · §14.5 9번 — 본인이 바꿀 수 있는 상태 전이는 하나뿐이다.
+    // 🔴 부장은 양도를 마치기 전에는 탈퇴할 수 없다(BR-56 · R-07).
+    // ⚠ 소비자는 S10(W-17)이고 **아직 없다.** 허용 키 3개를 그 회차가 정확히 맞춰야 한다.
+    function selfWithdraw(uid) {
+      return isSignedIn()
+        && request.auth.uid == uid
+        && resource.data.status == 'active'
+        && resource.data.role != 'head'
+        && request.resource.data.status == 'withdrawn'
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['status', 'withdrawnAt', 'updatedAt']);
+    }
+
+    // 🔴 **본인 자동 갱신 — 부록 B가 정본이다**(W-04 부칙 §2).
+    //    §9.6 요약표는 `lastActiveAt`·`notificationPrefs`·`displayNameRaw` 3개만 적지만,
+    //    DR-12가 **로그인할 때마다 표시 이름을 재파싱해 자동 갱신**하므로
+    //    `name`·`memberStudentNo` 계열이 함께 열려 있어야 한다.
+    //    요약표만 보고 쓰면 `AuthProvider`의 동기화 7키가 통째로 막힌다.
+    //
+    // 🔴 `recordCount`는 결정 R-a(A안)로 이번 회차에 추가됐다 — **「+1만」**이다.
+    //    조건이 없으면 클라이언트가 임의 값을 넣을 수 있다.
+    // ⚠ **규칙은 같은 배치의 다른 연산을 볼 수 없다.** 그래서 `records` create 없이
+    //    `recordCount`만 +1 하는 단독 update는 **막지 못한다.** 상한이 「한 번에 +1」이라
+    //    남용해도 자기 카운트를 부풀릴 뿐이고 그 값은 지표(M-02)에만 쓰인다.
+    //    실질 차단은 §11.3의 Cloud Function 소유다(v1.2).
+    function selfSync(uid) {
+      return isSignedIn()
+        && request.auth.uid == uid
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['lastActiveAt', 'notificationPrefs', 'displayNameRaw',
+                       'name', 'memberStudentNo', 'memberGrade', 'memberClassNo',
+                       'memberNumber', 'recordCount', 'updatedAt'])
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['recordCount'])
+            || request.resource.data.recordCount == resource.data.recordCount + 1);
+    }
+
+    // W-08 §2-3 — 재신청(BR-28)·재가입(BR-61) 전이. **6조건을 전부 만족할 때만** 연다.
+    // 없으면 탈퇴·거절 계정의 `가입 코드 다시 입력`이 마지막 쓰기에서 실패한다.
+    // ⚠ `anonymizedAt`은 문서에 없을 수 있어 `get(key, default)`로 읽는다.
+    //    필드가 없는데 `.anonymizedAt`으로 접근하면 평가가 실패해 정상 재신청이 막힌다.
+    function reapply(uid) {
+      return isSignedIn()
+        && request.auth.uid == uid
+        && resource.data.status in ['withdrawn', 'rejected']
+        && request.resource.data.status == 'pending'
+        && request.resource.data.role == 'member'
+        && request.resource.data.get('withdrawnAt', null) == null
+        && request.resource.data.get('rejectReason', null) == null
+        && request.resource.data.get('anonymizedAt', null) == null
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['status', 'role', 'withdrawnAt', 'rejectReason', 'inviteCodeId',
+                       'name', 'nameSource', 'displayNameRaw', 'updatedAt']);
+    }
+
+    // 🔴 **BR-21/R-04(부장은 자기 역할을 직접 못 바꾼다) ↔ 양도의 자기 강등.**
+    //    head가 양도를 실행하면 강등 대상이 **곧 본인**이다(W-15B §4-1).
+    //    「본인 role 변경 금지」를 그대로 쓰면 **양도가 죽는다.**
+    //    → 자기 자신에 대한 role 변경은 **`head` → `member` 한 전이만** 연다.
+    //
+    // 🔴 **`departments.headUid` 갱신을 조건으로 걸지 마라.** 같은 배치의 다른 문서
+    //    write를 규칙은 볼 수 없고, `get()`은 배치 **이전** 상태를 보므로
+    //    그런 조건은 자기 배치를 스스로 거부한다.
+    //    🔬 **W-16 Q-2 실측** — `dept.headUid`를 같은 배치에서 대상 uid로 바꾸면서
+    //    `users` 규칙이 `get(dept).headUid == uid`를 요구하게 하면 배치가 **자기 자신을
+    //    거부한다**(`evaluation error … false for 'update'`). 통과하는 경로가 아예 없다.
+    //
+    // ⚠ **남는 구멍 — BR-18(부장 정확히 1명)을 규칙은 끝까지 보장하지 못한다.**
+    //    ① 이 조건만으로는 「양도 없이 혼자 member로 내려가는」 head를 막지 못한다(부장 0명).
+    //       규칙은 **형제 연산을 볼 수 없다.**
+    //    ② 🔴 **Rules는 「`role == 'head'`인 문서가 정확히 1개」를 셀 수 없다** —
+    //       규칙 안에서 집합 질의를 할 수 없고 `get()`은 문서 1건만 본다.
+    //    ③ `departments.headUid`를 단일 진실로 삼아 `users.role`을 파생으로 강제하는 안은
+    //       **Q-2 때문에 채택할 수 없다**(위 실측 — 양도 배치가 스스로 거부된다).
+    //    ⇒ 실질 보장은 셋뿐이다: (1) `role` 변경 권한을 `head`·`dev`로 제한 ·
+    //      (2) 클라이언트 배치의 **원자성** — 🔬 **Q-3 실측**으로 3연산 중 1개가 거부되면
+    //          남은 문서가 **0/2**임을 확인했다. 「4연산 중 3개만 통과」하는 상태는 없다 ·
+    //      (3) BR-23 Dev 복구 경로(양도 3연산 — 테스트 B-6이 지킨다).
+    //    ⚠ **동시 양도 경쟁은 MVP에서 열려 있다.** 근본 차단은 §11.3
+    //      `transferHeadRole` Cloud Function이다(v1.2).
+    function selfDemoteOnTransfer(uid) {
+      return isSignedIn()
+        && request.auth.uid == uid
+        && resource.data.role == 'head'
+        && request.resource.data.role == 'member'
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['role', 'updatedAt']);
+    }
+
+    match /users/{uid} {
+      // 🔴 **`get`과 `list`를 나눈다.** read 조건에 경로 와일드카드(`uid`)를 쓰는
+      //    「본인 또는」 절은 **`list`에서 증명할 수 없다** — 뭉치면 목록 질의가 통째로
+      //    거부되고 S8 ②(부원 목록)와 S7(작성자 이름 묶음 읽기)이 죽는다.
+      //    🔬 **W-16 Q-1 실측** — `allow read: if request.auth.uid == uid` 하나만 둔 규칙에서
+      //    단건 `get`은 허용, 컬렉션 `list`는 `permission-denied`였다. 같은 규칙에서
+      //    `where(__name__ == 본인)`으로 좁힌 질의는 통과한다. 즉 **질의가 규칙 조건을
+      //    스스로 증명해야** 하는데, S8 ②의 `departmentId ==` + `status ==` 질의는
+      //    「본인」을 증명하지 못한다. 그래서 뭉치면 죽고, 나누면 산다.
+      allow get: if isSignedIn() && (request.auth.uid == uid || isActive());
+
+      // 🔴 **이번 회차 최대 위험**(W-15B §8-5 1순위). 앱에서 `users`를 `list`로 읽는 것은
+      //    S8 ②(`departmentId ==` + `status ==`)와 S7(`documentId() in`) 둘이다.
+      //    좁게 쓰면 두 화면이 죽고, 넓게 쓰면 부서 전체 `users`가 전 필드 노출된다.
+      //    🔴 **후자는 각주로 이미 닫혀 있다**(W-14 결정 3 · 결정 R-b) —
+      //    Rules의 `allow read`는 **문서 단위**라 필드 제한을 표현할 수 없다.
+      //    **규칙은 부서원에게 열고, 「부원은 이름·역할만 그린다」는 클라이언트 규율이 맡는다.**
+      //    실제로 S8 ②는 이메일을 그리지 않는다(W-15B DoD 7 실측).
+      allow list: if isActive();
+
+      allow create: if isSignedIn()
+        && request.auth.uid == uid
+        && request.resource.data.role == 'member'
+        && request.resource.data.status == 'pending'
+        && request.resource.data.email == request.auth.token.email;
+
+      // 🔴 `isHead()`에 **`request.auth.uid != uid`를 붙인 것이 BR-21의 본체다.**
+      //    붙이지 않으면 부장이 자기 역할을 마음대로 바꿀 수 있다(T-7).
+      //    양도의 자기 강등(T-2)은 `selfDemoteOnTransfer`가 따로 연다.
+      allow update: if (request.auth.uid != uid && isHead())
+        || selfDemoteOnTransfer(uid)
+        || selfWithdraw(uid)
+        || reapply(uid)
+        || selfSync(uid);
+
+      allow delete: if isDev();
+    }
+
+    // ========================================================================
+    //  departments  (§9.6 요약표 — 부록 B에 없다)
+    // ========================================================================
+    match /departments/{deptId} {
+      allow read: if isActive();
+      // 초기 시딩은 콘솔이 한다(§9.7). 앱은 만들지 않는다.
+      allow create: if false;
+      // 🔴 `headUid`(양도 · OP-11)와 `activeInviteCodeId`(재발급 · OP-10)가 여기로 온다.
+      //
+      // 🔬 **Q-2의 결과가 여기서는 반대 방향으로 일한다.** head가 실행하는 양도 배치는
+      //    같은 배치에서 본인을 `member`로 내리는데, 이 연산의 `isHead()`가 부르는
+      //    `get()`은 **배치 이전** 상태를 보므로 여전히 `head`로 읽혀 **통과한다**(B-4).
+      //    배치 안의 연산 순서를 바꿔도 같다 — 순서가 없기 때문이다.
+      //    ⇒ 「배치 안에서 자기 권한을 먼저 버리면 뒤 연산이 죽는다」는 걱정은
+      //      이 스키마에서 성립하지 않는다. 그 사실에 기대고 있다는 것을 적어 둔다.
+      allow update: if isHead();
+      allow delete: if false;
+
+      // ----------------------------------------------------------------
+      //  inviteCodes  (§9.3.3 — 🔴 하위 컬렉션이다)
+      // ----------------------------------------------------------------
+      match /inviteCodes/{codeId} {
+        // 🔴 **W-08 §2-1·§2-2 — `get`과 `list`는 분리된 권한이다.**
+        //    `allow read`로 뭉치면 목록 조회까지 열려 **유효한 코드 전체가 유출된다.**
+        //
+        //    단건 `get`을 학교 계정 전체에 여는 이유: S2 가입 신청이 코드를 검증해야
+        //    하는데 신청자는 정의상 `active`가 아니다. 문서 ID가 **코드 문자열 자체**라
+        //    코드를 이미 아는 사람만 1건을 읽을 수 있고, 목록이 잠겨 열거가 불가능하다.
+        //    읽어서 얻는 것도 `isActive`·`expiresAt`·`useCount`뿐이라 개인정보가 없다.
+        //
+        // ⚠ 무차별 대입(4,569,760가지)의 짝은 **BR-30 레이트 리밋 + App Check**이고
+        //    둘 다 배포 회차(W-22)로 이관됐다 — `database_ToDo/W-16.md` §7.
+        allow get: if isSignedIn();
+
+        // BR-16 발급 이력 조회(레이트 리밋)가 쓰는 유일한 목록 질의다.
+        allow list: if isHead();
+
+        // 🔴 `data.code == codeId`를 강제한다(W-08 §2-1). 어긋나면 S2의 코드 조회가
+        //    문서를 찾고도 값이 달라 판정이 무너진다.
+        allow create: if isHead() && request.resource.data.code == codeId;
+        allow update: if isHead() && request.resource.data.code == codeId;
+        allow delete: if false;
+      }
+    }
+
+    // ========================================================================
+    //  records
+    // ========================================================================
+    match /records/{recordId} {
+      // 조건에 문서별 절이 없어 `get`/`list`가 같은 판정을 받는다.
+      // 그래도 나눠 적는다 — 나중에 문서별 조건이 붙을 때 `list`가 조용히 죽지 않도록.
+      allow get: if isActive();
+      allow list: if isActive();
+
+      // §9.6 필수 조건 4·5 · §14.5 5·6·7·8번.
+      // 🔴 **`occurredAt`은 `request.time + 5분`이다.** 부록 B는 `<= request.time`으로
+      //    적었지만 BR-39가 「기기 시계 오차 ±5분 허용」을 규정하므로 필수 조건 4를 따른다.
+      //    부록 B대로 쓰면 시계가 조금 빠른 기기의 정상 저장이 거부된다.
+      allow create: if isActive()
+        && role() in ['member', 'vice', 'head', 'dev']
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.status == 'active'
+        && request.resource.data.occurredAt <= request.time + duration.value(5, 'm')
+        && validReason(request.resource.data);
+
+      // v1.1 사유 변경(BR-07b). 작성자·작성 시각은 불변이다.
+      allow update: if isVice()
+        && validReason(request.resource.data)
+        && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.createdAt == resource.data.createdAt;
+
+      // BR-08 — 물리 삭제는 없다. 삭제는 `status: 'deleted'` 전이(update)다.
+      allow delete: if false;
+    }
+
+    // ========================================================================
+    //  students
+    // ========================================================================
+    match /students/{docId} {
+      allow get: if isActive();
+      allow list: if isActive();
+      // 🔴 부록 B의 `allow write: if isHead()`는 **delete까지 연다.**
+      //    §9.6 요약표는 delete를 「금지(`isActive=false`로 대체)」로 규정한다 — 요약표를 따른다.
+      allow create: if isHead();
+      allow update: if isHead();
+      allow delete: if false;
+    }
+
+    // ========================================================================
+    //  dutySchedules
+    // ========================================================================
+    match /dutySchedules/{weekId} {
+      allow get: if isActive();
+      allow list: if isActive();
+      allow create: if isVice();
+      allow update: if isVice();
+      allow delete: if isHead();
+    }
+
+    // ========================================================================
+    //  approvalRequests
+    // ========================================================================
+    match /approvalRequests/{reqId} {
+      // 🔴 `get`/`list` 분리 — 「본인」 절이 `resource.data`를 보므로 `list`에서 증명할 수 없다.
+      allow get: if isVice() || isTeacher() || (isSignedIn() && resource.data.uid == request.auth.uid);
+      // S8 ③의 구독(`status == 'pending'`)이 쓰는 유일한 목록 질의다.
+      // ⚠ `member`(active)는 여기서 막힌다 — A-2.
+      allow list: if isVice() || isTeacher();
+
+      // S2 가입 신청. 신청자는 `active`가 아니므로 `isSignedIn()`이 맞다.
+      allow create: if isSignedIn() && request.resource.data.uid == request.auth.uid;
+      // 🔴 승인·거절은 `head`·`dev`만이다 — 차장은 읽기만 한다(US-V-03 AC-3).
+      allow update: if isHead();
+      allow delete: if false;
+    }
+
+    // ========================================================================
+    //  auditLogs
+    // ========================================================================
+    match /auditLogs/{logId} {
+      allow get: if isHead() || isTeacher();
+      allow list: if isHead() || isTeacher();
+      // §9.6 필수 조건 6 — 자기 uid로만 남길 수 있다.
+      allow create: if isSignedIn() && request.resource.data.actorUid == request.auth.uid;
+      // 🔴 **수정·삭제 전면 금지**(§14.5 3번). 감사 로그가 고쳐질 수 있으면 감사가 아니다.
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // ========================================================================
+    //  meta  (§9.6 요약표 — 부록 B에 없다)
+    // ========================================================================
+    match /meta/{docId} {
+      // 최소 지원 버전·점검 모드 플래그. 로그인 직후 판정에 쓰이므로 `active`를 요구하지 않는다.
+      allow read: if isSignedIn();
+      allow create: if false;
+      allow update: if isDev();
+      allow delete: if false;
+    }
+
+    // ========================================================================
+    //  🔴 그 밖의 모든 경로는 **기본 거부**다.
+    //
+    //     Firestore Rules는 어떤 `match`도 허용하지 않으면 거부한다. 그래서
+    //     `match /{document=**} { allow read, write: if false; }`를 **일부러 두지 않았다** —
+    //     동작이 같은데 W-04 임시 catch-all과 모양이 같아, 나중에 누가 `if false`를
+    //     `if isSignedIn()`으로 한 글자 고치는 순간 전 컬렉션이 다시 열린다.
+    //     🔴 **「임시로 열어 두는」 규칙을 다시 넣지 마라.**
+    //     PRD에 없는 컬렉션이 읽히는지는 규칙 테스트 `LOAD-1`이 지킨다.
+    // ========================================================================
+  }
+}

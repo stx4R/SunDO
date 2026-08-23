@@ -1,0 +1,25 @@
+// ============================================================================
+//  🔴 롤백 전용 원본 — W-04 임시 개발 규칙 (`database_ToDo/W-04_Firebase_콘솔.md` §5)
+//
+//  이 파일은 **배포 대상이 아니다.** `firebase.json`은 `firestore.rules`를 가리키고
+//  이 파일을 가리키지 않는다. 손으로 지정할 때만 쓰인다.
+//
+//  왜 남기나 — §18.4가 「Rules 롤백은 Git 이력에서 이전 버전 재배포」로 규정하는데
+//  `firestore.rules`가 **이번 회차의 첫 커밋**이라 이력에 이전 버전이 없다.
+//  W-16 배포 직후 스모크가 실패하면 되돌릴 곳이 필요하다.
+//
+//  🔴 이것은 **역할·상태 조건을 하나도 담고 있지 않은** 규칙이다.
+//     `@dshs.kr` 계정이면 전 컬렉션을 읽고 쓴다. **되돌린 상태로 오래 두지 마라.**
+//     되돌리는 절차와 그 뒤에 무엇을 해야 하는지는 `database_ToDo/W-16.md` §3에 있다.
+// ============================================================================
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      // 정규식 끝의 `$`는 유지한다(§9.6 필수 조건 1). 🔬 다만 W-16 Q-5 실측상
+      // `attacker@dshs.kr.evil.com`을 막는 것은 `$`가 아니라 `matches()`의 전체 일치다.
+      allow read, write: if request.auth != null
+        && request.auth.token.email.matches('.*@dshs[.]kr$');
+    }
+  }
+}

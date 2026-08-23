@@ -11,3 +11,14 @@ dist-ssr
 .vscode/*
 !.vscode/extensions.json
 .claude/settings.local.json
+
+# Firebase 에뮬레이터 산출물 (W-16) — 커밋하지 않는다
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+database-debug.log
+pubsub-debug.log
+.emulator-data
+*-emulator-*
+# 규칙 역검증(rules:mutate)이 만드는 원본 바이트 사본 — 실행이 끝나면 지워진다
+firestore.rules.mutbak

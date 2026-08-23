@@ -4,15 +4,16 @@ import {
   documentId,
   getCountFromServer,
   getDocs,
+  increment,
   limit,
   onSnapshot,
   orderBy,
   query,
   serverTimestamp,
-  setDoc,
   startAfter,
   Timestamp,
   where,
+  writeBatch,
   type DocumentData,
   type QueryConstraint,
   type QueryDocumentSnapshot,
@@ -210,11 +211,21 @@ export function buildRecordPayload(draft: RecordDraft) {
 }
 
 /**
- * OP-04 기록 생성 — `setDoc(records/{clientRecordId}, payload)` **1건**.
+ * OP-04 기록 생성 — **배치 2연산**(`records` create + `users/{본인}.recordCount` +1).
+ *
+ * 🔴 **W-16에서 1건 → 2연산이 됐다**(`recordCount` A안 ② — 결정 R-a).
+ * ①(규칙)과 ②(코드)는 **같은 회차**여야 한다. ②를 먼저 하면 규칙 배포 순간 저장이
+ * 통째로 막히고, ③(감소 · v1.1)을 먼저 하면 값이 음수가 된다.
+ * 규칙은 `users` 자기 갱신 허용 키에 `recordCount`를 열고 **「+1만」**을 강제한다.
+ *
+ * ⚠ **`batch.update`는 대상 문서가 없으면 배치 전체를 실패시킨다**(W-15A §4-2).
+ * `users/{본인}`은 로그인 상태에서만 이 경로에 도달하므로 **항상 존재한다** —
+ * `AuthProvider`가 문서를 읽어 `status === 'active'`를 확인한 뒤에야 S6에 들어온다.
+ * 그 전제가 깨지면(문서 삭제) 저장이 조용히 실패한다.
  *
  * 🔴 **`await`하지 않는다. 이 함수는 Promise를 돌려주지 않는다.**
  * 오프라인 지속성이 켜져 있으면(`lib/firebase.ts`의 `persistentLocalCache`)
- * `setDoc`의 Promise는 **서버 확인까지 resolve되지 않는다.** 실측(W-12 §2.3):
+ * `setDoc`·`batch.commit()`의 Promise는 **서버 확인까지 resolve되지 않는다.** 실측(W-12 §2.3):
  * `disableNetwork()` 뒤 `setDoc` promise는 8,000ms 후에도 pending인데,
  * 같은 문서를 즉시 `getDoc`하면 11ms에 `exists()=true`·`hasPendingWrites=true`로
  * 돌아온다. SDK 원문도 같다 — 「The userCallback is resolved once the write was
@@ -228,13 +239,19 @@ export function buildRecordPayload(draft: RecordDraft) {
  * 조용히 실패하는 오프라인 큐 경로는 W-17이 이어받는다(`database_ToDo/W-12.md` §5).
  */
 export function writeRecord(draft: RecordDraft): void {
-  void setDoc(doc(db, 'records', draft.clientRecordId), buildRecordPayload(draft)).catch(
-    (error: unknown) => {
-      /* 사용자에게 보여 줄 곳이 없다. 시트는 이미 닫혔고 재시도는 SDK 소유다.
-         삼키되 흔적은 남긴다. */
-      console.error('[records] 전송 실패', errorCode(error, 'unknown'), error)
-    },
-  )
+  const batch = writeBatch(db)
+  batch.set(doc(db, 'records', draft.clientRecordId), buildRecordPayload(draft))
+  /* 결정 R-a ② — 비정규화 카운터. 규칙이 「+1만」을 강제하므로 임의 값을 넣을 수 없다. */
+  batch.update(doc(db, 'users', draft.createdBy), {
+    recordCount: increment(1),
+    updatedAt: serverTimestamp(),
+  })
+  /* 🔴 `void` 그대로다 — 호출부가 실수로 기다릴 방법이 없어야 한다(W-12 §5-3). */
+  void batch.commit().catch((error: unknown) => {
+    /* 사용자에게 보여 줄 곳이 없다. 시트는 이미 닫혔고 재시도는 SDK 소유다.
+       삼키되 흔적은 남긴다. */
+    console.error('[records] 전송 실패', errorCode(error, 'unknown'), error)
+  })
 }
 
 /* ============================================================================

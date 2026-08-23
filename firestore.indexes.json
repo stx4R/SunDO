@@ -1,0 +1,45 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "records",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "academicYear", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "occurredAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "records",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "academicYear", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "reasonCode", "order": "ASCENDING" },
+        { "fieldPath": "occurredAt", "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": [
+    {
+      "collectionGroup": "records",
+      "fieldPath": "studentName",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "records",
+      "fieldPath": "reasonText",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "users",
+      "fieldPath": "email",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "users",
+      "fieldPath": "displayNameRaw",
+      "indexes": []
+    }
+  ]
+}
