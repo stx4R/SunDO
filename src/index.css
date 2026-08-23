@@ -95,6 +95,12 @@
   --text-body: 0.9375rem; /* 15px */
   --text-button: 1rem; /* 16px */
   --text-row: 0.90625rem; /* 14.5px */
+  /* §7.2 스케일 편입(W-15B 결정 3 ①). `--text-row`(14.5px) 바로 아래 단이라
+     이름을 그 계열로 지었다 — 값을 새로 만든 것이 아니라 소비자 **5곳**이 이미
+     같은 리터럴을 쓰고 있던 것을 승격한 것이다(W-03B §3 기준을 오래 전에 넘겼다).
+     🔴 `src/lib/cn.ts`의 `classGroups`에도 함께 등록돼 있다 — 빠뜨리면 유틸리티로
+     쓰는 순간 tailwind-merge가 색으로 오인해 조용히 사라진다(W-07 §5-6). */
+  --text-rowsm: 0.875rem; /* 14px */
   --text-label: 0.75rem; /* 12px */
   --text-caption: 0.71875rem; /* 11.5px */
   --text-micro: 0.6875rem; /* 11px */
@@ -246,8 +252,14 @@
     color: var(--color-sundo-800);
   }
 
+  /* 🔴 그림자를 **복원했다**(W-15B 결정 3 ②). W-03A §0.3-2가 「의도된 차이다.
+     실제 목록 행에 렌더한 뒤에도 어색하면 그때 다시 본다」로 유예했고, W-15A가
+     그 첫 렌더(S8 ③ `승인`)를 만들어 조건이 충족됐다. design `9a` 원문
+     `box-shadow:0 5px 12px rgba(31,81,56,0.28)` 그대로다.
+     ⚠ `--shadow-primary`(`0 10px 24px …0.35`)와 값이 달라 토큰을 쓰지 않는다. */
   .pill-fill {
     background: var(--gradient-primary);
+    box-shadow: 0 5px 12px rgba(31, 81, 56, 0.28);
     color: #fff;
   }
 
@@ -1384,10 +1396,10 @@
   }
 
   /* design `1e` 원문 `font-size:14px;font-weight:700;color:rgba(20,53,38,0.55)`.
-     PRD §8.4.2 #4도 `반`(14px)이다. 14px는 §7.2 스케일에 없어 리터럴로 둔다
-     (`--text-row`는 14.5px라 다른 값이다). */
+     PRD §8.4.2 #4도 `반`(14px)이다. W-15B 결정 3 ①로 `--text-rowsm`에 편입됐다 —
+     computed는 그대로 14px다(`--text-row`는 14.5px라 다른 값이다). */
   .cbtn-unit {
-    font-size: 14px;
+    font-size: var(--text-rowsm);
     font-weight: 700;
     color: var(--color-sundo-ink-55);
   }
@@ -1748,9 +1760,10 @@
     line-height: 1.35;
   }
 
+  /* 14px은 W-15B 결정 3 ①로 `--text-rowsm`에 편입됐다. computed 불변. */
   .modal-body {
     margin-top: 12px;
-    font-size: 14px;
+    font-size: var(--text-rowsm);
     font-weight: 500;
     color: var(--color-sundo-ink-70);
     text-align: center;
@@ -2019,11 +2032,10 @@
     border: 1px solid rgba(255, 255, 255, 0.85);
   }
 
-  /* 14px은 §7.2 스케일에 없다(가장 가까운 것이 `--text-row` 14.5px).
-     이 한 곳뿐이라 W-03B §3 기준(서로 다른 컴포넌트 2곳)에 미달해 리터럴로 둔다.
-     🔴 14.5px으로 맞추지 마라 — design 원문은 `14`다. */
+  /* design 원문은 `14`다. W-15B 결정 3 ①로 `--text-rowsm`에 편입됐다.
+     🔴 14.5px(`--text-row`)으로 맞추지 마라 — 다른 값이다. computed 불변. */
   .rs-when-text {
-    font-size: 14px;
+    font-size: var(--text-rowsm);
     font-weight: 500;
     color: var(--color-sundo-900);
     font-variant-numeric: tabular-nums;
@@ -2507,13 +2519,12 @@
   }
 
   /* `1j` 원문 `flex:1;font-size:14px;font-weight:600`.
-     ⚠ 14px는 §7.2 스케일에 없다(`--text-row`는 14.5px). W-12가 S6 일시에서 같은 공백을
-     보고했고(§7 이월 항목) 이번이 **두 번째 사용처**다 — 승격 판단은 §7.2 소유자(PM)에게 넘긴다.
+     14px는 W-15B 결정 3 ①로 `--text-rowsm`에 편입됐다(`--text-row`는 14.5px라 다른 값이다).
      `min-width: 0`은 긴 이름 목록이 배지·칩을 밀어내지 않게 한다. */
   .drow-name {
     min-width: 0;
     flex: 1;
-    font-size: 14px;
+    font-size: var(--text-rowsm);
     font-weight: 600;
     color: var(--color-sundo-900);
   }
@@ -2607,10 +2618,11 @@
   }
 
   /* `9a` 원문 `display:flex;flex-direction:column;gap:14px`.
-     ⚠ 원문의 카드 등장 모션(`rise .5s ease .05s/.1s/.15s/.2s both`)은 **섹션 수가
-     이번 회차에 2개**라 스태거가 두 칸뿐이다. 카드마다 지연을 손으로 박지 않고
-     `.rise` + `--rise-delay`(W-03B 계약)를 쓰는 편이 맞지만, ②가 들어오는 W-15B에서
-     지연 순서가 다시 바뀐다 — **이번 회차는 모션을 붙이지 않았다**(보고서 §4). */
+     🔴 카드 등장 모션은 **규칙으로 계산한다**(W-15B 결정 3 ③) — 「n번째 카드 = 0.05×n초」.
+     design `9a`의 `.05/.1/.15/.2s`는 섹션 4개 기준이고 S8은 역할·회차에 따라 섹션 수가
+     2~6개로 변하므로 상수를 박지 않는다. 화면이 `.rise` + `--rise-delay`(W-03B 계약)로
+     넘기고, reduce는 `.rise` 규칙이 duration 0.01s + delay 0s로 이미 덮는다 —
+     🔴 인라인 `style`로 `animation-delay`를 직접 주면 그 덮기가 이길 수 없다(W-03B §4-3). */
   .adm-sections {
     display: flex;
     flex-direction: column;
@@ -2693,6 +2705,19 @@
     font-size: var(--text-subtitle);
     font-weight: 700;
     color: var(--color-sundo-800);
+  }
+
+  /* 🔴 결정 1(W-15B)의 읽기 전용 안내 3종이 쓰는 줄.
+     design `9b`·`9c` 원문 `margin-top:6px;font-size:11px;font-weight:500;
+      color:rgba(20,53,38,0.70)`. **라벨 바로 아래**이지 카드 하단이 아니다 —
+     지시서 §3.7은 「섹션 하단」이라 적었으나 시각 원본이 `9b`·`9c`다(보고서 §3).
+     `.adm-note`(10.5px · 하단 힌트)와 갈리는 지점이다 — 이쪽은 **권한 상태**를 말하고
+     저쪽은 **행동의 결과**를 말한다. */
+  .adm-ro {
+    margin-top: 6px;
+    font-size: var(--text-micro);
+    font-weight: 500;
+    color: var(--color-sundo-ink-70);
   }
 
   /* §8.8.3 #5 코드 힌트 · #13 하단 힌트 — 둘 다 10.5px다.
@@ -2788,14 +2813,38 @@
     border-bottom: none;
   }
 
+  /* `9a` 두 번째 카드 원문 — ② 부원 행은 아바타가 붙어 `gap:10px`이다.
+     ③ 신청 행(`gap:8px`)과 갈리는 유일한 칸이라 수식자만 얹는다. */
+  .mrow-mem {
+    gap: 10px;
+  }
+
+  /* §8.8.3 #6 · `9a` 원문 `width:32px;height:32px;flex:none;border-radius:11px;
+     background:rgba(31,81,56,0.10);display:flex;align-items:center;justify-content:center;
+     font-size:12px;font-weight:700;color:#1F5138`.
+     🔴 **역할 첫 글자**다(§8.8.3 #6). 이름 첫 글자가 아니다 —
+     §9.3.1 NG-13의 각주(「아바타는 `name`의 첫 글자」)와 어긋나며 보고서 §7에 올렸다.
+     `aria-hidden`이라 역할은 바로 아래 텍스트가 전달한다(§3.9). */
+  .mrow-av {
+    display: flex;
+    width: 32px;
+    height: 32px;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-11);
+    background: var(--color-sundo-tint-10);
+    font-size: var(--text-label);
+    font-weight: 700;
+    color: var(--color-sundo-800);
+  }
+
   /* `9a` 원문 `font-size:14px;font-weight:700;color:#14352A`.
-     ⚠ 14px는 §7.2 스케일에 없다. S6 일시·S9 요일 행에 이은 **세 번째 사용처**다 —
-     §4-3이 「세 번째가 나오면 승격하라」로 지시한 그 지점이라 보고서 §7에 승격을 요청했다.
-     🔴 토큰을 여기서 만들지 않은 이유: `--text-*`는 §7.2 스케일의 사본이고, 스케일에 없는
-     이름을 `lib/cn.ts`까지 등록하면 PRD가 모르는 스케일이 코드에만 생긴다(W-07 §5-6의 반대 방향). */
+     🔴 W-15A가 「§7.2 편입이 먼저다」로 미룬 값이고, **결정 3 ①로 편입이 확정돼**
+     `--text-rowsm`이 됐다. 소비자는 5곳(S4 `반` · 모달 본문 · S6 일시 · S9 요일 행 · 이 행)이다. */
   .mrow-name {
     display: block;
-    font-size: 14px;
+    font-size: var(--text-rowsm);
     font-weight: 700;
     color: var(--color-sundo-900);
   }

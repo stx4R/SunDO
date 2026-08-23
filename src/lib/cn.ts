@@ -25,6 +25,9 @@ const twMerge = extendTailwindMerge({
             'body',
             'button',
             'row',
+            /* W-15B 결정 3 ① — `--text-rowsm`(14px)을 §7.2 스케일로 편입하면서
+               같은 회차에 등록했다. `--text-row`(14.5px)와 **다른 값**이다. */
+            'rowsm',
             'label',
             'caption',
             'micro',

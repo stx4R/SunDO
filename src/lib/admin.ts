@@ -79,10 +79,18 @@ interface StoredCode {
 }
 
 let codeCache: InviteCodeState | null = null
+let memberCache: MemberListState | null = null
 
-/** 🔴 다섯 번째 캐시다. `clearHomeCache`·`clearRosterCache`·`clearRecordsCache`·`clearDutyCache`를 부르지 마라. */
+/**
+ * 🔴 다섯 번째 캐시다. `clearHomeCache`·`clearRosterCache`·`clearRecordsCache`·`clearDutyCache`를 부르지 마라.
+ *
+ * 🔴 **여섯 번째 `clear*Cache`를 만들지 않는다.** W-15B가 부원 목록 캐시를 더하면서
+ * 이 함수를 **넓혔다** — `admin.ts`가 화면과 Firestore 사이의 유일한 통로인 이상
+ * 이 파일의 캐시를 비우는 함수도 하나여야 한다.
+ */
 export function clearAdminCache(): void {
   codeCache = null
+  memberCache = null
 }
 
 /**
@@ -145,6 +153,84 @@ export async function countRecentIssues(now: Date): Promise<number | null> {
     console.warn('[admin] 발급 이력 조회 실패', errorCode(error, 'unknown'))
     return null
   }
+}
+
+/* --- ② 부원 · 권한 양도 ------------------------------------------------- */
+
+/**
+ * §8.8.3 #6 — 부원 행에 그리는 값. 🔴 **이메일을 담지 않는다.**
+ * §8.8.3 #6이 아바타 + 이름 + 역할만 규정하고, 부원이 보는 목록은 이름·역할만이라는
+ * §4.2 단서 1과도 맞다(W-14 결정 3의 클라이언트 규율).
+ */
+export interface Member {
+  uid: string
+  name: string
+  role: string
+}
+
+/** 🔴 **실패 ≠ 없음.** 조회 실패를 빈 목록으로 떨어뜨리면 EM-05가 거짓으로 뜬다. */
+export type MemberListState = { kind: 'ok'; members: Member[] } | { kind: 'failed'; code: string }
+
+/**
+ * §4.4 R-01~R-04 · BR-24의 권한 순서. **알파벳 순이 아니다.**
+ *
+ * 🔴 IX-10의 `role ASC`는 `dev`·`head`·`member`·`teacher`·`vice` 순이라
+ * 조직도와 아무 관계가 없다. 사람이 목록에서 찾는 순서(부장 → 차장 → 부원 → 교사 → Dev)로
+ * **클라이언트에서** 정렬한다 — §7 신규 항목으로 올렸다.
+ */
+const ROLE_RANK: Readonly<Record<string, number>> = {
+  head: 0,
+  vice: 1,
+  member: 2,
+  teacher: 3,
+  dev: 4,
+}
+
+/** BR-20 · R-08 · BR-59 · US-H-03 AC-4 — 양도 대상 자격. 본인 제외는 호출부가 판단한다. */
+export function isTransferTarget(member: Pick<Member, 'role'>): boolean {
+  return member.role === 'member' || member.role === 'vice'
+}
+
+/**
+ * §8.8.3 #6 — `users` where `departmentId ==` + `status == 'active'`.
+ *
+ * 🔴 **등식 2개뿐이고 `orderBy`를 서버에 맡기지 않는다.** §9.5 IX-10은 미생성이고
+ * `role ASC`는 알파벳 순이라 의미도 없다. 실사용 규모가 약 40명이라 정렬은 클라이언트가
+ * 한다(W-15A의 승인 대기 목록과 같은 판단 — **S8은 인덱스를 0건 요구한다**).
+ *
+ * ⚠ **`users`를 `list`로 읽는 것은 앱에서 이번이 처음이다**(W-13은 `documentId() in` 묶음이었다).
+ * 규칙 회차 재검증 항목이다 — `database_ToDo/W-15B.md` §3.
+ *
+ * 🔴 **탈퇴·승인 대기 계정은 질의 단계에서 이미 빠진다**(`status == 'active'`) —
+ * R-08 · BR-59 · US-H-03 AC-4가 여기서 함께 지켜진다. 별도 필터를 덧붙이지 마라.
+ */
+export async function fetchMembers(force = false): Promise<MemberListState> {
+  if (!force && memberCache) return memberCache
+
+  try {
+    const snapshot = await getDocs(
+      query(
+        collection(db, 'users'),
+        where('departmentId', '==', DEPARTMENT_ID),
+        where('status', '==', 'active'),
+      ),
+    )
+    const members = snapshot.docs.map((snap) => {
+      const data = snap.data() as { name?: string; role?: string }
+      return { uid: snap.id, name: data.name ?? '', role: data.role ?? 'member' }
+    })
+    /* 역할 권한 순 → 이름 가나다. 표에 없는 역할은 뒤로 보낸다. */
+    members.sort(
+      (a, b) =>
+        (ROLE_RANK[a.role] ?? 99) - (ROLE_RANK[b.role] ?? 99) ||
+        a.name.localeCompare(b.name, 'ko'),
+    )
+    memberCache = { kind: 'ok', members }
+  } catch (error: unknown) {
+    /* 실패는 캐시하지 않는다. `다시 시도`가 바로 재조회해야 한다. */
+    return { kind: 'failed', code: errorCode(error, 'firestore/members-failed') }
+  }
+  return memberCache
 }
 
 /* --- ③ 가입 승인 대기 --------------------------------------------------- */
@@ -222,7 +308,12 @@ export interface Actor {
 
 export type WriteResult = { ok: true } | { ok: false; code: string }
 
-type AuditAction = 'USER_APPROVE' | 'USER_REJECT' | 'CODE_ISSUE'
+/**
+ * §9.3.8의 `action` 목록에서 **이번 회차에 쓰는 값만** 늘린다.
+ * 🔴 `ROLE_CHANGE`를 넣지 않았다 — 부장의 부원↔차장 역할 변경(§4.2 BR-24)은
+ * §8.8.3 요소 표에 UI가 없고 ⑥ Dev 도구(v1.2) 소유다. 쓰지 않는 값을 미리 열지 않는다.
+ */
+type AuditAction = 'USER_APPROVE' | 'USER_REJECT' | 'CODE_ISSUE' | 'HEAD_TRANSFER'
 
 /**
  * §9.3.8 전 필드. **배치에 넣기만 하고 커밋은 호출부가 한다** — 감사 로그만 따로
@@ -415,4 +506,104 @@ export async function reissueInviteCode(
   }
   clearAdminCache()
   return { ok: true, codeId }
+}
+
+/**
+ * OP-11 E-3003 — 화면이 이 코드로 §8.8.4의 `양도할 수 없는 계정입니다`를 고른다.
+ * 통신 실패와 **대상 부적격**은 사용자가 할 수 있는 일이 다르므로 코드로 갈라 둔다.
+ */
+export const CODE_INELIGIBLE_TARGET = 'admin/ineligible-target'
+
+/**
+ * OP-11 부장 권한 양도 — **배치 4연산**(현 부장 문서가 없으면 3연산).
+ *
+ * 🔴 **이 앱에서 유일하게 되돌릴 수 없는 조작이다.** 넘긴 사람은 그것을 되돌릴 권한이 없다.
+ * 빗장(호출부 `lockRef`) · 확인 모달(MD-02) · 대상 검증(여기) 세 겹을 전부 지킨다.
+ *
+ * 🔴 **강등 대상은 「본인」이 아니라 `departments/{id}.headUid`가 가리키는 사람이다.**
+ * R-02·BR-19의 문언은 「본인 → member」지만 그것은 실행자가 `head`인 경우만 참이다 —
+ * §4.1이 Dev에게 전 기능 접근을 주므로(결정 2) Dev도 양도할 수 있고, 그때 강등 대상은
+ * 본인이 아니다. `headUid`를 읽으면 두 경로가 **한 형태**가 된다. §7 신규 항목이다.
+ *
+ * **커밋 전 확인**(W-15A §4-2 — `batch.update`는 대상 문서가 없으면 배치 전체를 실패시킨다)
+ * 1. 대상 문서: 존재 · `status === 'active'` · `role ∈ {member, vice}` (BR-20)
+ * 2. 대상이 본인이면 거부 (BR-21 — 부장은 자기 역할을 직접 바꿀 수 없다)
+ * 3. 현 부장 문서: 없거나 `role !== 'head'`면 **그 연산만 빼고 승격 3연산으로 진행**한다.
+ *    🔴 BR-23의 「부장 0명」 복구 경로가 실제로 그 상태이고, 그 상태에서 양도가 막히면
+ *    복구할 방법이 없어진다.
+ *
+ * 🔴 **클라이언트 배치는 「부장 정확히 1명」(BR-18)을 보장하지 못한다.** 네 연산이
+ * 원자적으로 함께 적용될 뿐, 같은 순간 다른 부장·Dev가 다른 사람에게 양도하는 경쟁은
+ * 막지 못한다. 실질 보장은 Rules(§9.6 필수 조건 3)와 BR-23의 Dev 복구 경로다 —
+ * `database_ToDo/W-15B.md` §4가 규칙 회차로 넘긴다.
+ */
+export async function transferHead(actor: Actor, target: Member): Promise<WriteResult> {
+  /* BR-21 — 본인은 대상이 될 수 없다. 목록에서 본인 행의 pill을 빼는 것만으로는 부족하다. */
+  if (!target.uid || target.uid === actor.uid) {
+    return { ok: false, code: CODE_INELIGIBLE_TARGET }
+  }
+
+  let currentHeadUid: string | null = null
+  let demoteHead = false
+  try {
+    const targetSnap = await getDoc(doc(db, 'users', target.uid))
+    const targetData = targetSnap.data() as { role?: string; status?: string } | undefined
+    /* 🔴 목록을 그린 뒤 대상이 탈퇴했을 수 있다. 실제 문서를 다시 본다. */
+    if (
+      !targetSnap.exists() ||
+      targetData?.status !== 'active' ||
+      !isTransferTarget({ role: targetData?.role ?? '' })
+    ) {
+      return { ok: false, code: CODE_INELIGIBLE_TARGET }
+    }
+
+    const deptSnap = await getDoc(doc(db, 'departments', DEPARTMENT_ID))
+    currentHeadUid =
+      (deptSnap.data() as { headUid?: string | null } | undefined)?.headUid ?? null
+
+    if (currentHeadUid && currentHeadUid !== target.uid) {
+      const headSnap = await getDoc(doc(db, 'users', currentHeadUid))
+      /* BR-23 복구 경로 — 문서가 없거나 이미 `head`가 아니면 강등할 것이 없다. */
+      demoteHead =
+        headSnap.exists() && (headSnap.data() as { role?: string } | undefined)?.role === 'head'
+    }
+  } catch (error: unknown) {
+    /* 🔴 읽기 실패를 「강등 대상 없음」으로 읽지 마라 — 부장이 2명이 된다.
+       `unavailable`이면 어차피 커밋도 resolve되지 않는다(W-15A §4-7). */
+    return { ok: false, code: errorCode(error, 'firestore/transfer-precheck-failed') }
+  }
+
+  const batch = writeBatch(db)
+  const now = serverTimestamp()
+
+  batch.update(doc(db, 'users', target.uid), { role: 'head', updatedAt: now })
+  if (demoteHead && currentHeadUid) {
+    batch.update(doc(db, 'users', currentHeadUid), { role: 'member', updatedAt: now })
+  }
+  batch.update(doc(db, 'departments', DEPARTMENT_ID), {
+    headUid: target.uid,
+    updatedAt: now,
+  })
+
+  /* 🔴 `before`/`after`에 이름·이메일을 담지 않는다(W-15A §4-9의 규율).
+     누가 누구에게 넘겼는지는 `actorUid`와 `targetId`(uid)로 역추적한다.
+     `actorRole`이 `dev`면 그대로 기록된다 — §4.1 · US-D-01 AC-2가 요구하는 바다. */
+  appendAudit(
+    batch,
+    actor,
+    'HEAD_TRANSFER',
+    'users',
+    target.uid,
+    { headUid: currentHeadUid },
+    { headUid: target.uid },
+  )
+
+  try {
+    await batch.commit()
+  } catch (error: unknown) {
+    return { ok: false, code: errorCode(error, 'firestore/transfer-failed') }
+  }
+  /* 두 계정의 역할이 바뀌었으므로 목록 캐시가 곧 거짓이다(`reissueInviteCode` 선례). */
+  clearAdminCache()
+  return { ok: true }
 }
