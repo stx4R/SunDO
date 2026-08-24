@@ -10,6 +10,7 @@ import { Switch } from '../components/Switch'
 import { useToast } from '../components/Toast'
 import { useAuth } from '../contexts/AuthProvider'
 import { refreshSessionCaches, saveNotificationPrefs, withdrawAccount } from '../lib/account'
+import { isStandalone } from '../lib/pwa'
 import { fetchDepartment } from '../lib/stats'
 import { useOnline } from '../lib/useOnline'
 
@@ -110,17 +111,11 @@ const POLICY_ROWS: readonly { path: string; label: string }[] = [
 ]
 
 /**
- * §8.11.3 #6 · §8.11.5 — standalone(홈 화면에서 실행)인지.
- * iOS Safari는 `navigator.standalone`, 그 밖은 `display-mode` 미디어 쿼리다.
- */
-function isStandalone(): boolean {
-  if (typeof window === 'undefined') return false
-  const iosStandalone = (window.navigator as { standalone?: boolean }).standalone === true
-  return iosStandalone || window.matchMedia?.('(display-mode: standalone)').matches === true
-}
-
-/**
  * §8.11.5 「Push 미지원(iOS 미설치)」.
+ *
+ * 🔴 `isStandalone()`은 W-19에서 `lib/pwa.ts`로 옮겼다. 소비자가 둘이 됐기 때문이다 —
+ * 이 화면의 `설치됨` 표시와 설치 안내 배너(design `10d`)의 노출 조건.
+ * 두 벌이면 한쪽만 고쳐졌을 때 「설치됐다면서 설치하라고 하는」 상태가 조용히 생긴다.
  *
  * ⚠ **MVP에서는 대부분의 사용자가 잠금 상태를 본다**(§8.11.5 말미). Web Push 발송은
  * v1.1이고(§13.1 · D-12) 실제 구독도 W-19(PWA)가 소유한다. 여기서는 **토글을 잠글지**만

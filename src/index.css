@@ -1,6 +1,77 @@
 @import "tailwindcss";
 
 /* ============================================================
+   Spoqa Han Sans Neo — 로컬 `@font-face` (W-19 결정 2)
+
+   🔴 **왜 이 5개가 CDN CSS와 1:1인가.**
+   `index.html`이 받던 `cdn.jsdelivr.net/gh/spoqa/spoqa-han-sans@latest/css/SpoqaHanSansNeo.css`는
+   TTF가 아니라 **`Subset/` woff2**를 가리켰다. `public/fonts/`의 파일은 그 배포처의
+   같은 파일이고 바이트 크기까지 일치한다(Bold 183,708 · Medium 179,960 · Regular 180,600 ·
+   Light 175,620 · Thin 160,912). 그래서 **글리프 커버리지·시각 변화가 정의상 0**이다.
+   굵기를 3개로 줄이지 않은 것도 같은 이유다 — 줄이면 그 문장이 거짓이 된다.
+   ⚠ 브라우저는 **실제로 쓰이는 face만 내려받는다.** 앱이 쓰는 굵기는 400·500·700뿐이라
+   전송량은 544 kB이고, Thin·Light 2개는 배포 산출물에만 있고 전송되지 않는다.
+
+   `local()`을 남긴 것도 CDN CSS 원문 그대로다. 기기에 설치돼 있으면 요청이 0이 된다.
+
+   `font-display: swap` — ① CDN CSS가 쓰던 값이라 전환으로 바뀌는 것이 없고
+   ② `block`·`optional`과 달리 **글자가 보이지 않는 구간을 만들지 않는다**(§15 접근성).
+   FOUT 대신 폴백(`-apple-system`)으로 먼저 그린다.
+
+   ⚠ `@layer` 안에 넣지 마라. `@font-face`는 캐스케이드 레이어의 대상이 아니다.
+   ============================================================ */
+
+@font-face {
+  font-family: "Spoqa Han Sans Neo";
+  font-weight: 100;
+  font-style: normal;
+  font-display: swap;
+  src:
+    local("Spoqa Han Sans Neo Thin"),
+    url("/fonts/SpoqaHanSansNeo-Thin.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Spoqa Han Sans Neo";
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+  src:
+    local("Spoqa Han Sans Neo Light"),
+    url("/fonts/SpoqaHanSansNeo-Light.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Spoqa Han Sans Neo";
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  src:
+    local("Spoqa Han Sans Neo Regular"),
+    url("/fonts/SpoqaHanSansNeo-Regular.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Spoqa Han Sans Neo";
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+  src:
+    local("Spoqa Han Sans Neo Medium"),
+    url("/fonts/SpoqaHanSansNeo-Medium.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Spoqa Han Sans Neo";
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+  src:
+    local("Spoqa Han Sans Neo Bold"),
+    url("/fonts/SpoqaHanSansNeo-Bold.woff2") format("woff2");
+}
+
+/* ============================================================
    SunDO 디자인 토큰 — PRD docs/SunDO_PRD.md §7.1~§7.3
    값의 정본은 PRD 표다. 임의로 바꾸지 않는다.
    ============================================================ */
@@ -969,6 +1040,130 @@
        이 배너에는 상호작용이 없고, `auto`로 두면 시트가 열린 동안 배너 띠에서
        딤 탭-투-클로즈가 죽는다. 되돌리지 마라. */
     pointer-events: none;
+  }
+
+  /* ==========================================================
+     PWA 배너 2종 — design `10c`(업데이트) · `10d`(설치 안내)
+     PRD §18.2 · EC-24 · W-19
+     ========================================================== */
+
+  /**
+   * 공통 유리 바.
+   *
+   * 🔴 **`.glass`를 쓰지 않는다.** 두 시안이 하이라이트를 `rgba(255,255,255,0.8)`로
+   * 그리는데 `--highlight-top`은 `0.85`다. design 전체에서 `0.8`이 88회 · `0.85`가 26회로
+   * **0.8이 다수**다 — 토큰 값을 바꾸는 것은 이 회차의 범위가 아니라 보고서 §7로 올린다.
+   *
+   * 🔴 **`bottom`에 design의 `132px`을 그대로 쓰지 않는다.** design의 독은 `bottom:50px`인데
+   * 구현의 `.dock`은 `calc(env(safe-area-inset-bottom) + 16px)`다(W-03B가 iOS 프레임의
+   * 안전 영역을 분리한 결과). 두 시안이 잠근 것은 **독 바닥에서 82px 위**라는 관계이므로
+   * `16 + 82 = 98`을 같은 형태로 적는다. 값을 바꾼 것이 아니라 같은 관계를 옮긴 것이다.
+   *
+   * z-30은 독과 같은 층이다 — 딤(z-40) **아래**여야 시트가 열렸을 때 가려진다.
+   */
+  .pwab {
+    position: absolute;
+    left: 18px;
+    right: 18px;
+    bottom: calc(env(safe-area-inset-bottom) + 98px);
+    z-index: 30;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    border-radius: var(--radius-18);
+    background: var(--color-sundo-glass);
+    backdrop-filter: blur(18px) saturate(160%);
+    border: 1px solid var(--color-sundo-border-light);
+    box-shadow:
+      var(--shadow-glass),
+      inset 0 1px 0 rgba(255, 255, 255, 0.8);
+    animation: rise 0.5s ease both;
+  }
+
+  /* `10c` — 높이 52px 고정. 우측 패딩이 8px인 것은 알약 버튼이 자기 패딩을 갖기 때문이다. */
+  .pwab-upd {
+    height: 52px;
+    gap: 10px;
+    padding: 0 8px 0 16px;
+  }
+
+  /* `10d` — 2줄이라 높이를 고정하지 않는다. */
+  .pwab-a2hs {
+    gap: 12px;
+    padding: 14px 16px;
+  }
+
+  .pwab-ico {
+    flex: none;
+  }
+
+  /* `10c`의 한 줄 문구. `flex:1`이 알약을 오른쪽 끝으로 민다. */
+  .pwab-msg {
+    flex: 1;
+    font-size: var(--text-subtitle);
+    font-weight: 700;
+    color: var(--color-sundo-900);
+  }
+
+  /* `10d`의 2줄 묶음. `min-width:0`이 없으면 긴 문구가 X 버튼을 밀어낸다. */
+  .pwab-txt {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .pwab-title {
+    font-size: var(--text-subtitle);
+    font-weight: 700;
+    color: var(--color-sundo-900);
+    line-height: 1.4;
+  }
+
+  .pwab-sub {
+    margin-top: 3px;
+    font-size: var(--text-micro);
+    font-weight: 500;
+    color: var(--color-sundo-ink-70);
+  }
+
+  /* `10c`의 `새로고침` 알약. §15.1 터치 타깃 44px을 `min-height`로 잡는다. */
+  .pwab-act {
+    flex: none;
+    display: flex;
+    min-height: 44px;
+    align-items: center;
+    border-radius: var(--radius-pill);
+    padding: 0 16px;
+    background: var(--color-sundo-tint-10);
+    font-size: var(--text-subtitle);
+    font-weight: 700;
+    color: var(--color-sundo-800);
+    transition: transform 0.15s;
+  }
+
+  .pwab-act:active {
+    transform: scale(0.97);
+  }
+
+  /* `10d`의 닫기. 시각은 28px 원이고 터치 타깃은 44px이다 —
+     `margin-right:-8px`이 그 차이를 흡수해 우측 패딩 16px을 유지한다. */
+  .pwab-x {
+    flex: none;
+    display: flex;
+    width: 44px;
+    height: 44px;
+    margin-right: -8px;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .pwab-x span {
+    display: flex;
+    width: 28px;
+    height: 28px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: var(--color-sundo-tint-10);
   }
 
   /* ==========================================================
@@ -3750,6 +3945,16 @@
   .rise {
     animation-duration: 0.01s;
     animation-delay: 0s;
+  }
+
+  /* W-19 — 배너 2종은 `.rise`와 같은 판단이다. 등장 **위치**가 정보이지 이동이 아니다.
+     `.rise` 규칙이 클래스 선택자라 `.pwab`에는 닿지 않는다 — 따로 적어야 한다. */
+  .pwab {
+    animation-duration: 0.01s;
+  }
+
+  .pwab-act {
+    transition-duration: 0.01s;
   }
 
   /* 지시서 §2.2 — 모션이 곧 정보인 것만 남긴다. 알약은 **최종 위치**가 정보이고

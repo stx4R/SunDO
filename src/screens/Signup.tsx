@@ -109,7 +109,10 @@ export default function Signup() {
   const [draft] = useState(takeDraft)
   const [code, setCode] = useState(() => draft?.code ?? '')
   const [name, setName] = useState(() => draft?.name ?? '')
-  /* W-18 신규 — 동의 확인. Firestore에 쓰지 않는다(§9.3.1 필드 불변 · rules diff 0줄). */
+  /* W-18 신규 — 동의 확인.
+     🔴 **W-19에서 Firestore에 남기기 시작했다**(결정 3). 이 체크박스가 곧 제출 조건이고
+     `lib/signup.ts`의 `agreement()`가 `agreedAt`·`agreedPolicyVersion`을 배치에 넣는다.
+     ⚠ 그래서 `disabled`에서 `agreed`를 빼지 마라 — 빼는 순간 동의 없이 동의 기록이 남는다. */
   const [agreed, setAgreed] = useState(() => draft?.agreed ?? false)
   const [checking, setChecking] = useState(false)
   const [submitting, setSubmitting] = useState(false)

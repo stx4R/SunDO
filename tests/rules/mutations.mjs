@@ -152,6 +152,13 @@ export const MUTATIONS = [
     breaks: ['A-2'],
   },
   {
+    name: 'reapply-no-agreement-keys',
+    why: '🔴 W-19가 넓힌 동의 2키를 되돌린다 — 재신청 배치가 통째로 죽는지 본다',
+    from: "                       'name', 'nameSource', 'displayNameRaw', 'updatedAt',\n                       'agreedAt', 'agreedPolicyVersion']);",
+    to: "                       'name', 'nameSource', 'displayNameRaw', 'updatedAt']);",
+    breaks: ['RE-0', 'RE-0b', 'RE-7'],
+  },
+  {
     name: 'reapply-anonymized-ok',
     why: '익명화 계정의 재활성 차단을 뺀다 (BR-63)',
     from: "&& request.resource.data.get('anonymizedAt', null) == null",

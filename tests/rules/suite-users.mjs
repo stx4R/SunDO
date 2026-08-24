@@ -14,7 +14,12 @@ const listMembers = (db) =>
     where('status', '==', 'active'),
   ))
 
-/** `signup.ts`의 재신청 배치가 실제로 쓰는 6키. */
+/**
+ * `signup.ts`의 재신청 배치가 실제로 쓰는 키.
+ * 🔴 **W-19에서 `agreedAt`·`agreedPolicyVersion` 2키가 늘었다**(결정 3).
+ * 이 헬퍼가 배치와 어긋나면 규칙 테스트가 **통과하는데 실기기가 죽는다** —
+ * `lib/signup.ts`의 `agreement()`를 고치면 여기도 고쳐라.
+ */
 function reapplyPayload(over = {}) {
   return {
     status: 'pending',
@@ -23,6 +28,8 @@ function reapplyPayload(over = {}) {
     rejectReason: null,
     inviteCodeId: 'DJSN-2691',
     updatedAt: serverTimestamp(),
+    agreedAt: serverTimestamp(),
+    agreedPolicyVersion: '0.12.0',
     ...over,
   }
 }
@@ -147,6 +154,14 @@ export async function run() {
     setDoc(doc(as('uid-new4'), 'users', 'uid-other'), newUser({ uid: 'uid-other', email: 'uid-other@dshs.kr' })))
   await check('UC-5', 'deny', '`email`이 토큰 이메일과 다르다', () =>
     setDoc(doc(as('uid-new5'), 'users', 'uid-new5'), newUser({ uid: 'uid-new5', email: 'someone@dshs.kr' })))
+  // 🔴 W-19 결정 3 — 동의 시각 2필드가 붙은 신규 가입.
+  //    `create`가 `hasOnly`를 쓰지 않는다는 W-18 §4.1 실측을 **테스트로 고정한다** —
+  //    누군가 나중에 `hasOnly`를 붙이면 여기서 먼저 깨진다.
+  await check('UC-6', 'pass', '🔴 W-19 `agreedAt`·`agreedPolicyVersion`이 붙은 가입', () =>
+    setDoc(doc(as('uid-new6'), 'users', 'uid-new6'), newUser({
+      uid: 'uid-new6', email: 'uid-new6@dshs.kr',
+      agreedAt: serverTimestamp(), agreedPolicyVersion: '0.12.0',
+    })))
 
   describe('users update — DR-12 자동 갱신 (🔴 부록 B가 정본)')
   await seed()
@@ -204,6 +219,15 @@ export async function run() {
   await reset()
   await check('RE-6', 'deny', '조건6 위반 — `recordCount`를 함께 바꾼다 (허용 키 밖)', () =>
     updateDoc(doc(as(UIDS.withdrawn), 'users', UIDS.withdrawn), reapplyPayload({ recordCount: 999 })))
+  // 🔴 W-19 결정 4 — 넓힌 2키가 **정확히 2키**인지 잠근다.
+  //    RE-7이 없으면 재신청 배치 전체가 죽는 회귀를 아무도 못 잡고,
+  //    RE-8이 없으면 「넓혔다」가 「열었다」로 조용히 번진다.
+  await reset()
+  await check('RE-7', 'pass', '🔴 W-19 동의 2필드를 포함한 재신청 배치', () =>
+    updateDoc(doc(as(UIDS.withdrawn), 'users', UIDS.withdrawn), reapplyPayload()))
+  await reset()
+  await check('RE-8', 'deny', '🔴 넓힌 것은 2키뿐 — 세 번째 `agreed*` 키는 여전히 거부', () =>
+    updateDoc(doc(as(UIDS.withdrawn), 'users', UIDS.withdrawn), reapplyPayload({ agreedBy: 'uid-x' })))
 
   describe('본인 탈퇴 — §9.6 필수 조건 7 · §14.5 9번 (소비자는 S10/W-17)')
   await seed()

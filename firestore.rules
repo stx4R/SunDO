@@ -126,9 +126,15 @@ service cloud.firestore {
         && request.resource.data.get('withdrawnAt', null) == null
         && request.resource.data.get('rejectReason', null) == null
         && request.resource.data.get('anonymizedAt', null) == null
+        // 🔴 **W-19 — `agreedAt`·`agreedPolicyVersion` 2키를 넓혔다**(결정 3·4).
+        //    재가입도 S2에서 동의를 다시 받는다. 이 둘이 없으면 재신청 배치가 통째로 죽고,
+        //    빼고 쓰면 문서에 **오늘 동의한 적 없는 옛 시각·옛 버전**이 남는다 —
+        //    증명하려고 만든 필드가 반대를 증명한다.
+        //    ⚠ `create`는 `hasOnly`를 쓰지 않으므로 신규 가입 쪽 diff는 0줄이다.
         && request.resource.data.diff(resource.data).affectedKeys()
              .hasOnly(['status', 'role', 'withdrawnAt', 'rejectReason', 'inviteCodeId',
-                       'name', 'nameSource', 'displayNameRaw', 'updatedAt']);
+                       'name', 'nameSource', 'displayNameRaw', 'updatedAt',
+                       'agreedAt', 'agreedPolicyVersion']);
     }
 
     // 🔴 **BR-21/R-04(부장은 자기 역할을 직접 못 바꾼다) ↔ 양도의 자기 강등.**

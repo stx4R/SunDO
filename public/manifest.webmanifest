@@ -1,0 +1,30 @@
+{
+  "name": "자율생활부",
+  "short_name": "자율생활부",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#F7FBF8",
+  "background_color": "#F7FBF8",
+  "start_url": "/?source=pwa",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

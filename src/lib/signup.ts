@@ -17,6 +17,26 @@ import type { ParseResult } from './parseDisplayName'
 /** §9.3.1 — 단일 부서 고정값. 부서 선택 화면은 존재하지 않는다. */
 export const DEPARTMENT_ID = 'dshs-jayul'
 
+/**
+ * W-19 결정 3 — **동의 시각을 남긴다.** W-18 §8-2가 「동의를 받았다를 증명할 수 없다」를
+ * 올렸고 이 두 필드가 그것을 닫는다.
+ *
+ * 🔴 **버전 값은 `package.json`의 앱 버전이다.** 정책 문안에는 버전·시행일 필드가 없고
+ * (`lib/policy.ts`), 저장소에 존재하는 유일한 버전 식별자가 이것이다. 문안이 바뀌는
+ * 회차마다 버전이 오르므로 사실상 문서 버전과 1:1이다. **새 상수를 발명하지 않았다.**
+ *
+ * ⚠ **소급하지 않는다.** 이 코드 이전에 만들어진 계정에는 두 필드가 **없다** — 그것이 사실이다.
+ * 「동의 시점부터 기록한다」 같은 문장을 처리방침에 만들지도 마라(§8.10에 없다).
+ *
+ * 🔴 두 필드를 **create와 update 양쪽에** 쓴다. 재가입도 S2에서 동의를 다시 받기 때문이다.
+ * 신규에만 쓰면 재가입자 문서에 **오늘 동의한 적 없는 옛 시각·옛 버전**이 남아,
+ * 증명하려고 만든 필드가 반대를 증명하게 된다. 그래서 `firestore.rules`의
+ * `reapply()` `hasOnly` 목록을 2키 넓혔다(W-19 결정 4 · 계약 4-2 이탈).
+ */
+function agreement() {
+  return { agreedAt: serverTimestamp(), agreedPolicyVersion: __APP_VERSION__ }
+}
+
 /** §9.3.3 문서 중 판정에 쓰는 필드만 읽는다. */
 interface InviteCodeDoc {
   code?: string
@@ -99,7 +119,13 @@ export type SubmitResult = { ok: true } | { ok: false; errorCode: string }
 
 /**
  * OP-01 배치. **2건이다** — `users/{uid}` + `approvalRequests/{reqId}`.
- * `inviteCodes` 쓰기는 없다(안 2).
+ * `inviteCodes` 쓰기는 없다(안 2). 🔴 **W-19가 필드를 2개 더했어도 연산 수는 그대로다** —
+ * 2연산 계약을 깨지 않았다.
+ *
+ * ⚠ **호출부는 S2 하나뿐이고, 그 화면이 동의 체크박스를 제출 조건에 넣는다**
+ * (`Signup.tsx`의 `disabled = !codeFilled || !online || !agreed`).
+ * 그래서 여기서 `agreed`를 다시 받지 않는다 — 받으면 `false`로 부를 수 있는 경로를
+ * 만드는 셈이고, 그 경로는 `agreedAt`이 있는 문서를 동의 없이 만든다.
  *
  * `writeBatch`가 원자적이므로 부분 생성 문서가 남지 않는다. 롤백 코드를 따로 쓰지 마라.
  */
@@ -121,6 +147,7 @@ export async function submitSignup(input: SignupSubmission): Promise<SubmitResul
       rejectReason: null,
       inviteCodeId: input.codeId,
       updatedAt: serverTimestamp(),
+      ...agreement(),
     })
   } else {
     /* §11.2 OP-01 요청 JSON 전문 + `updatedAt`.
@@ -143,6 +170,7 @@ export async function submitSignup(input: SignupSubmission): Promise<SubmitResul
       createdAt: serverTimestamp(),
       recordCount: 0,
       updatedAt: serverTimestamp(),
+      ...agreement(),
     })
   }
 
