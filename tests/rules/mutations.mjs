@@ -113,7 +113,22 @@ export const MUTATIONS = [
     why: '🔴 부장 탈퇴 차단을 뺀다 (BR-56 · R-07 · §14.5 9번)',
     from: "&& resource.data.role != 'head'",
     to: '&& true',
-    breaks: ['SEC-9a'],
+    /* W-17 — S10이 첫 소비자가 되면서 배치 케이스 B-15가 같은 조건에 걸린다.
+       조건 하나에 개별 연산과 배치가 **둘 다** 매달려 있어야 그 조건이 일한다. */
+    breaks: ['SEC-9a', 'B-15'],
+  },
+  {
+    /* 🔴 W-17 — `selfWithdraw()`의 허용 키 3개가 이 회차에 **처음으로 소비된다**
+       (`src/lib/account.ts`). 조건만 있고 변형이 없으면 그것이 일하는지 아무도 모른다
+       (`reports/W-16.md` §8-5). SEC-9c는 `role`을, B-16은 `recordCount`를 얹는다 —
+       후자가 C7(「탈퇴해도 기록은 보존된다」)의 급소다. */
+    name: 'selfwithdraw-keys-open',
+    why: '🔴 탈퇴 허용 키 3개 제한을 뺀다 — 탈퇴하면서 아무 필드나 함께 쓴다 (§9.6 필수 조건 7)',
+    from:
+      "&& request.resource.data.diff(resource.data).affectedKeys()\n" +
+      "             .hasOnly(['status', 'withdrawnAt', 'updatedAt']);",
+    to: ';',
+    breaks: ['SEC-9c', 'B-16'],
   },
   {
     name: 'recordcount-plus-any',

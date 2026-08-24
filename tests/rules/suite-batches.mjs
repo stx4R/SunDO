@@ -184,4 +184,95 @@ export async function run() {
     b.update(doc(db, 'users', UIDS.member), { recordCount: increment(1), updatedAt: serverTimestamp() })
     return b.commit()
   })
+
+  describe('🔴 배치 조합 — S10 탈퇴 2연산 (W-17 · BR-57)')
+
+  /**
+   * 🔴 **`src/lib/account.ts`의 `withdrawAccount`와 필드가 같아야 한다.**
+   * 한 글자라도 다르면 이 테스트가 코드를 검증하지 못한다(파일 머리글 규율).
+   *
+   * BR-57은 4연산을 규정하지만 `departments.memberCount` 감소는 **넣지 않는다** —
+   * B-17이 그것을 넣으면 배치가 죽는 것을 증명한다.
+   */
+  function withdrawBatch(db, uid, { extra = {}, action = 'USER_WITHDRAW' } = {}) {
+    const b = writeBatch(db)
+    const now = serverTimestamp()
+    b.update(doc(db, 'users', uid), {
+      status: 'withdrawn', withdrawnAt: now, updatedAt: now, ...extra,
+    })
+    b.set(doc(db, 'auditLogs', 'log-withdraw'), {
+      actorUid: uid, actorName: '탈퇴자', actorRole: 'member', action,
+      targetType: 'users', targetId: uid,
+      before: { status: 'active' }, after: { status: 'withdrawn' },
+      createdAt: now,
+    })
+    return b.commit()
+  }
+
+  await seed()
+  await check('B-14', 'pass', '🔴 `member` 탈퇴 — `users` 3키 + `auditLogs(USER_WITHDRAW)`', () =>
+    withdrawBatch(as(UIDS.member), UIDS.member))
+
+  await seed()
+  await check('B-15', 'deny', '🔴 **부장**의 탈퇴 배치 (BR-56 — `users` 연산이 걸려 전체 거부)', () =>
+    withdrawBatch(as(UIDS.head), UIDS.head))
+
+  /* 🔬 시드의 `recordCount`는 `0`이다. **같은 값을 다시 쓰면 `affectedKeys()`에 들어가지
+     않아** `hasOnly`가 걸리지 않는다 — 처음에 `recordCount: 0`으로 썼다가 통과해서 알았다.
+     실제 위반을 재현하려면 **값이 달라야** 한다. 그 성질 자체는 B-20이 잠근다. */
+  await seed()
+  await check('B-16', 'deny', '🔴 탈퇴하면서 `recordCount`를 함께 바꾼다 (허용 키 밖 — C7 위반)', () =>
+    withdrawBatch(as(UIDS.member), UIDS.member, { extra: { recordCount: 999 } }))
+
+  /**
+   * 🔬 **`diff().affectedKeys()`는 「쓴 키」가 아니라 「값이 바뀐 키」다.**
+   * 그래서 허용 키 밖 필드를 **같은 값으로** 다시 써도 `hasOnly`가 통과한다.
+   *
+   * 🔴 **이것을 「규칙이 느슨하다」로 읽지 마라** — 값이 바뀌지 않았으므로 문서도 바뀌지
+   * 않는다. `recordCount`는 탈퇴 후에도 보존되고(C7) 그 보존을 깨는 경로는 B-16이 막는다.
+   * 이 케이스는 규칙의 **의미**를 문서화해 다음 회차가 오해하지 않게 잠근다.
+   */
+  await seed()
+  await check('B-20', 'pass', '🔬 허용 키 밖 필드를 **같은 값으로** 다시 쓴다 (값이 안 바뀌면 `affectedKeys`에 없다)', () =>
+    withdrawBatch(as(UIDS.member), UIDS.member, { extra: { recordCount: 0 } }))
+
+  await seed()
+  await check(
+    'B-17',
+    'deny',
+    '🔴 **BR-57 원문대로** `departments.memberCount` 감소를 넣는다 (탈퇴자는 `head`가 아니다 → 전체 거부)',
+    () => {
+      const db = as(UIDS.member)
+      const b = writeBatch(db)
+      const now = serverTimestamp()
+      b.update(doc(db, 'users', UIDS.member), {
+        status: 'withdrawn', withdrawnAt: now, updatedAt: now,
+      })
+      b.update(doc(db, 'departments', DEPT), { memberCount: increment(-1) })
+      return b.commit()
+    },
+  )
+
+  /* ⚠ 규칙의 `auditLogs` create는 `actorUid == request.auth.uid`만 본다 —
+     `action` 유니온을 **검사하지 않는다**. 그래서 `USER_WITHDRAW`를 더하는 데
+     규칙 재배포가 필요 없다는 것이 B-18의 관측 내용이다(보고서 §4). */
+  await seed()
+  await check('B-18', 'pass', '⚠ 규칙은 `action` 값을 검사하지 않는다 (임의 문자열도 통과)', () =>
+    withdrawBatch(as(UIDS.member), UIDS.member, { action: 'ZZ_NOT_IN_UNION' }))
+
+  await seed()
+  await check('B-19', 'deny', '🔴 남의 uid로 감사 로그를 남긴다 (§9.6 필수 조건 6)', () => {
+    const db = as(UIDS.member)
+    const b = writeBatch(db)
+    const now = serverTimestamp()
+    b.update(doc(db, 'users', UIDS.member), {
+      status: 'withdrawn', withdrawnAt: now, updatedAt: now,
+    })
+    b.set(doc(db, 'auditLogs', 'log-withdraw'), {
+      actorUid: UIDS.head, actorName: '위조', actorRole: 'head', action: 'USER_WITHDRAW',
+      targetType: 'users', targetId: UIDS.member,
+      before: { status: 'active' }, after: { status: 'withdrawn' }, createdAt: now,
+    })
+    return b.commit()
+  })
 }

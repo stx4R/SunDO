@@ -230,3 +230,33 @@ export function DutyEmptyIcon({ className }: IconProps) {
     </svg>
   )
 }
+
+/**
+ * S10 §8.11.3 #3 — 읽기 전용 자물쇠. design `20a`·`20b` 원문
+ * (`13×13` · viewBox `0 0 14 14` · `stroke-width 1.9` · `rgba(20,53,38,0.45)`).
+ * 색은 `currentColor`로 바꿔 CSS가 제어한다 — 독 아이콘과 같은 규율이다.
+ *
+ * 🔴 **장식이 아니다.** T-02가 이 아이콘을 흔들어 「변경할 수 없다」를 알리므로
+ * 호출부가 이름을 준다(§15.3). `aria-hidden`을 여기서 박지 않는 이유다.
+ */
+export function LockIcon({ className }: IconProps) {
+  return (
+    <svg width="13" height="13" viewBox="0 0 14 14" fill="none" className={className}>
+      <rect x="2.9" y="6.1" width="8.2" height="5.6" rx="1.6" stroke="currentColor" strokeWidth="1.9" />
+      <path d="M4.8 6.1V4.6a2.2 2.2 0 014.4 0v1.5" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+/**
+ * S10 §8.11.3 #7·#8 — 리스트 행 우측 화살표. design `20a`·`20b` 원문
+ * (`13×13` · viewBox `0 0 14 14` · `stroke-width 2` · 라운드 캡).
+ * 행 전체가 버튼이고 라벨이 이름을 가지므로 **장식이다**.
+ */
+export function ChevronRightIcon({ className }: IconProps) {
+  return (
+    <svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true" className={className}>
+      <path d="M5.2 3.2l4 3.8-4 3.8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}

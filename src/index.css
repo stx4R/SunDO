@@ -2868,6 +2868,437 @@
     animation: fadeOut 0.2s ease both;
     pointer-events: none;
   }
+
+  /* ==========================================================
+     S10 설정 — design `20a`(부원) · `20b`(부장 탈퇴 차단)
+     §8.11이 이름을 준 요소는 그 이름을, 그 밖은 `.set-*`이다.
+     🔴 제목·배지는 `.adm-title`·`.adm-badge*`를 **그대로 쓴다**(값이 같다).
+        `adm-` 접두사가 S10에도 걸리는 것은 이름 부채이고 보고서 §7 항목이다.
+     ========================================================== */
+
+  /* `20a` 원문 `display:flex;align-items:center;justify-content:space-between;gap:12px`.
+     🔴 `.adm-head`(S8)와 **다르다** — 저쪽은 제목과 배지가 붙어 있고(gap 10)
+     여기는 양 끝으로 벌어진다. 재사용하면 배지가 제목 옆에 붙는다. */
+  .set-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+
+  /* `20a` 원문 `background:rgba(31,81,56,0.10);color:#1F5138`.
+     `.adm-badge-vice`와 표면이 같지만 역할이 달라 이름을 따로 둔다 —
+     한쪽 표면이 바뀔 때 다른 쪽이 끌려가면 안 된다. */
+  .set-badge-member {
+    background: var(--color-sundo-tint-10);
+    color: var(--color-sundo-800);
+  }
+
+  .set-main {
+    padding-bottom: 10px;
+  }
+
+  /* ① 내 계정 ---------------------------------------------- */
+
+  /* `20a` 원문 `margin-top:12px;display:flex;align-items:center`.
+     🔴 `button`이지만 표면은 평범하다 — 눌러도 아무 일도 일어나지 않는 것이
+     §8.11.3 #3의 계약이라 눌림 표현을 주지 않는다. */
+  /* 🔴 `.set-row`와 같은 이유로 UA 기본값을 초기화한다 — 이 행도 `button`이다. */
+  .set-acct {
+    display: flex;
+    box-sizing: border-box;
+    width: 100%;
+    align-items: center;
+    border: 0;
+    padding: 0;
+    margin-top: 12px;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+  }
+
+  /* `20a` 원문 52px · `linear-gradient(160deg,#2E6B4C,#1F5138)` ·
+     `box-shadow:0 8px 20px rgba(31,81,56,0.28)` · 글자 `20px/700 #fff`. */
+  .set-avatar {
+    display: flex;
+    width: 52px;
+    height: 52px;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: var(--gradient-primary);
+    box-shadow: 0 8px 20px rgba(31, 81, 56, 0.28);
+    color: #fff;
+    font-size: 20px;
+    font-weight: 700;
+  }
+
+  .set-acct-txt {
+    display: block;
+    min-width: 0;
+    margin-left: 12px;
+  }
+
+  /* `20a` 원문 `display:flex;align-items:center;gap:6px`. */
+  .set-acct-namerow {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  /* `20a` 원문 `17px/700 #14352A`. §7.2 스케일에 17px가 없어 리터럴이다
+     (`.adm-badge`의 10.5px에 이은 같은 성격 — 승격 판단은 §7.2 소유자에게 넘긴다). */
+  .set-acct-name {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--color-sundo-900);
+  }
+
+  /* `20a` 원문 `12.5px/500` + ellipsis. */
+  .set-acct-mail {
+    display: block;
+    overflow: hidden;
+    margin-top: 2px;
+    color: var(--color-sundo-ink-70);
+    font-size: 12.5px;
+    font-weight: 500;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .set-lock {
+    flex: none;
+    color: rgba(20, 53, 38, 0.45);
+  }
+
+  /* §8.11.4 T-02 — 0.2s 동안 **1회** x ±2. `.ff-err`의 shakeX(±6/±5/±3)보다 얕다.
+     🔴 진폭이 다르므로 기존 키프레임을 빌리지 않는다 — 규격이 ±2를 명시한다. */
+  .set-lock-shake {
+    animation: lockShake 0.2s ease-out 1;
+  }
+
+  /* `20a` 원문 `margin-top:14px`. 행 높이 44px · 마지막 행만 구분선이 없다. */
+  .set-inforows {
+    margin-top: 14px;
+  }
+
+  .set-inforow {
+    display: flex;
+    height: 44px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    border-bottom: 1px solid rgba(20, 53, 38, 0.06);
+  }
+
+  .set-inforow:last-child {
+    border-bottom: 0;
+  }
+
+  /* `20a` 원문 라벨 `13px/500 rgba(20,53,38,0.70)` · 값 `13px/700 #14352A`. */
+  .set-rowlabel {
+    color: var(--color-sundo-ink-70);
+    font-size: var(--text-subtitle);
+    font-weight: 500;
+  }
+
+  .set-rowval {
+    color: var(--color-sundo-900);
+    font-size: var(--text-subtitle);
+    font-weight: 700;
+  }
+
+  /* `20a` 원문 `margin-top:12px;font-size:11px;line-height:1.5;text-wrap:pretty`. */
+  .set-note {
+    margin-top: 12px;
+    color: var(--color-sundo-ink-70);
+    font-size: var(--text-micro);
+    font-weight: 500;
+    line-height: 1.5;
+    text-wrap: pretty;
+  }
+
+  /* ② 알림 ------------------------------------------------- */
+
+  /* `20a`·`20b` 원문 행 높이 56px. 마지막 행만 구분선이 없다. */
+  .set-toggle {
+    display: flex;
+    height: 56px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    border-bottom: 1px solid rgba(20, 53, 38, 0.06);
+  }
+
+  .set-toggle:last-child {
+    border-bottom: 0;
+  }
+
+  /* §8.11.5 Push 미지원 — 🔴 `opacity 0.4`는 **행 전체**다(토글만이 아니다).
+     `Switch`의 `locked`가 aria를 맡고 여기서는 표면만 낮춘다. */
+  .set-toggles-locked {
+    opacity: 0.4;
+  }
+
+  .set-toggle-txt {
+    display: block;
+    min-width: 0;
+  }
+
+  /* `20a` 원문 `14px/500 #14352A` · 보조 `margin-top:2px;11px/500`. */
+  .set-toggle-title {
+    display: block;
+    color: var(--color-sundo-900);
+    font-size: var(--text-rowsm);
+    font-weight: 500;
+  }
+
+  .set-toggle-sub {
+    display: block;
+    margin-top: 2px;
+    color: var(--color-sundo-ink-70);
+    font-size: var(--text-micro);
+    font-weight: 500;
+  }
+
+  /* §8.11.3 #5 정보 박스 — `radius 12` · `rgba(31,81,56,0.08)` · `12px/500 #1F5138`.
+     ⚠ `.adm-off`(S8 오프라인 행)와 표면이 비슷하지만 틴트 농도가 다르다(0.08 vs 0.10).
+     규격이 각각 값을 주므로 합치지 않는다. */
+  .set-notify-lock {
+    margin-top: 12px;
+    border-radius: var(--radius-12);
+    padding: 11px 13px;
+    background: rgba(31, 81, 56, 0.08);
+    color: var(--color-sundo-800);
+    font-size: var(--text-label);
+    font-weight: 500;
+  }
+
+  /* ③ 앱 · ④ 약관·정책 ------------------------------------ */
+
+  /* `20a` 원문 행 높이 52px. 두 카드가 같은 행 표면을 쓴다.
+     🔴 **`div` 행과 `button` 행이 픽셀 단위로 같아야 한다**(W-17F ①). `button`은 UA 기본
+     `padding`·`border`·`font`·`text-align`·`color`를 갖고, 그것이 남으면 우측 요소의 x가
+     행마다 갈린다. 여기서 **전부 초기화**한다 — 행 쪽에 여백을 더해 눈으로 맞추지 않는다. */
+  .set-row {
+    display: flex;
+    box-sizing: border-box;
+    width: 100%;
+    height: 52px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    border: 0;
+    border-bottom: 1px solid rgba(20, 53, 38, 0.06);
+    padding: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+  }
+
+  .set-row:last-child {
+    border-bottom: 0;
+  }
+
+  /* §8.11.3 #7·#8 눌림 = 배경 하이라이트.
+     🔴 **음수 마진으로 카드 끝까지 넓히지 않는다.** `width:100%` + `box-sizing:border-box`에
+     `margin:0 -20px; padding:0 20px`를 얹으면 **콘텐츠 폭이 40px 줄고 20px 왼쪽으로 밀린다** —
+     그것이 W-17F ①의 원인이었다(`버전` 행만 `div`라 멀쩡했다). 하이라이트는 행 폭(카드
+     콘텐츠 폭)까지만 칠한다. §8.11.3은 하이라이트의 **범위**를 규정하지 않는다. */
+  .set-row-tap {
+    transition: background-color 0.15s ease;
+  }
+
+  .set-row-tap:active:not(:disabled) {
+    background: rgba(31, 81, 56, 0.06);
+  }
+
+  .set-row-tap:disabled {
+    opacity: 0.4;
+  }
+
+  /* `20a` 원문 `14px/500 #14352A`. */
+  .set-rowname {
+    color: var(--color-sundo-900);
+    font-size: var(--text-rowsm);
+    font-weight: 500;
+  }
+
+  /* `20a` 원문 `13px/500 rgba(20,53,38,0.70)` + tabular-nums. */
+  .set-rowver {
+    color: var(--color-sundo-ink-70);
+    font-size: var(--text-subtitle);
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .set-chev {
+    flex: none;
+    color: rgba(20, 53, 38, 0.45);
+  }
+
+  /* §8.11.3 #7 로딩 스피너. `.ff-spin`(Field)과 기하가 같아 값을 빌렸고
+     출처를 여기 남긴다(「값을 빌리는 것과 이름을 빌리는 것은 다르다」). */
+  .set-spin {
+    width: 14px;
+    height: 14px;
+    flex: none;
+    border: 2px solid rgba(31, 81, 56, 0.18);
+    border-radius: 50%;
+    border-top-color: var(--color-sundo-700);
+    animation: spin 0.7s linear infinite;
+  }
+
+  /* 하단 ---------------------------------------------------- */
+
+  /* `20a` 원문 `margin-top:18px;height:50px;border-radius:15px;
+     background:rgba(255,255,255,0.72);border:1px solid rgba(20,53,38,0.12);
+     box-shadow:0 6px 18px rgba(20,53,38,0.06)` · 라벨 `13px/700 rgba(20,53,38,0.70)`. */
+  .set-logout {
+    display: flex;
+    box-sizing: border-box;
+    width: 100%;
+    height: 50px;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    margin-top: 18px;
+    border: 1px solid rgba(20, 53, 38, 0.12);
+    border-radius: 15px;
+    background: rgba(255, 255, 255, 0.72);
+    box-shadow: 0 6px 18px rgba(20, 53, 38, 0.06);
+    color: var(--color-sundo-ink-70);
+    font-family: inherit;
+    font-size: var(--text-subtitle);
+    font-weight: 700;
+    transition: transform 0.15s ease;
+  }
+
+  .set-logout:active {
+    transform: scale(0.97);
+  }
+
+  /* `20a` 원문 `margin-top:12px;height:44px` · 라벨 `13px/700 #C0392B` ·
+     눌림 `opacity:0.6`.
+     🔴 **`disabled`가 기본이 아니다.** 부장에게도 눌린다 — T-06이 탭을 요구한다. */
+  .set-withdraw {
+    display: flex;
+    box-sizing: border-box;
+    width: 100%;
+    height: 44px;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    padding: 0;
+    margin-top: 12px;
+    background: none;
+    color: var(--color-sundo-danger);
+    font-family: inherit;
+    font-size: var(--text-subtitle);
+    font-weight: 700;
+    transition: opacity 0.15s ease;
+  }
+
+  .set-withdraw:active:not(:disabled) {
+    opacity: 0.6;
+  }
+
+  /* §8.11.5 — 오프라인에서만 잠근다. */
+  .set-withdraw:disabled {
+    opacity: 0.4;
+  }
+
+  /* §8.11.4 T-06 문구 펼침 0.2s. `grid-template-rows` 기법은 `.rs-etc`(S6)와 같고
+     🔴 **최종 상태(1fr · opacity 1)를 reduce가 유지**하도록 duration만 줄인다. */
+  .set-blockedwrap {
+    display: grid;
+    grid-template-rows: 0fr;
+    opacity: 0;
+    transition:
+      grid-template-rows 0.2s ease,
+      opacity 0.2s ease;
+  }
+
+  .set-blockedwrap-open {
+    grid-template-rows: 1fr;
+    opacity: 1;
+  }
+
+  .set-blocked {
+    overflow: hidden;
+    margin-top: 6px;
+    color: var(--color-sundo-danger);
+    font-size: var(--text-micro);
+    font-weight: 500;
+    text-align: center;
+  }
+
+  /* `20a` 원문 `margin-top:6px;text-align:center;11px/500 rgba(20,53,38,0.70)`. */
+  .set-hint {
+    margin-top: 6px;
+    color: var(--color-sundo-ink-70);
+    font-size: var(--text-micro);
+    font-weight: 500;
+    text-align: center;
+  }
+
+  /* `20a` 원문 `margin-top:26px` + 구분선. Footer 아래 120px은 `AppShell` 소유다. */
+  .set-footer {
+    margin-top: 26px;
+    border-top: 1px solid rgba(20, 53, 38, 0.06);
+  }
+
+  /* T-04 A2HS 안내 시트 — §18.3 3단계. */
+  .set-a2hs {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .set-a2hs-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .set-a2hs-no {
+    display: flex;
+    width: 22px;
+    height: 22px;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: var(--color-sundo-tint-10);
+    color: var(--color-sundo-800);
+    font-size: var(--text-micro);
+    font-weight: 700;
+  }
+
+  .set-a2hs-txt {
+    color: var(--color-sundo-900);
+    font-size: var(--text-rowsm);
+    font-weight: 500;
+    line-height: 1.5;
+    text-wrap: pretty;
+  }
+
+  @keyframes lockShake {
+    0%,
+    100% {
+      transform: translateX(0);
+    }
+    25% {
+      transform: translateX(-2px);
+    }
+    75% {
+      transform: translateX(2px);
+    }
+  }
 }
 
 /* design/index.html 원문 그대로 — 수정 금지 */
@@ -3190,5 +3621,22 @@
 
   .toast {
     animation-duration: 0.01s;
+  }
+
+  /* AC-07 — S10. 🔴 **최종 상태는 같다**(W-03B §4-3 · W-12 §3.12와 같은 규율):
+     펼침은 `grid-template-rows: 1fr` · `opacity: 1`에 그대로 도착하고,
+     자물쇠는 흔들림만 사라진다(아이콘 자체는 계속 보인다 — §8.11.3 #3의 표식이다). */
+  .set-blockedwrap {
+    transition-duration: 0.01s;
+  }
+
+  .set-lock-shake {
+    animation: none;
+  }
+
+  .set-logout,
+  .set-withdraw,
+  .set-row-tap {
+    transition-duration: 0.01s;
   }
 }
