@@ -1,16 +1,12 @@
+import { PolicyScreen } from '../components/PolicyScreen'
+import { OSS } from '../lib/policy'
+
 /**
- * S-oss 오픈소스 라이선스 — `/policy/oss`
+ * S-oss 오픈소스 라이선스 — `/policy/oss` · design `20h` · PRD §8.12.4.
  *
- * **자리표시자다.** 내용물은 W-14가 만든다(지시서 §11).
- * 파일 1개 + `default export` 구조는 W-16이 `lazy()`를 얹을 때를 위한 것이다(§0.2).
+ * 레이아웃은 `PolicyScreen`이, 목록은 `lib/policy.ts`가 갖는다.
+ * 🔴 **목록은 `package.json`의 `dependencies`와 1:1이다.** 늘리거나 줄이지 마라.
  */
 export default function PolicyOss() {
-  return (
-    <main data-screen="S-oss" aria-labelledby="scr-s-oss">
-      <h1 id="scr-s-oss" className="text-h2 font-bold tracking-[-0.01em] text-sundo-900">
-        오픈소스 라이선스
-      </h1>
-      <p className="mt-2 text-body font-medium text-sundo-ink-70">S-oss · W-14</p>
-    </main>
-  )
+  return <PolicyScreen doc={OSS} />
 }

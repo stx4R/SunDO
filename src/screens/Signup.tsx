@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router'
 import { Field, type FieldHandle } from '../components/Field'
 import { GlassCard } from '../components/GlassCard'
 import { PrimaryButton } from '../components/PrimaryButton'
@@ -52,6 +53,47 @@ const SWITCH_ACCOUNT = '다른 계정으로 로그인'
 const PRIVACY_NOTE = '가입 시 이름과 학교 이메일이 자율생활부 운영에 사용됩니다'
 const BACK_LABEL = '이전 화면으로'
 
+/* 🔴 **W-18 신규 — §8.10 사전에 없는 문구다.** 약관 동의 시점이 규격 어디에도 없다는
+   것을 확인하고(S1·S2 코드 0줄 · PRD §8.2 조항 없음) 사용자 결정으로 신설했다.
+   W-18 지시서 §0.5·§3.6이 「만들지 마라」로 적은 범위라 보고서 §4에 이탈로 남긴다.
+   경로 2개는 `Footer.tsx`·`Settings.tsx`가 이미 쓰는 3경로 중 둘이다. */
+const AGREE_PRIVACY = '개인정보 처리방침'
+const AGREE_TERMS = '서비스 이용약관'
+const AGREE_JOIN = '과 '
+const AGREE_TAIL = '에 동의합니다'
+const AGREE_PATH_PRIVACY = '/policy/privacy'
+const AGREE_PATH_TERMS = '/policy/terms'
+
+/* 정책 화면으로 이동하면 이 화면이 언마운트돼 입력값이 사라진다. **그 한 번의 왕복만**
+   건너게 하는 임시 보관이고 읽는 즉시 지운다 — 새로고침 복원 기능이 아니다.
+   `sessionStorage`는 Safari 개인정보 보호 모드 등에서 접근 자체가 throw하므로
+   `useLastActiveAt`(EC-23 계열)과 같은 방식으로 조용히 포기한다. */
+const DRAFT_KEY = 'sundo.signupDraft'
+
+interface Draft {
+  code: string
+  name: string
+  agreed: boolean
+}
+
+function takeDraft(): Draft | null {
+  try {
+    const raw = window.sessionStorage.getItem(DRAFT_KEY)
+    window.sessionStorage.removeItem(DRAFT_KEY)
+    return raw ? (JSON.parse(raw) as Draft) : null
+  } catch {
+    return null
+  }
+}
+
+function stashDraft(draft: Draft): void {
+  try {
+    window.sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft))
+  } catch {
+    /* 보관에 실패해도 이동은 막지 않는다. 돌아와서 다시 입력하면 된다. */
+  }
+}
+
 /** §8.2.3 — 한글·영문·공백만, 트림 후 2~10자. */
 const NAME_CHARS = /^[가-힣a-zA-Z\s]+$/
 const NAME_MIN = 2
@@ -60,9 +102,15 @@ const NAME_MAX = 10
 export default function Signup() {
   const { status, profile, parsed, refresh, signOut } = useAuth()
   const online = useOnline()
+  const navigate = useNavigate()
 
-  const [code, setCode] = useState('')
-  const [name, setName] = useState('')
+  /* 🔴 초기값을 함수로 준다. 정책 화면을 다녀온 직후 한 번만 값이 들어오고,
+     그 뒤에는 `sessionStorage`가 이미 비어 있어 `null`이다. */
+  const [draft] = useState(takeDraft)
+  const [code, setCode] = useState(() => draft?.code ?? '')
+  const [name, setName] = useState(() => draft?.name ?? '')
+  /* W-18 신규 — 동의 확인. Firestore에 쓰지 않는다(§9.3.1 필드 불변 · rules diff 0줄). */
+  const [agreed, setAgreed] = useState(() => draft?.agreed ?? false)
   const [checking, setChecking] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [banner, setBanner] = useState<string | null>(null)
@@ -109,7 +157,8 @@ export default function Signup() {
   const reactivate = status === 'withdrawn' || status === 'rejected'
 
   const codeFilled = code.length === INVITE_CODE_LENGTH
-  const disabled = !codeFilled || !online
+  /* 🔴 `agreed`가 제출 조건에 들어간다 — 동의하지 않으면 신청을 보낼 수 없다. */
+  const disabled = !codeFilled || !online || !agreed
 
   const validateCode = (v: string): string | null => {
     if (!v) return CODE_REQUIRED
@@ -175,6 +224,15 @@ export default function Signup() {
     if (signOutLatch.current) return
     signOutLatch.current = true
     void signOut()
+  }
+
+  /* 동의 줄의 두 링크. 화면을 떠나기 전에 입력값을 담아 두고, 돌아오면
+     `takeDraft()`가 한 번만 꺼내 되돌린다. `navigate`이지 `signOut`이 아니다 —
+     정책 3종은 가드 바깥이라(EC-44) 인증 상태를 잃지 않고 다녀올 수 있다. */
+  const openPolicy = (path: string) => {
+    if (submitting) return
+    stashDraft({ code, name, agreed })
+    void navigate(path)
   }
 
   const handleSubmit = () => {
@@ -362,6 +420,37 @@ export default function Signup() {
         <p className="mt-1.5 text-micro font-medium text-sundo-ink-70">
           {online ? CODE_HINT : OFFLINE_HINT}
         </p>
+
+        {/* 🔴 W-18 신규 — 약관·처리방침 동의 확인.
+            네이티브 `input[type=checkbox]`를 쓰지 않는다(DS-06). `Switch`가
+            `role="switch"`로 만들어진 것과 같은 형태로 `role="checkbox"`를 쓴다.
+            라벨 안에 링크가 있어 라벨 자체를 버튼에 넣을 수 없으므로
+            `aria-labelledby`로 이름을 잇는다 — 낭독 결과는 한 문장 그대로다. */}
+        <div className="s2-agree">
+          <button
+            type="button"
+            role="checkbox"
+            aria-checked={agreed}
+            aria-labelledby="s2-agree-label"
+            onClick={() => setAgreed((v) => !v)}
+            className="s2-cb"
+          >
+            <span className={cn('s2-cb-box', agreed && 's2-cb-on')}>
+              {agreed && <CheckIcon />}
+            </span>
+          </button>
+
+          <p id="s2-agree-label" className="s2-agree-txt">
+            <button type="button" className="s2-agree-a" onClick={() => openPolicy(AGREE_PATH_PRIVACY)}>
+              {AGREE_PRIVACY}
+            </button>
+            {AGREE_JOIN}
+            <button type="button" className="s2-agree-a" onClick={() => openPolicy(AGREE_PATH_TERMS)}>
+              {AGREE_TERMS}
+            </button>
+            {AGREE_TAIL}
+          </p>
+        </div>
 
         <PrimaryButton
           label={SUBMIT}

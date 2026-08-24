@@ -1240,6 +1240,76 @@
     caret-color: transparent;
   }
 
+  /* 🔴 **W-18 신규 — design 원본이 없다.** `13a`~`13e`·`20d`·`20e` 어디에도 동의 줄이
+     없고 §8.10 사전에도 문구가 없다. 사용자 결정으로 신설했고(W-18 §4) 값은 새로
+     만든 것이 아니라 이 화면이 이미 쓰는 것들이다 — 터치 44는 `.back`, 상자 표면은
+     `.ff`(`--color-sundo-control` + `--shadow-inset-soft`), 체크 상태는 `.s2-chip`의
+     `--color-sundo-tint-10`, 체크 아이콘은 `13a` 원문 `CheckIcon` 그대로다. */
+  .s2-agree {
+    display: flex;
+    align-items: center;
+    margin-top: 4px;
+  }
+
+  /* 시각 20px을 유지한 채 44×44 터치 타깃은 **투명 확장**이 갖는다(§15.1).
+     좌측 `-12px`은 그 확장분을 되돌려 상자 좌변이 카드 콘텐츠 좌변에 서게 한다 —
+     `.back`의 `margin-left:-3px`과 같은 계산이다(실측 오차 1px).
+     🔴 **우측에는 음수 여백을 두지 않는다.** 확장분 12px이 그대로 상자와 라벨 사이의
+     시각 간격이 된다. `-10px`을 함께 걸었더니 간격이 12가 아니라 **2px**로 측정됐다
+     (12 − 10 = 2) — 보고서 §6.3의 자기 결함 1건이다. */
+  .s2-cb {
+    display: flex;
+    width: 44px;
+    height: 44px;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    margin-left: -12px;
+    transition: transform 0.15s;
+  }
+
+  .s2-cb:active {
+    transform: scale(0.92);
+  }
+
+  .s2-cb-box {
+    display: flex;
+    width: 20px;
+    height: 20px;
+    align-items: center;
+    justify-content: center;
+    /* §7.3 반경 스케일의 최솟값이 11이라 20px 상자에 맞지 않는다. `.ff`(14)의
+       비율(반경/높이 ≈ 0.25)을 20px에 적용한 값이다. 1곳뿐이라 토큰화하지 않았다. */
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    background: var(--color-sundo-control);
+    box-shadow: var(--shadow-inset-soft);
+  }
+
+  /* AC-04 이중 표시 — 배경 틴트(색)와 체크(아이콘)가 함께 바뀐다. */
+  .s2-cb-on {
+    border-color: var(--color-sundo-line-border);
+    background: var(--color-sundo-tint-10);
+    box-shadow: none;
+  }
+
+  /* `.s2-code` 아래 힌트(11px/500)와 같은 단이다. 링크가 섞이므로 줄간격을 준다. */
+  .s2-agree-txt {
+    color: var(--color-sundo-ink-70);
+    font-size: var(--text-micro);
+    font-weight: 500;
+    line-height: 1.5;
+    text-wrap: pretty;
+  }
+
+  /* `다른 계정으로 로그인`과 같은 강조색이다. 밑줄은 링크임을 색 말고도 알린다(AC-04). */
+  .s2-agree-a {
+    color: var(--color-sundo-700);
+    font-weight: 700;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
   /* ==========================================================
      S3 홈 · 학년 선택 — design `1d`(舊 version) + PRD §8.3.2(정본)
      `1d`에서 가져온 것은 **색·간격·타입·반경**뿐이고 요소 목록·문구·상태는 §8.3이다.
@@ -3285,6 +3355,155 @@
     font-weight: 500;
     line-height: 1.5;
     text-wrap: pretty;
+  }
+
+  /* ==========================================================
+     정책 문서 3종 — design `20i`·`20g`·`20h` (PRD §8.12.1)
+     세 화면이 `PolicyScreen` 하나를 공유하므로 선택자도 한 벌이다.
+     ========================================================== */
+
+  /* 🔴 높이 사슬 복구. `AppShell`의 스크롤 영역은 높이가 확정이지만 그 사이에 낀
+     `ScreenTransition`의 `.blur-in`이 `height:auto`라 `.pol`의 `100%`가 끊긴다.
+     **기존 `.blur-in` 선언은 한 글자도 건드리지 않고** 정책 화면일 때만 매치하는
+     규칙을 따로 둔다 — `.pol`을 쓰는 화면이 정책 3종뿐이라 다른 화면의 computed는
+     정의상 바뀌지 않는다. `AppShell`의 여백 계약도 그대로다. */
+  .blur-in:has(> .pol) {
+    height: 100%;
+  }
+
+  /* 🔴 `min-height`가 아니라 **`height`**다. `min-height:100%`로 두면 높이가 여전히
+     `auto`라 「남는 공간」이 생기지 않고, 카드의 `flex:1`이 아무것도 분배받지 못해
+     카드가 본문 길이만큼 늘어난다(실측: 카드 1,731px · 화면 802px · 카드 내부
+     스크롤 0 — 보고서 §6.2). 높이를 확정해야 `flex:1`+`min-height:0`이 카드를
+     남은 높이로 **줄이고** 그 안에서 `.pol-scroll`이 스크롤한다.
+     루트 32px·200% 확대에서 헤더+버튼이 커지면 이 상자가 넘치고, 그때는
+     `AppShell`의 스크롤 영역(`overflow-y:auto`)이 대신 받는다(AC-05 실측 §6.2). */
+  .pol {
+    display: flex;
+    height: 100%;
+    flex-direction: column;
+  }
+
+  /* design 원문 `display:flex;align-items:center;gap:9px;flex:none`. */
+  .pol-head {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 9px;
+  }
+
+  /* design 원문 `24px/700 -0.01em #14352A`. 🔴 `white-space:nowrap`은 따르지 않는다 —
+     루트 32px에서 제목이 스테이지를 넘겨 가로 스크롤이 생긴다(AC-05가 우선).
+     기본 폭에서는 세 제목 모두 1줄이라 시안과 결과가 같다. */
+  .pol-title {
+    min-width: 0;
+    color: var(--color-sundo-900);
+    font-size: var(--text-h2);
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+
+  /* design 원문 `margin-top:16px;flex:1;min-height:0;padding:20px 18px`.
+     🔴 배경은 `.glass`(0.55)를 **0.65로 올린 것**이다 — §8.12.1 「글이 많으므로 카드
+     불투명도를 0.65로 올린다」. 이 화면 하나만 쓰는 값이라 토큰으로 승격하지 않았다
+     (W-02 §5.3 기준 — 2곳 이상일 때 승격). radius·border·그림자는 `.glass` 그대로다. */
+  .pol-card {
+    display: flex;
+    min-height: 0;
+    flex: 1;
+    flex-direction: column;
+    margin-top: 16px;
+    padding: 20px 18px;
+    background: rgba(255, 255, 255, 0.65);
+  }
+
+  /* 칩 줄(`20i`)·안내 줄(`20h`)이 들어가는 고정 블록. `20g`는 이 블록이 없다. */
+  .pol-cardhead {
+    flex: none;
+  }
+
+  /* `20i` 원문 `12px/700 rgba(20,53,38,0.70)`. */
+  .pol-chiplabel {
+    color: var(--color-sundo-ink-70);
+    font-size: var(--text-label);
+    font-weight: 700;
+  }
+
+  /* `20i` 원문 `margin-top:8px;flex-wrap:wrap;gap:8px`. 칩 자체는 기존 `.chip`이
+     원문과 정확히 같다(`padding 6px 12px` · `radius 999` · `tint-10` · 12px/700). */
+  .pol-chips {
+    display: flex;
+    margin-top: 8px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  /* `20h` 원문 `11px/500 rgba(20,53,38,0.70)`. */
+  .pol-note {
+    color: var(--color-sundo-ink-70);
+    font-size: var(--text-micro);
+    font-weight: 500;
+  }
+
+  /* design 원문 `height:1px;background:rgba(20,53,38,0.06);margin:16px 0 0`. */
+  .pol-hr {
+    height: 1px;
+    margin-top: 16px;
+    background: var(--color-sundo-divider);
+  }
+
+  /* 🔴 스크롤 주체는 카드가 아니라 이 요소다. 카드에 걸면 칩 줄·안내 줄이 함께
+     밀려 올라가 §8.12.1의 「상단 고정」이 깨진다. */
+  .pol-scroll {
+    min-height: 0;
+    flex: 1;
+    overflow-y: auto;
+  }
+
+  /* `20i`·`20h` 원문 `padding-top:16px`. `20g`는 상단 블록이 없어 여백도 없다. */
+  .pol-scroll-gap {
+    padding-top: 16px;
+  }
+
+  /* design 원문 `display:flex;flex-direction:column;gap:20px` — §8.12.1 「섹션 간격 20px」. */
+  .pol-secs {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  /* design 원문 `14px/700 #1F5138`. */
+  .pol-h {
+    color: var(--color-sundo-800);
+    font-size: var(--text-rowsm);
+    font-weight: 700;
+  }
+
+  /* design 원문 `margin-top:6px;13px/500 rgba(20,53,38,0.70);line-height:1.7;text-wrap:pretty`.
+     🔴 `overflow-wrap`은 design에 없다 — 라이선스 고지의 URL(`http://www.apache.org/…`)이
+     좌우 18px 패딩 안에서 넘치므로 지시서 §3.1이 지시한 보정이다. `anywhere`가 아니라
+     `break-word`다 — min-content 폭을 바꾸지 않아 카드 레이아웃에 영향이 없다. */
+  .pol-p {
+    margin-top: 6px;
+    color: var(--color-sundo-ink-70);
+    font-size: var(--text-subtitle);
+    font-weight: 500;
+    line-height: 1.7;
+    overflow-wrap: break-word;
+    text-wrap: pretty;
+  }
+
+  /* 한 섹션 안의 둘째 문단부터. design은 한 섹션이 한 문단이라 원문에 없는 값이고,
+     본문을 사실 단위로 가르면서 생겼다. 소제목↔본문 6px과 구분되도록 10px이다. */
+  .pol-p-next {
+    margin-top: 10px;
+  }
+
+  /* design 원문 `flex:none;padding:16px 0 26px`. 독 여백 120px은 여기 없다 —
+     정책 화면은 독이 숨김이라 `AppShell`의 하단 여백이 0이다. */
+  .pol-foot {
+    flex: none;
+    padding: 16px 0 26px;
   }
 
   @keyframes lockShake {
