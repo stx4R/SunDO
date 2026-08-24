@@ -22,3 +22,9 @@ pubsub-debug.log
 *-emulator-*
 # 규칙 역검증(rules:mutate)이 만드는 원본 바이트 사본 — 실행이 끝나면 지워진다
 firestore.rules.mutbak
+
+# 학생 개인정보 · 서비스 계정 키 (커밋 금지 — W-16D §2.4)
+database_ToDo/*.csv
+database_ToDo/*.xlsx
+*serviceAccount*.json
+*-firebase-adminsdk-*.json
