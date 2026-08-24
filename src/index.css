@@ -2439,6 +2439,44 @@
     gap: 6px;
   }
 
+  /**
+   * BR-41 전송 대기 배지 — design `6l` · PRD §8.7.3 #4 · W-20.
+   *
+   * 🔴 **그림자는 design `6l`의 `rgba(31,81,56,0.30)`이 아니라 `--shadow-primary`(0.35)다.**
+   * design 전수 조사에서 `0.35`가 26회 · `0.30`이 2회이고, §7.1이 `--shadow-primary`를
+   * 「주 버튼」 값으로 **변경 금지**로 규정한다. `6l`은 `舊 version.` 배지가 붙은
+   * 레이아웃 참고용 화면이다(OV-01). 안쪽 하이라이트는 `.btnp`와 **한 글자도 다르지 않다.**
+   *
+   * 배지가 아니라 **버튼**이다 — 「탭 시 즉시 재전송 시도」가 규격이라 44px을 확보한다.
+   */
+  .rpend {
+    display: flex;
+    min-height: 44px;
+    align-self: flex-start;
+    margin-top: 12px;
+    align-items: center;
+    gap: 8px;
+    border-radius: var(--radius-pill);
+    padding: 0 18px;
+    background: var(--gradient-primary);
+    box-shadow:
+      var(--shadow-primary),
+      inset 0 1px 0 rgba(255, 255, 255, 0.28);
+    color: #fff;
+    font-size: var(--text-label);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    transition: transform 0.15s;
+  }
+
+  .rpend:active {
+    transform: scale(0.97);
+  }
+
+  .rpend:disabled {
+    opacity: 0.6;
+  }
+
   /* design `20f` 원문 `margin-top:18px;font-size:12px;font-weight:700;
      color:rgba(20,53,38,0.70)`.
      ⚠ 크기는 **§8.7.2 #6의 11px**을 따랐다(PRD가 클래스 이름과 함께 규격을 적은
@@ -3954,6 +3992,11 @@
   }
 
   .pwab-act {
+    transition-duration: 0.01s;
+  }
+
+  /* W-20 — 배지 눌림도 `.pwab-act`와 같은 범주다. 결과(재전송 시도)는 그대로다. */
+  .rpend {
     transition-duration: 0.01s;
   }
 

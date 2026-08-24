@@ -9,7 +9,9 @@ import {
   fetchRecordCounts,
   fetchRecordPage,
   fetchWithdrawnAuthors,
+  retryPendingWrites,
   subscribeRecords,
+  watchPendingCount,
   type RecordCountsResult,
   type RecordCursor,
   type RecordFilter,
@@ -56,6 +58,10 @@ const EM_03_ACTION = '전체 보기'
 const ER_02 = '기록을 불러오지 못했습니다'
 const RETRY = '다시 시도'
 const MORE_FAILED = '더 불러오지 못했습니다'
+/** BR-41 · §8.7.3 #4 — design `6l`의 `전송 대기 2건`이 이 형식이다. */
+const PENDING_BADGE = (n: number) => `전송 대기 ${n}건`
+/** §8.10에 이 버튼의 접근성 이름이 없다. W-06의 칩 X와 같은 판단으로 동작을 담는다. */
+const PENDING_LABEL = '전송 대기 중인 기록을 지금 다시 보냅니다'
 
 /** §8.7.2 #5 · §8.7.3 — 4개 고정, 단일 선택. `기타`가 C5 파생 변경분이다. */
 const FILTERS: readonly { value: RecordFilter; label: string }[] = [
@@ -147,6 +153,15 @@ export default function Records() {
      중복 행이 생기지 않고, 새 기록에 밀려 첫 페이지 창 밖으로 나간 문서도 남는다 —
      그래서 고정 커서(§3.7-4)와 함께 구멍이 0이다. */
   const [rows, setRows] = useState<ReadonlyMap<string, RecordRow>>(() => new Map())
+  /**
+   * BR-41 — 🔴 **근거가 둘이다**(`lib/records.ts`의 표 참조).
+   * `sessionPending`은 필터와 무관하지만 앱을 껐다 켜면 0이고,
+   * `snapshotPending`은 재실행 뒤에도 남지만 현재 필터 안에서만 보인다.
+   * 어느 하나도 단독으로는 규격을 못 채워 **최댓값**을 쓴다.
+   */
+  const [sessionPending, setSessionPending] = useState(0)
+  const [snapshotPending, setSnapshotPending] = useState(0)
+  const [retrying, setRetrying] = useState(false)
   const [risingIds, setRisingIds] = useState<ReadonlySet<string>>(() => new Set())
   const [withdrawn, setWithdrawn] = useState<ReadonlySet<string>>(() => new Set())
 
@@ -198,6 +213,11 @@ export default function Records() {
     }
   }, [reloadKey])
 
+  /* BR-41 — 전송 대기 건수. 🔴 **플러시 토스트(NT-07)는 구독하지 않는다** —
+     그것은 `DockLayout`이 전역으로 소유한다. 여기서 함께 받으면 S7이 부모보다
+     **먼저** 마운트되어(React는 자식 effect를 먼저 돌린다) 토스트를 가로챈다. */
+  useEffect(() => watchPendingCount(setSessionPending), [])
+
   /* §12.1 카운터 3종. 🔴 ST-03 — `filter`가 의존성에 **없다.** */
   useEffect(() => {
     let alive = true
@@ -229,6 +249,7 @@ export default function Records() {
         setListFailed(false)
         setGotSnapshot(true)
         setFromCache(snapshot.fromCache)
+        setSnapshotPending(snapshot.pendingWrites)
         if (!snapshot.fromCache) setServerSynced(true)
 
         /* 🔴 커서는 **한 번만** 잡는다. 이후 스냅샷이 밀려도 갱신하지 않는다. */
@@ -380,6 +401,25 @@ export default function Records() {
 
   usePullToRefresh(refresh)
 
+  /**
+   * BR-41 — 두 근거의 **최댓값**. 합이 아니다: 같은 쓰기를 둘 다 보는 것이 정상이라
+   * 더하면 두 배로 센다.
+   */
+  const pending = Math.max(sessionPending, snapshotPending)
+
+  /**
+   * §8.7.3 #4 「탭 시 즉시 재전송 시도」.
+   *
+   * ⚠ **SDK에 「지금 보내라」 API가 없다**(`lib/records.ts` 주석). 연결을 껐다 켜서
+   * 재연결을 강제하는 것이 전부다 — 오프라인이면 아무 일도 일어나지 않는 것이 정상이다.
+   * 🔴 실패해도 화면을 바꾸지 않는다. 큐는 그대로 남아 있고 SDK가 계속 시도한다.
+   */
+  const handleRetryPending = () => {
+    if (retrying) return
+    setRetrying(true)
+    void retryPendingWrites().finally(() => setRetrying(false))
+  }
+
   const countsOk = counts?.kind === 'ok' && !listFailed ? counts : null
   /* §8.7.5 에러 행 — 목록이 실패하면 카운터도 `-`다. 🔴 `0`으로 그리지 마라. */
   const countsFailed = counts?.kind === 'failed' || listFailed
@@ -486,6 +526,29 @@ export default function Records() {
           </button>
         ))}
       </div>
+
+      {/* BR-41 · design `6l` — 🔴 **1건 이상일 때만** 그린다. 0건에 자리를 잡지 않는다. */}
+      {pending > 0 && (
+        <button
+          type="button"
+          className="rpend"
+          onClick={handleRetryPending}
+          disabled={retrying}
+          aria-label={PENDING_LABEL}
+        >
+          {/* design `6l` 원문 — 위로 향하는 화살표. */}
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path
+              d="M8 13.2V3.4M4.2 7.2L8 3.2l3.8 4"
+              stroke="#fff"
+              strokeWidth="2.1"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          <span>{PENDING_BADGE(pending)}</span>
+        </button>
+      )}
 
       {listFailed ? (
         /* §8.7.5 에러 — ER-02 + `다시 시도`(design `6j`). */

@@ -1,7 +1,9 @@
 import {
   collection,
+  disableNetwork,
   doc,
   documentId,
+  enableNetwork,
   getCountFromServer,
   getDocs,
   increment,
@@ -12,6 +14,7 @@ import {
   serverTimestamp,
   startAfter,
   Timestamp,
+  waitForPendingWrites,
   where,
   writeBatch,
   type DocumentData,
@@ -238,6 +241,115 @@ export function buildRecordPayload(draft: RecordDraft) {
  * T-07(저장 실패 → 시트 유지 + 롤백)은 사전 검증 실패에만 적용된다.
  * 조용히 실패하는 오프라인 큐 경로는 W-17이 이어받는다(`database_ToDo/W-12.md` §5).
  */
+/* ============================================================================
+   전송 대기 큐 (W-20) — BR-40 · BR-41 · NT-07 · EC-01 · EC-02
+   ==========================================================================*/
+
+/**
+ * 🔴 **Firestore Web SDK는 「대기 중인 쓰기가 몇 건인가」를 노출하지 않는다.**
+ * 큐 수준 API는 `waitForPendingWrites()` 하나이고 그것은 **건수를 주지 않는다.**
+ * 그래서 두 근거를 합쳐 센다.
+ *
+ * | 근거 | 세는 것 | 강점 | 한계 |
+ * | --- | --- | --- | --- |
+ * | 세션 카운터(아래) | 이 세션이 넣은 쓰기 | **필터와 무관하다** | 🔴 앱을 껐다 켜면 0이 된다(EC-02) |
+ * | 스냅샷 `hasPendingWrites` | 캐시가 들고 있는 문서 | **재실행 뒤에도 남는다** | S7의 **현재 필터** 안에서만 보인다 |
+ *
+ * ⇒ 화면은 **둘의 최댓값**을 쓴다(`Records.tsx`). 어느 한쪽만으로는 규격을 못 채운다.
+ */
+let sessionPending = 0
+/** 구독자가 없는 동안 끝난 플러시를 잃지 않기 위한 보관함. S4·S5는 `DockLayout` 밖이다. */
+let unreportedFlush = 0
+let flushArmed = false
+const countWatchers = new Set<(pending: number) => void>()
+const flushWatchers = new Set<(flushed: number) => void>()
+
+function notifyCount() {
+  for (const fn of countWatchers) fn(sessionPending)
+}
+
+/**
+ * 🔴 `waitForPendingWrites()`는 **이 클라이언트의 대기 쓰기가 전부 서버에 확인되면**
+ * resolve한다. 오프라인이면 계속 pending이므로 「전송 완료」의 정확한 신호가 된다.
+ * ⚠ 대기 쓰기가 없으면 **즉시** resolve한다 — 그래서 `flushArmed`로 한 번만 건다.
+ */
+function armFlushWatch() {
+  if (flushArmed) return
+  flushArmed = true
+  void waitForPendingWrites(db)
+    .then(() => {
+      const flushed = sessionPending
+      sessionPending = 0
+      flushArmed = false
+      notifyCount()
+      if (flushed <= 0) return
+      /* 🔴 구독자가 없으면 **버리지 않고 쌓아 둔다.** 오프라인 기록은 S5(반 학생 목록)에서
+         작성되는데 그 화면은 `DockLayout` 밖이라 토스트 구독자가 없다 — 버리면
+         NT-07이 「가장 필요한 순간에만」 안 뜬다. */
+      if (flushWatchers.size === 0) unreportedFlush += flushed
+      else for (const fn of flushWatchers) fn(flushed)
+    })
+    .catch(() => {
+      /**
+       * 🔴 **로그아웃하면 여기로 온다.** SDK 원문 실측 —
+       * `__PRIVATE_rejectOutstandingPendingWritesCallbacks(r, "'waitForPendingWrites' promise
+       * is rejected due to a user change.")` (`@firebase/firestore` `common-*.esm.js:25655`).
+       *
+       * 🔴 **카운터를 되돌리지 않는다.** 쓰기가 사라진 것이 아니라 **그 사용자의 큐로
+       * 옮겨 간 것**이다 — 같은 파일의 `__PRIVATE_localStoreHandleUserChange`가 큐를
+       * 통째로 갈아 끼우고(`removedBatchIds`/`addedBatchIds`), IndexedDB의 큐는
+       * **사용자별로 나뉘어 있다**(`IndexedDbMutationQueue.Kr(user, …)`).
+       * ⇒ 그 사용자가 다시 로그인하기 전에는 전송되지 않는다. 보고서 §4-2가 이 사실 위에 선다.
+       */
+      flushArmed = false
+    })
+}
+
+/**
+ * BR-41 배지 — **건수만** 본다. 구독 즉시 현재 값을 한 번 보낸다.
+ *
+ * 🔴 **플러시 이벤트와 갈라 둔 이유.** React는 자식 effect를 부모보다 **먼저** 돌린다.
+ * 한 통로로 두면 S7(자식)이 `DockLayout`(부모)보다 먼저 구독해 **밀린 플러시를 가로채고**
+ * NT-07 토스트가 조용히 사라진다. 통로가 둘이면 그 순서에 의존하지 않는다.
+ */
+export function watchPendingCount(onChange: (pending: number) => void): () => void {
+  countWatchers.add(onChange)
+  onChange(sessionPending)
+  return () => {
+    countWatchers.delete(onChange)
+  }
+}
+
+/** NT-07 토스트 — **플러시 완료만** 본다. 밀려 있던 것이 있으면 구독 즉시 한 번 준다. */
+export function watchPendingFlush(onFlushed: (flushed: number) => void): () => void {
+  flushWatchers.add(onFlushed)
+  if (unreportedFlush > 0) {
+    const missed = unreportedFlush
+    unreportedFlush = 0
+    onFlushed(missed)
+  }
+  return () => {
+    flushWatchers.delete(onFlushed)
+  }
+}
+
+/**
+ * §8.7.3 #4 「탭 시 즉시 재전송 시도」.
+ *
+ * ⚠ **SDK에 「지금 보내라」 API가 없다.** 연결을 껐다 켜서 재연결을 강제하는 것이
+ * 표준 관용구다. `enableNetwork`만 부르면 이미 켜져 있을 때 아무 일도 하지 않는다.
+ * 🔴 **이것은 쓰기를 만들지 않는다** — 큐에 있는 것을 보낼 기회를 줄 뿐이다.
+ */
+export async function retryPendingWrites(): Promise<void> {
+  try {
+    await disableNetwork(db)
+    await enableNetwork(db)
+    armFlushWatch()
+  } catch (error: unknown) {
+    console.warn('[records] 재전송 시도 실패', errorCode(error, 'unknown'))
+  }
+}
+
 export function writeRecord(draft: RecordDraft): void {
   const batch = writeBatch(db)
   batch.set(doc(db, 'records', draft.clientRecordId), buildRecordPayload(draft))
@@ -246,6 +358,13 @@ export function writeRecord(draft: RecordDraft): void {
     recordCount: increment(1),
     updatedAt: serverTimestamp(),
   })
+  /* BR-40·BR-41 — 큐에 들어간 것으로 센다. 🔴 **`commit()`을 기다리지 않는다**는
+     계약은 그대로다. 여기서 세는 것은 「보냈다」가 아니라 「로컬에 커밋됐다」이고,
+     그 둘이 갈리는 것이 곧 오프라인이다. */
+  sessionPending += 1
+  notifyCount()
+  armFlushWatch()
+
   /* 🔴 `void` 그대로다 — 호출부가 실수로 기다릴 방법이 없어야 한다(W-12 §5-3). */
   void batch.commit().catch((error: unknown) => {
     /* 사용자에게 보여 줄 곳이 없다. 시트는 이미 닫혔고 재시도는 SDK 소유다.
@@ -319,6 +438,11 @@ export type RecordPageResult = ({ kind: 'ok' } & RecordPage) | { kind: 'failed';
 /** 구독 콜백 1회분. `fromCache`가 §3.2 동기화 칩의 유일한 근거다. */
 export interface RecordListenSnapshot extends RecordPage {
   fromCache: boolean
+  /**
+   * W-20 — 이 스냅샷 안에서 아직 서버 확인을 못 받은 문서 수(BR-41의 두 번째 근거).
+   * ⚠ **현재 필터 안에서만 보인다.** 필터와 무관한 값은 세션 카운터가 맡는다.
+   */
+  pendingWrites: number
 }
 
 function isReasonCode(v: unknown): v is ReasonCode {
@@ -420,7 +544,11 @@ export function subscribeRecords(
     recordsQuery(academicYear, filter, null),
     { includeMetadataChanges: true },
     (snapshot) => {
-      onData({ ...toPage(snapshot.docs), fromCache: snapshot.metadata.fromCache })
+      onData({
+        ...toPage(snapshot.docs),
+        fromCache: snapshot.metadata.fromCache,
+        pendingWrites: snapshot.docs.filter((d) => d.metadata.hasPendingWrites).length,
+      })
     },
     (error: unknown) => {
       /* 🔴 실패를 빈 배열로 흘리지 마라. ER-02이고 EM-02가 아니다(§8.7.2). */
