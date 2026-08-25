@@ -60,6 +60,22 @@ export async function run() {
   await check('A-9', 'deny', '신청 문서 삭제', () =>
     deleteDoc(doc(as(UIDS.head), 'approvalRequests', 'req-1')))
 
+  /* 🔴 **W-22B BR-30 — 신청자가 「자기」 신청을 목록으로 셀 수 있는가.**
+     이 시점의 컬렉션에는 `req-1`(uid=pending)과 A-7이 만든 `req-new`(uid=uid-new)가 있다.
+     🔴 **A-11이 성립하려면 남의 문서가 하나 있어야 한다** — 전부 본인 것이면
+     `where` 없는 질의도 통과해 버려 「전체 목록이 막힌다」를 증명하지 못한다.
+     (W-15B §6 ④ — 픽스처가 좁으면 결함이 코드로 오해된다.) */
+  await check('A-10', 'pass', '🔴 **BR-30** — `pending`이 `where(uid == 본인)`으로 자기 신청을 센다', () =>
+    getDocs(query(collection(as(UIDS.pending), 'approvalRequests'), where('uid', '==', UIDS.pending))))
+  await check('A-11', 'deny', '🔴 `pending`이 **`where` 없이** 전체 목록 (남의 문서가 섞인다)', () =>
+    getDocs(collection(as(UIDS.pending), 'approvalRequests')))
+  await check('A-12', 'deny', '🔴 `pending`이 **남의 uid**로 목록', () =>
+    getDocs(query(collection(as(UIDS.pending), 'approvalRequests'), where('uid', '==', 'uid-new'))))
+  await check('A-13', 'pass', '`withdrawn`(재가입 경로)이 자기 신청을 센다 — BR-61', () =>
+    getDocs(query(collection(as(UIDS.withdrawn), 'approvalRequests'), where('uid', '==', UIDS.withdrawn))))
+  await check('A-14', 'pass', '🔴 `noprofile`(문서가 아직 없는 신규)이 자기 신청을 센다 — 0건이어도 허용', () =>
+    getDocs(query(collection(as(UIDS.noprofile), 'approvalRequests'), where('uid', '==', UIDS.noprofile))))
+
   /* ==========================================================================
      inviteCodes — W-15A §4.3 · W-08 §2-1 + 🔴 **W-21B 기능 12(결정 5)**
 

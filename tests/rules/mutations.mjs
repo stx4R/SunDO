@@ -147,9 +147,23 @@ export const MUTATIONS = [
   {
     name: 'approvals-list-open',
     why: '`approvalRequests` list를 active 전원에게 연다 (A-2)',
-    from: 'allow list: if isVice() || isTeacher();',
+    from: 'allow list: if isVice() || isTeacher()\n        || (isSignedIn() && resource.data.uid == request.auth.uid);',
     to: 'allow list: if isActive();',
-    breaks: ['A-2'],
+    breaks: ['A-2', 'A-10', 'A-13', 'A-14'],
+  },
+  {
+    name: 'approvals-list-no-self',
+    why: '🔴 W-22B가 더한 「본인」 절을 뺀다 — BR-30 카운터가 죽는지 본다',
+    from: 'allow list: if isVice() || isTeacher()\n        || (isSignedIn() && resource.data.uid == request.auth.uid);',
+    to: 'allow list: if isVice() || isTeacher();',
+    breaks: ['A-10', 'A-13', 'A-14'],
+  },
+  {
+    name: 'approvals-list-self-no-uid-check',
+    why: '🔴 「본인」 절에서 uid 대조를 뺀다 — 남의 신청을 세는 경로가 열리는지 본다',
+    from: 'allow list: if isVice() || isTeacher()\n        || (isSignedIn() && resource.data.uid == request.auth.uid);',
+    to: 'allow list: if isVice() || isTeacher() || isSignedIn();',
+    breaks: ['A-2', 'A-11', 'A-12'],
   },
   {
     name: 'reapply-no-agreement-keys',

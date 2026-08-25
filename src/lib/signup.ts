@@ -1,4 +1,4 @@
-import { doc, getDoc, serverTimestamp, writeBatch } from 'firebase/firestore'
+import { collection, doc, getDoc, getDocs, query, serverTimestamp, where, writeBatch } from 'firebase/firestore'
 import { db } from './firebase'
 import type { ParseResult } from './parseDisplayName'
 
@@ -95,6 +95,67 @@ export async function lookupInviteCode(codeId: string): Promise<CodeLookup> {
   if (useCount >= maxUses) return { kind: 'unusable' }
 
   return { kind: 'ok', codeId: snapshot.id }
+}
+
+/* ==========================================================================
+   BR-30 — 가입 신청 레이트 리밋 (§11.5 · W-22B 결정 1)
+   ========================================================================== */
+
+/** §11.5 — 계정당 24시간 3회. 🔴 **IP 몫은 App Check가 맡는다**(클라이언트는 자기 IP를 모른다). */
+export const SIGNUP_ATTEMPT_LIMIT = 3
+export const SIGNUP_ATTEMPT_WINDOW_MS = 24 * 60 * 60 * 1000
+
+/**
+ * 🔴 **`unknown`을 `0`이나 `3`과 뭉개지 마라.** `CodeLookup`·`DuplicateVerdict`와 같은 형태다.
+ * 「몇 건인지 안다」와 「셀 수 없었다」는 다른 사실이고, 뒤엣것은 **통과**로 떨어진다(§3.5).
+ */
+export type SignupAttemptCount =
+  | { kind: 'ok'; count: number }
+  | { kind: 'unknown'; errorCode: string }
+
+/**
+ * BR-30 카운터 — **이미 만들어지는 데이터를 센다. 새 컬렉션도 새 필드도 만들지 않았다.**
+ * 신청 1회 = `approvalRequests` 문서 1건이고 재신청도 새 문서 1건이다(BR-28 · W-08 §4-4).
+ *
+ * 🔴 **질의는 등식 1개뿐이다.** `where('createdAt', '>=', …)`를 더하면 등식+범위가 되어
+ * **복합 인덱스**를 요구하고, 그러면 배포가 2단계가 된다(W-15A §1-4와 같은 판단).
+ * ⇒ 24시간 창은 **클라이언트에서 거른다.**
+ *
+ * 🔴 **규칙이 이 질의를 허용하는 것은 W-22B가 연 자리다** — `approvalRequests`의
+ * `allow list`에 「본인」 절이 있어야 한다(A-10). 없으면 `permission-denied`로 떨어지고
+ * 아래 계약대로 **통과**가 되어 BR-30이 통째로 무동작이 된다.
+ *
+ * 🔴 **실패는 전부 「통과」다**(§3.5 · W-12 §3.8과 같은 규칙).
+ * > 가입을 잘못 막는 것이 한 번 더 신청받는 것보다 비싸다.
+ * 신입 부원이 아무 설명 없이 가입 불가가 되면 **복구할 방법이 앱 안에 없다.**
+ */
+export async function countRecentSignupAttempts(uid: string): Promise<SignupAttemptCount> {
+  let snapshot
+  try {
+    snapshot = await getDocs(query(collection(db, 'approvalRequests'), where('uid', '==', uid)))
+  } catch (error: unknown) {
+    /* `permission-denied` · `unavailable` · `failed-precondition`이 전부 여기로 온다. */
+    const code = (error as { code?: string })?.code ?? 'firestore/signup-attempts-failed'
+    console.warn('[SunDO] 가입 신청 횟수를 셀 수 없어 제한을 적용하지 않습니다.', code)
+    return { kind: 'unknown', errorCode: code }
+  }
+
+  const since = Date.now() - SIGNUP_ATTEMPT_WINDOW_MS
+  let count = 0
+  snapshot.forEach((docSnap) => {
+    const createdAt = (docSnap.data() as { createdAt?: { toMillis?: () => number } | null })?.createdAt
+    const ms = createdAt?.toMillis?.()
+    /* 🔴 `serverTimestamp()`가 아직 확정되지 않은 문서(방금 쓴 본인 것)는 `undefined`다.
+       **창 밖으로 빼지 않는다** — 미확정이라는 것 자체가 「방금 만들었다」는 뜻이고,
+       빼면 자기 최근 신청을 놓쳐 한도가 한 칸 헐거워진다. */
+    if (typeof ms !== 'number' || ms >= since) count += 1
+  })
+  return { kind: 'ok', count }
+}
+
+/** 🔴 `unknown`은 **막지 않는다.** 이 함수가 그 계약의 유일한 판정 지점이다. */
+export function isSignupBlocked(attempts: SignupAttemptCount): boolean {
+  return attempts.kind === 'ok' && attempts.count >= SIGNUP_ATTEMPT_LIMIT
 }
 
 export interface SignupSubmission {

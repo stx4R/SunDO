@@ -8,7 +8,13 @@ import { auth } from '../lib/firebase'
 import { cn } from '../lib/cn'
 import { formatInviteCode, INVITE_CODE_LENGTH, isInviteCodeComplete } from '../lib/inviteCode'
 import { splitSentences } from '../lib/sentences'
-import { lookupInviteCode, newRequestId, submitSignup } from '../lib/signup'
+import {
+  countRecentSignupAttempts,
+  isSignupBlocked,
+  lookupInviteCode,
+  newRequestId,
+  submitSignup,
+} from '../lib/signup'
 import { useOnline } from '../lib/useOnline'
 
 /**
@@ -27,6 +33,12 @@ import { useOnline } from '../lib/useOnline'
 
 /* §8.2.3 · §8.10.3 확정 문안. 한 글자도 바꾸지 마라. */
 const CODE_REQUIRED = '가입 코드를 입력해 주세요'
+/**
+ * 🔴 **E-1009(신설 · W-22B 결정 3) — BR-30 · §11.5.**
+ * E-3002(`잠시 후 다시 시도해 주세요 (시간당 5회 제한)`)의 형태를 본떠 **한도를 문구에 드러낸다.**
+ * 🔴 **남은 시간을 표시하지 않는다** — §11.4에 그 형태의 문구가 하나도 없다.
+ */
+const E_1009 = '가입 신청은 24시간에 3회까지 가능합니다'
 const CODE_FORMAT = '코드 형식이 올바르지 않습니다 (예: DJSN-2691)'
 const E_1001 = '존재하지 않는 코드입니다'
 const E_1002 = '만료된 코드입니다. 부장에게 새 코드를 요청해 주세요'
@@ -134,6 +146,9 @@ export default function Signup() {
   const [checking, setChecking] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [banner, setBanner] = useState<string | null>(null)
+  /* 🔴 **BR-30(§11.5) — 계정당 24시간 3회.** `unknown`은 여기 들어오지 않는다:
+     `isSignupBlocked`가 「셀 수 없었다」를 **통과**로 떨어뜨린다(§3.5). */
+  const [rateLimited, setRateLimited] = useState(false)
 
   const titleRef = useRef<HTMLHeadingElement>(null)
   const codeRef = useRef<FieldHandle>(null)
@@ -152,6 +167,9 @@ export default function Signup() {
      막지 못한다. 같은 태스크 안의 5회 탭은 전부 리렌더 전의 옛 값을 본다. */
   const submitLatch = useRef(false)
   const signOutLatch = useRef(false)
+  /* 🔴 **진입 카운트를 uid당 1회로 못 박는다.** React StrictMode는 개발에서 이펙트를
+     두 번 실행하고, 그대로 두면 질의가 2회로 보여 §3.4의 「진입 1회」를 못 잰다. */
+  const countedUidRef = useRef<string | null>(null)
 
   /* §15.3 — 진입 시 제목에 포커스. */
   useEffect(() => {
@@ -176,6 +194,28 @@ export default function Signup() {
   const withdrawn = status === 'withdrawn'
   const reactivate = status === 'withdrawn' || status === 'rejected'
 
+  /**
+   * 🔴 **§3.4 — 세는 시점 ① 진입 시 1회.**
+   * 진입 시만 세면 화면을 열어 둔 채 3회를 채울 수 있고, 제출 직전만 세면
+   * **다 입력한 뒤에야 막혀** §8.2의 동선이 깨진다. 그래서 둘 다 센다.
+   *
+   * 🔴 **오프라인에서는 세지 않는다.** S2는 이미 오프라인 제출을 막고 있고(W-08 §5-7),
+   * 캐시만 보고 「3회 미만」이라고 답하면 그 값이 거짓일 수 있다. **새 분기를 만들지 않았다.**
+   */
+  useEffect(() => {
+    if (!uid || !online) return
+    if (countedUidRef.current === uid) return
+    countedUidRef.current = uid
+    let alive = true
+    void (async () => {
+      const attempts = await countRecentSignupAttempts(uid)
+      if (alive) setRateLimited(isSignupBlocked(attempts))
+    })()
+    return () => {
+      alive = false
+    }
+  }, [uid, online])
+
   const codeFilled = code.length === INVITE_CODE_LENGTH
   /**
    * 🔴 **W-21 P-11 ② — `agreed`가 여기서 빠졌다.**
@@ -183,7 +223,10 @@ export default function Signup() {
    * (오프라인은 `OFFLINE_HINT` 줄, 코드는 `Field`의 인라인 에러).
    * 미동의만 「활성 + 탭하면 안내」로 바뀐다. 동의 없는 제출은 `handleSubmit`이 잠근다.
    */
-  const disabled = !codeFilled || !online
+  /* 🔴 **BR-30은 「비활성」이다. 부재가 아니다.**
+     W-15A §4-4의 「읽기 전용 = 버튼 부재」와 **반대**인 이유 — 거기는 **권한이 없어
+     영원히 못 하는 것**이고 여기는 **지금만 못 하는 것**이다. 문구가 그 이유를 말한다. */
+  const disabled = !codeFilled || !online || rateLimited
 
   const validateCode = (v: string): string | null => {
     if (!v) return CODE_REQUIRED
@@ -278,6 +321,14 @@ export default function Signup() {
         /* 형식·이름은 서버를 부르기 전에 끝낸다. 통과하지 못하면 조회도 하지 않는다. */
         if (!codeRef.current?.validate()) return
         if (needsName && !nameRef.current?.validate()) return
+
+        /* 🔴 **§3.4 — 세는 시점 ② 제출 직전 1회.**
+           화면을 열어 둔 채 다른 탭에서 3회를 채웠을 수 있다. 진입 시의 값을 믿지 않는다.
+           🔴 **셀 수 없으면(`unknown`) 막지 않는다** — `isSignupBlocked`가 그 계약이다. */
+        if (isSignupBlocked(await countRecentSignupAttempts(uid))) {
+          setRateLimited(true)
+          return
+        }
 
         /* ① EC-07 — 입력 도중 만료될 수 있다. **캐시된 결과를 믿지 않는다.** */
         const lookup = await lookupInviteCode(code)
@@ -504,6 +555,14 @@ export default function Signup() {
             (`Field`와 같은 규율). 0fr→1fr 그리드라 닫힌 상태의 높이는 0이다. */}
         <div role="alert" className={cn('ff-msgwrap', agreeError && 'ff-msgwrap-open')}>
           <span className="ff-msg">{agreeError ? AGREE_REQUIRED : ''}</span>
+        </div>
+
+        {/* 🔴 **E-1009 인라인**(BR-30 · §11.5). 동의 안내와 **같은 표면**을 쓴다 —
+            `Field`의 `.ff-msgwrap`/`.ff-msg`이고 새 표면을 만들지 않았다.
+            라이브 영역은 문구보다 먼저 존재해야 낭독되므로 노드는 **항상 마운트**한다.
+            🔴 **남은 시간을 계산해 보여 주지 않는다**(결정 3). */}
+        <div role="alert" className={cn('ff-msgwrap', rateLimited && 'ff-msgwrap-open')}>
+          <span className="ff-msg">{rateLimited ? E_1009 : ''}</span>
         </div>
 
         <PrimaryButton

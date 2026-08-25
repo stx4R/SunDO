@@ -1,4 +1,5 @@
 import { initializeApp, type FirebaseOptions } from 'firebase/app'
+import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check'
 import { getAuth, GoogleAuthProvider } from 'firebase/auth'
 import {
   initializeFirestore,
@@ -45,6 +46,44 @@ const options: FirebaseOptions = {
 }
 
 export const app = initializeApp(options)
+
+/**
+ * §11.5 · §14.5 11번 — **App Check(reCAPTCHA v3)**. W-22B 결정 2.
+ *
+ * 🔴 **`initializeApp` 직후, `getAuth`·`initializeFirestore`보다 먼저다.**
+ * 뒤에 놓으면 앞선 서비스의 **첫 요청에 토큰이 붙지 않는다** — 시행을 켠 뒤에는
+ * 그 첫 요청이 거부된다. 줄 순서가 계약이다. **밑으로 내리지 마라.**
+ *
+ * 🔴 **키가 없으면 건너뛴다. 앱을 멈추지 않는다.**
+ * ⚠ 이것은 위 `KEYS` 6개의 「하나라도 비면 `throw`」 계약을 **일부러 따르지 않는 것**이다.
+ *   근거 — `VITE_FIREBASE_*` 6개는 **없으면 앱이 아무것도 못 한다(기능)**. 사이트 키는
+ *   **없어도 시행 전까지 앱이 정상 동작한다(방어)**. 방어 계층의 부재로 기능을 세우면
+ *   키를 못 넣은 개발자가 앱 자체를 못 띄운다.
+ * 🔴 **단, ③ 시행(enforce)을 켠 뒤에는 키가 없으면 모든 요청이 거부된다.**
+ *   그때는 이 `warn`이 유일한 단서다. 절차는 `database_ToDo/W-22B.md` §2에 있다.
+ *
+ * 🔴 **`try`로 감싼 이유** — reCAPTCHA 스크립트 로드는 네트워크를 탄다.
+ * 오프라인 첫 실행에서 던지면 **앱이 시작조차 못 한다.** 이 앱은 오프라인이 기능이다(EC-01).
+ */
+const siteKey = env.VITE_RECAPTCHA_SITE_KEY
+if (siteKey) {
+  try {
+    if (import.meta.env.DEV) {
+      /* 🔴 로컬 개발을 죽이지 않는다. 콘솔이 발급한 디버그 토큰을 브라우저가 받아 쓴다.
+         **토큰 문자열을 코드나 `.env.example`에 적지 마라**(§14.5 12번) — 등록 절차는
+         `database_ToDo/W-22B.md` §2다. */
+      ;(self as unknown as Record<string, unknown>).FIREBASE_APPCHECK_DEBUG_TOKEN = true
+    }
+    initializeAppCheck(app, {
+      provider: new ReCaptchaV3Provider(siteKey),
+      isTokenAutoRefreshEnabled: true,
+    })
+  } catch (error: unknown) {
+    console.warn('[SunDO] App Check 초기화에 실패했습니다. 앱은 계속 동작합니다.', error)
+  }
+} else {
+  console.warn('[SunDO] VITE_RECAPTCHA_SITE_KEY가 없어 App Check를 건너뜁니다.')
+}
 
 export const auth = getAuth(app)
 
