@@ -4,7 +4,6 @@ dist-ssr
 *.local
 .env
 .env.*
-!.env.example
 .firebase
 .DS_Store
 *.log
@@ -28,3 +27,40 @@ database_ToDo/*.csv
 database_ToDo/*.xlsx
 *serviceAccount*.json
 *-firebase-adminsdk-*.json
+
+# ============================================================
+# W-23 §C — 저장소 정리 (B-12 · 사용자 승인 뒤 실행)
+#
+# 🔴 **이 저장소는 public이다.** `.gitignore`와 `git rm --cached`는 **최신 트리에서만**
+# 지운다 — 여기 적힌 파일들은 v0.18.0 이전 커밋에 그대로 남아 있고 누구나 볼 수 있다.
+# 이 규칙은 「감추기」가 아니라 **「앞으로의 트리에서 빼기」**다. 그 사실을 알린 뒤 승인받았다.
+#
+# ✅ **작업 트리의 파일은 지워지지 않는다.** 이 기계의 다음 세션은 `CLAUDE.md`(규약의 정본)와
+# `docs/SunDO_PRD.md`(사양의 정본)를 **그대로 읽는다.** 잃는 것은 **새 clone·다른 기계·협력자**다.
+#
+# 🔴 **빌드·런타임 의존은 0건이다**(W-23 §C 전수 조사) — `src/`·`scripts/`·`tests/`·
+# `vite.config.ts`·`firebase.json` 어디도 아래를 참조하지 않는다(참조는 전부 주석이다).
+#
+# ⚠ **운영에 필요한 것은 하나도 빼지 않았다**: `firebase.json` · `.firebaserc` ·
+# `firestore.rules` · `firestore.indexes.json` · `firestore.rules.catchall` · `scripts/` ·
+# `tests/` · `public/`(images 제외) · `package*.json` · `index.html` · `vite.config.ts` ·
+# `tsconfig*.json` · `src/**` · `README.md`.
+# ============================================================
+
+# 회차 지시서 · 보고서 · 콘솔 요청서 — 「왜 이렇게 했는가」의 근거
+prompts/
+reports/
+database_ToDo/
+
+# 사양(`SunDO_PRD.md`)·진행 기록 정본 · 규약 정본 · 시각 원본(DS-01)
+docs/
+design/
+CLAUDE.md
+
+# 🔴 `.env.example`을 살려 두던 `!.env.example` 부정 규칙을 위에서 제거했다.
+#    이제 `.env.*` 패턴이 이 파일도 함께 잡는다(W-04 §6의 「예시 파일만 커밋 대상」 폐기).
+
+# 🔴 **버그 재현 스크린샷 — 실명 학급 명부가 찍혀 있다.**
+#    저장소가 public이므로 **한 번도 커밋된 적이 없어야 한다.** 지금까지 untracked였고
+#    이 줄이 `git add -A`로 실수로 올라가는 것을 막는다.
+public/images/
