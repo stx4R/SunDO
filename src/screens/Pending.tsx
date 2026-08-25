@@ -143,7 +143,6 @@ export default function Pending() {
   }
 
   const email = profile?.email ?? ''
-  const initial = profile?.name?.trim().charAt(0) ?? ''
 
   return (
     <main
@@ -200,8 +199,10 @@ export default function Pending() {
 
           {/* R-03 델타 1 — 세 변형 공통. */}
           <div className="pend-id mt-[18px]">
+            {/* 🔴 W-21 P-7(결정 4) — 이름 첫 글자를 **가입 계정 아바타**로 바꿨다.
+                이 화면은 본인 계정이라 `DSHS.png`다. 식별은 바로 옆 이메일이 맡는다. */}
             <span className="pend-avatar" aria-hidden="true">
-              <span className="text-micro font-bold text-white">{initial}</span>
+              <img src="/DSHS.png" alt="" className="h-full w-full object-cover" />
             </span>
             <span className="ml-2 text-label font-medium text-sundo-ink-70">{email}</span>
           </div>

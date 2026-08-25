@@ -249,18 +249,44 @@
 
   /* 라벨 광택 스윕. @keyframes는 design/index.html 원문 그대로이고,
      적용 규칙은 프로토타입에 없어 W-02에서 신규 확정했다(회신 §1.2).
-     background-size: 200% 100% 조합에서 130% → -30%는 좌 → 우 이동이다. */
+     background-size: 200% 100% 조합에서 130% → -30%는 좌 → 우 이동이다.
+
+     🔴 **W-21 P-2 — 광택이 글자가 아니라 글자 상자에 걸려 있었다**(사용자 보고: 직사각형이
+     반짝인다). `display:inline-block` + `background-image`는 **상자**를 칠한다.
+     🔬 design 전수: `@keyframes shine`은 있으나 **적용 규칙 0건 · `background-clip` 용례 0건**
+     ⇒ 이 규칙은 처음부터 SunDO 소유이고 정지점을 고쳐도 DS-01에 걸리지 않는다.
+
+     🔴 **정지점의 기저색이 투명이면 안 된다.** `background-clip:text`를 걸면 칠해진 곳만
+     글자가 되므로, 기존 `rgba(255,255,255,0) → 0.45 → 0`을 그대로 두면 **글자가 띠 밖에서
+     통째로 사라진다.** 그래서 기저를 `0.82`, 띠를 `#fff`로 뒤집었다 —
+     흰 라벨 위의 광택은 「더 밝아지는 것」이 아니라 「기저가 조금 어둡고 띠가 순백인 것」으로만
+     성립한다(흰색보다 밝은 색이 없다).
+     🔬 대비 실측(`.btnp` 그라디언트의 밝은 끝 `#2E6B4C` 기준): 기저 0.82 → **4.80:1**.
+     §15.2 AC-01(18px 미만 4.5:1)을 넘긴다. 순백 띠는 6.24:1이라 더 안전하다. */
   .shine {
     display: inline-block;
     background-image: linear-gradient(
       100deg,
-      rgba(255, 255, 255, 0) 40%,
-      rgba(255, 255, 255, 0.45) 50%,
-      rgba(255, 255, 255, 0) 60%
+      rgba(255, 255, 255, 0.82) 40%,
+      #fff 50%,
+      rgba(255, 255, 255, 0.82) 60%
     );
     background-size: 200% 100%;
     background-repeat: no-repeat;
     animation: shine 2.8s linear infinite;
+  }
+
+  /* 🔴 **`color: transparent`를 맨몸으로 쓰지 마라.** `background-clip:text`가 없는 환경에서
+     글자가 통째로 사라진다. 두 선언을 `@supports` 안에 **함께** 가둬야 폴백이 성립한다 —
+     지원하지 않으면 W-20까지의 거동(상자가 반짝인다)이 그대로 남고 글자는 언제나 보인다.
+     조건에 `-webkit-` 판을 함께 적는 것은 Safari가 오랫동안 접두사판만 지원했기 때문이다.
+     ⚠ **선언부에는 접두사를 손으로 적지 않는다** — lightningcss가 표준 선언에 붙여 준다
+     (`.glass`의 `backdrop-filter`와 같은 규율 · W-02 §4-1). */
+  @supports (background-clip: text) or (-webkit-background-clip: text) {
+    .shine {
+      background-clip: text;
+      color: transparent;
+    }
   }
 
   /* 인원 수·상태 표시 */
@@ -307,13 +333,22 @@
      **§15.1이 적은 `padding: 12px 14px` 대신 design 원문의 좌우 13**을 쓴다 —
      조치의 목적(44×44 타깃)은 그대로 달성되고 가로 규격은 시안과 일치한다.
      `.fchip`을 W-13이 올린 것과 같은 근거다. 보고서 §3에 이탈로 적었다. */
+  /* 🔴 **W-21 P-5 — 좌우를 13 → 22로 넓혔다.** design `9a` 원문이 `padding:0 13px`이고
+     구현이 그것과 일치했으나, 2글자 라벨(`승인`·`거절`·`양도`)에서 실물 상자가
+     **약 49×44 — 거의 정원**이 되어 「누르기 어렵다」는 보고가 왔다(분류 C · 지시서 §0.3 각주).
+     세로 44는 §15.1이 이미 확보했으므로 **모자란 축은 가로다.** 22로 넓히면 약 67×44
+     (1.52:1)가 되어 둥근 직사각형으로 읽힌다.
+     🔴 `border-radius`는 건드리지 않았다 — `.pill`이라는 이름과 §7.3 규격의 정체성이
+     그 값에 있다. 모양은 **비율**로 바꾸고 표면 규격은 유지한다.
+     🔬 소비자 전수 = `screens/Admin.tsx` **3곳뿐**(양도 `soft` · 승인 `fill` · 거절 `line`).
+     「공용 클래스라 회귀 범위가 넓다」가 이 저장소에서는 성립하지 않는다 — 보고서 §3 P-5. */
   .pill {
     display: inline-flex;
     min-height: 44px;
     align-items: center;
     justify-content: center;
     border-radius: var(--radius-pill);
-    padding: 0 13px;
+    padding: 0 22px;
     font-size: var(--text-caption);
     font-weight: 700;
   }
@@ -835,8 +870,11 @@
      배경을 깔지 않는다. 스테이지 그라디언트가 비친다.
      ========================================================== */
   .ft {
-    padding-left: 22px;
-    padding-right: 22px;
+    /* 🔴 **W-21 P-10 — 좌우 22px을 걷어냈다.** design `14a`·`20a`·`12a`가 전부
+       「스테이지 가장자리에서 22px」로 그리는데, 이 저장소의 Footer 소비자 3종(S1·S2-1·S10)은
+       모두 `AppShell` 스크롤 영역(**이미 좌우 22px**) 안에 있다. 여기서 22를 또 주면 44가 된다.
+       🔬 실측(전): `.ft-a`의 x = **44px** · `.ft-hr` 폭 342px(시안 386).
+       여백 소유자는 `AppShell`이다(§0.4) — 그 계약을 복제하지 않는다. */
     /* design 14a는 env()를 못 읽어 45px로 굳혔다. 링크 자체 padding 15px을
        더한 60px이 safe-area 34px + 26px과 정확히 같다(보고서 §5). */
     padding-bottom: calc(env(safe-area-inset-bottom) + 26px);
@@ -1295,6 +1333,8 @@
     background: var(--color-sundo-tint-06);
   }
 
+  /* 🔴 W-21 P-7 — 안에 이미지가 들어왔다. `overflow:hidden`이 없으면 반경이 무시된다.
+     배경·크기·반경은 시안 값 그대로 둔다(로고가 투명 모서리를 가져 배경이 그대로 비친다). */
   .pend-avatar {
     display: flex;
     width: 22px;
@@ -1303,6 +1343,7 @@
     align-items: center;
     justify-content: center;
     border-radius: 50%;
+    overflow: hidden;
     background: var(--gradient-primary);
   }
 
@@ -1366,7 +1407,8 @@
       var(--highlight-top);
   }
 
-  /* 신원 카드 아바타. 사진이 아니라 **이름 첫 글자**다(NG-13). */
+  /* 신원 카드 아바타. NG-13대로 **Google 프로필 사진이 아니다** —
+     🔴 W-21 P-7(결정 4)부터 앱이 배포하는 정적 이미지다(이름 첫 글자에서 바뀌었다). */
   .s2-avatar {
     display: flex;
     width: 48px;
@@ -1375,6 +1417,7 @@
     align-items: center;
     justify-content: center;
     border-radius: 50%;
+    overflow: hidden;
     background: var(--gradient-primary);
   }
 
@@ -1476,7 +1519,14 @@
     /* §7.3 반경 스케일의 최솟값이 11이라 20px 상자에 맞지 않는다. `.ff`(14)의
        비율(반경/높이 ≈ 0.25)을 20px에 적용한 값이다. 1곳뿐이라 토큰화하지 않았다. */
     border-radius: 6px;
-    border: 1px solid rgba(255, 255, 255, 0.8);
+    /* 🔴 W-21 P-11 ① — 원래 `rgba(255,255,255,0.8)`(= `.ff`에서 빌려 온 값)이었는데
+       20px 상자에는 성립하지 않았다. `.ff`는 56px 유리 표면이라 배경 대비로 읽히지만
+       이 상자는 흰 카드 위의 흰 테두리라 **미체크 상태가 보이지 않는다**(사용자 보고).
+       새 색을 만들지 않고 §7.1 보완 토큰 `--color-sundo-line-border`를 쓴다 —
+       `.pill-line`·`.tage`·`.s2-cb-on`이 이미 쓰는 「line 계열 테두리」 역할 그대로다.
+       ⚠ 체크 상태와 테두리 색이 같아졌지만 AC-04 이중 표시는 유지된다 —
+       배경(control → tint-10)과 체크 아이콘이 그대로 갈린다. */
+    border: 1px solid var(--color-sundo-line-border);
     background: var(--color-sundo-control);
     box-shadow: var(--shadow-inset-soft);
   }
@@ -1523,11 +1573,13 @@
   }
 
   /* design 1d 원문 `font-size:11px;font-weight:600;color:rgba(20,53,38,0.5)`.
-     11px는 `--text-micro`와 같은 값이라 토큰을 쓴다. */
+     11px는 `--text-micro`와 같은 값이라 토큰을 쓴다.
+     🔴 **알파는 원문 0.5가 아니라 0.70이다**(W-21 결정 3 · AC-01 · W-14 §7-6).
+     「아침 야외에서 한 손으로 쓰는」 환경 대응이라 시안을 의도적으로 덮었다 — 보고서 §6 ②. */
   .s3-stat-label {
     font-size: var(--text-micro);
     font-weight: 600;
-    color: rgba(20, 53, 38, 0.5);
+    color: var(--color-sundo-ink-70);
   }
 
   /* design 1d 원문 `font-size:24px;font-weight:800;color:#1F5138`.
@@ -1669,25 +1721,34 @@
     color: var(--color-sundo-ink-55);
   }
 
+  /* 🔴 **높이 사슬 — W-21 P-1.** `.pol`과 같은 처방이다(W-18 §4.6 · §6.2).
+     `ScreenTransition`의 `.blur-in`이 `height:auto`라 S5의 `h-full`이 끊긴다.
+     **기존 `.blur-in` 선언은 건드리지 않고** S5일 때만 매치하는 규칙을 따로 둔다 —
+     `data-screen`은 이 저장소가 이미 쓰는 화면 식별자라 새 훅을 만들지 않았다. */
+  .blur-in:has(> [data-screen='S5']) {
+    height: 100%;
+  }
+
   /* 🔴 §8.5.4 T-03 「헤더 고정, 리스트만 스크롤」.
-     **리스트에 자체 `overflow`를 걸지 않는다** — 스크롤 요소는 `AppShell` 하나다(W-09 §5).
-     헤더를 `sticky`로 붙여 같은 결과를 얻는다.
+     **W-21 P-1 — W-11의 `sticky` 방식을 design `1f` 원문(리스트 내부 스크롤)으로 되돌렸다.**
 
-     🔴 배경 띠는 design `1f`에 **없다.** `1f`는 리스트 컨테이너가 `flex:1;overflow:hidden`
-     으로 스스로 잘라내는 목업이라 헤더 뒤로 행이 지나가는 상황 자체가 없었다.
-     단일 스크롤에서는 지나가므로 가림막이 필요하고, 값은 이미 앱에 있는 부유 표면
-     (`.dock` — 스크롤 콘텐츠 위에 뜨는 유일한 선례)의 유리 처리를 그대로 가져왔다.
-     **st4R 승인 항목이다**(QA-11-01, W-11 보고서 §4-1).
+     W-11(QA-11-01)은 「스크롤 요소는 `AppShell` 하나」라는 W-09 §5 계약 아래에서 판단했고,
+     `1f`의 `flex:1;overflow:hidden`을 옮길 수 없어 `sticky` + **유리 헤더 띠**로 같은 결과를
+     냈다. 🔴 그런데 그 방식은 행이 유리 띠 **뒤로 비쳐 지나가는 것**을 막지 못한다 —
+     사용자가 그것을 보고했다(W-21 P-1). 값(불투명도)을 올려 가리는 것은 증상 처리다.
+     **원인은 행이 헤더 밑으로 들어갈 수 있다는 것**이고, 리스트가 스스로 잘라내면 사라진다.
 
+     🔬 스크롤 주체를 바꿔도 안전한 근거: **S5는 `usePullToRefresh` 소비자가 아니다**
+     (실측 — 소비자는 S3·S7·S8·S9). `ScrollRootContext`도 구독하지 않는다.
+     `AppShell`·`ScreenTransition`은 **한 글자도 바뀌지 않는다**(사용자 승인 · W-21 §9 확인 1).
+
+     띠 자체는 유지한다 — 배경·`backdrop-filter`는 헤더의 시각 규격이고,
      `margin: 0 -22px` + `padding: 0 22px`는 `AppShell`의 좌우 패딩을 상쇄해 띠를
-     스테이지 끝까지 잇는다. **세로 여백은 건드리지 않는다** — 상단 여백은 `AppShell` 소유다(§0.4).
-     `top: 0`인데도 띠는 스크롤 영역의 **패딩 가장자리**에 선다(실측: 여백 26 → `y 26`,
-     safe-area 59 → `y 85`, 배너까지 → `y 141`. 세 경우 모두 스크롤 전후 불변).
-     그래서 노치 아래로 파고들지 않고, 화면이 상단 여백을 다시 계산할 필요도 없다(보고서 §4-2). */
+     스테이지 끝까지 잇는다(그대로다). **세로 여백은 건드리지 않는다** — `AppShell` 소유다(§0.4).
+     ⚠ `position: sticky`·`top`·`z-index`는 **뺐다**. 흐름의 `flex:none` 머리가 되었으므로
+     붙잡을 스크롤이 없다 — 남겨 두면 아무 일도 하지 않는 선언이 다음 사람을 헷갈리게 한다. */
   .s5-head {
-    position: sticky;
-    top: 0;
-    z-index: 10;
+    flex: none;
     margin: 0 -22px;
     padding: 0 22px 10px;
     background: var(--color-sundo-control);
@@ -1702,11 +1763,13 @@
   }
 
   /* design `1f` 원문 `font-size:11px;color:rgba(20,53,38,0.42);margin-bottom:10px`.
-     10px는 `.s5-head`의 하단 패딩이 갖는다. 0.42는 이 한 곳뿐이라 토큰화하지 않았다. */
+     10px는 `.s5-head`의 하단 패딩이 갖는다.
+     🔴 **알파는 원문 0.42가 아니라 0.70이다**(W-21 결정 3 · AC-01 · W-14 §7-6).
+     0.42는 이 한 곳뿐이라 토큰화하지 않았었고, 0.70은 이미 토큰이 있어 그것을 쓴다. */
   .s5-hint {
     margin-top: 14px;
     font-size: var(--text-micro);
-    color: rgba(20, 53, 38, 0.42);
+    color: var(--color-sundo-ink-70);
   }
 
   /* design `1f` 원문 `border-radius:22px 22px 0 0;padding:6px 0` + 유리.
@@ -1715,10 +1778,21 @@
      🔴 `1f`의 `overflow:hidden`은 옮기지 않았다. 목업에서 `flex:1` 패널을 자르려던
      선언이고, 흐름 안에서 자라는 컨테이너에 걸면 위험만 남는다. 상단 6px 패딩이 있어
      행의 눌림 배경이 둥근 모서리를 넘지 않는다(보고서 §3-2). */
+  /* 🔴 **W-21 P-1 — `1f`의 `overflow`가 여기로 돌아왔다.**
+     W-11 주석은 「`1f`의 `overflow:hidden`은 옮기지 않았다 — 흐름 안에서 자라는 컨테이너에
+     걸면 위험만 남는다」고 적었고 **그때는 맞았다**(높이가 확정이 아니었다).
+     이제 `.blur-in:has(> [data-screen='S5'])` → `main.h-full` → 여기까지 사슬이 이어져
+     이 상자의 높이가 확정된다. `hidden`이 아니라 `auto`인 것은 **잘라내는 것이 아니라
+     그 안에서 스크롤하는 것**이 요구이기 때문이다.
+     🔴 `min-height: 0`이 없으면 flex 항목의 기본 최소 크기(`auto`)가 콘텐츠 높이를 바닥으로
+     삼아 **줄어들지 않는다** — `flex: 1`만으로는 부족하다.
+     🔬 소비자 전수 = `screens/ClassStudents.tsx` **한 곳뿐**(S7은 `.s7-list`가 따로 있다). */
   .list {
     border-top-left-radius: var(--radius-22);
     border-top-right-radius: var(--radius-22);
     padding: 6px 0;
+    min-height: 0;
+    overflow-y: auto;
   }
 
   /* design `1f` 원문 `display:flex;align-items:center;gap:14px;padding:15px 18px;
@@ -1911,12 +1985,26 @@
   }
 
   /* 토스트 (§6.4 z 60). 조작 대상이 아니라 pointer-events를 되돌리지 않는다. */
+  /* 🔴 **W-21 P-8 ① — 토스트는 한 줄이다.**
+     🔬 실측(전): 문구 길이와 무관하게 **전부 215px · 높이 57.1px(2줄)**.
+     원인은 문구가 아니라 상자다 — `left:50%`에 `right`가 없어 shrink-to-fit의 가용 폭이
+     `430 − 215 = 215px`로 잘려 **모든 토스트가 반쪽 폭에서 접혔다.**
+     `width: max-content`가 그 제약을 끊고 내용 폭을 그대로 준다.
+
+     ⚠ **`white-space: nowrap`을 쓰지 않았다.** 지시서가 제시한 안이지만, 재 보니
+     그것 없이도 사전의 **모든** 문구가 한 줄에 들어간다(가장 긴 `E_2001` 30자 = 333.4px,
+     우변 381.7 < 430). `nowrap`은 규격이 늘어난 날 **화면을 뚫고 글자를 잘라 낸다**.
+     `max-width`만 두면 그 날에도 조용히 두 줄로 접힐 뿐이다 — 실패하는 방향이 안전한 쪽이다
+     (`sw.js`의 내비게이션 타임아웃과 같은 판단 기준 · W-20 §3.2). 근거는 보고서 §3 P-8. */
   .toast {
     position: absolute;
     top: calc(env(safe-area-inset-top) + 18px);
     left: 50%;
     z-index: 60;
     display: flex;
+    width: max-content;
+    /* 스테이지 430 기준 좌우 14px씩 남긴다. 현재 사전에서는 한 번도 걸리지 않는다. */
+    max-width: calc(100% - 28px);
     align-items: center;
     gap: 9px;
     padding: 11px 18px;
@@ -2124,11 +2212,13 @@
     background: var(--color-sundo-tint-08);
   }
 
+  /* 🔴 W-21 P-7 — 이 저장소에서 `DSHSS.png`(일반 학생)를 쓰는 **유일한** 자리다. */
   .rs-avatar {
     width: 34px;
     height: 34px;
     flex: none;
     border-radius: var(--radius-11);
+    overflow: hidden;
     background: var(--gradient-primary);
     display: flex;
     align-items: center;
@@ -2693,7 +2783,8 @@
     flex: none;
     font-size: var(--text-label);
     font-weight: 700;
-    color: rgba(20, 53, 38, 0.5);
+    /* 🔴 알파는 원문 0.5가 아니라 0.70이다(W-21 결정 3 · AC-01). */
+    color: var(--color-sundo-ink-70);
   }
 
   /* `1j` 원문 `padding:20px;border-radius:22px;background:linear-gradient(160deg,#2E6B4C,#1F5138);
@@ -2852,7 +2943,8 @@
   .d-hint {
     margin-top: 12px;
     font-size: var(--text-micro);
-    color: rgba(20, 53, 38, 0.42);
+    /* 🔴 알파는 원문 0.42가 아니라 0.70이다(W-21 결정 3 · AC-01). */
+    color: var(--color-sundo-ink-70);
     text-align: center;
   }
 
@@ -3136,6 +3228,7 @@
     align-items: center;
     justify-content: center;
     border-radius: var(--radius-11);
+    overflow: hidden;
     background: var(--color-sundo-tint-10);
     font-size: var(--text-label);
     font-weight: 700;
@@ -3232,6 +3325,7 @@
     align-items: center;
     justify-content: center;
     border-radius: 50%;
+    overflow: hidden;
     background: var(--gradient-primary);
     box-shadow: 0 8px 20px rgba(31, 81, 56, 0.28);
     color: #fff;
@@ -3601,6 +3695,24 @@
      규칙을 따로 둔다 — `.pol`을 쓰는 화면이 정책 3종뿐이라 다른 화면의 computed는
      정의상 바뀌지 않는다. `AppShell`의 여백 계약도 그대로다. */
   .blur-in:has(> .pol) {
+    height: 100%;
+  }
+
+  /* 🔴 **W-21 P-10 — 같은 사슬, 같은 처방.** Footer를 가진 화면(S1·S2-1·S10)도 `.blur-in`의
+     `height:auto`에서 끊겨 `main`의 `min-h-full`이 무효였다.
+     🔬 실측(전): 스크롤 영역 900px · `.blur-in` **485.25px** · footer 하단이 화면 최하단에서
+     **388.75px 위**. design `12a`(`height:100%` + 콘텐츠 `flex:1`)·`14a`(`justify-content:flex-end`)
+     둘 다 최하단에 그리므로 **시안과 사용자 요구가 같다 — 결함이다**(분류 C 아님).
+
+     🔴 **`min-height`가 아니라 `height`다** — `.pol`에서 배운 것 그대로(W-18 §6.2).
+     `min-height:100%`로는 높이가 여전히 `auto`라 「남는 공간」이 0이고 `flex:1`이
+     아무것도 분배받지 못한다.
+
+     🔴 **`.blur-in` 본체 선언은 한 글자도 건드리지 않는다.** S1의 제목 5글자와 부제도
+     `.blur-in`을 쓰는데(`Login.tsx`), 그것들은 `.ft`를 후손으로 갖지 않아 이 규칙에 걸리지 않는다.
+     ⚠ S10은 `flex-1` 자식이 없어 footer가 흐름대로 콘텐츠 뒤에 남는다 —
+     design `20a`가 `overflow-y:auto` 단순 흐름이라 **그것이 시안대로다.** 밀어 올리지 않는다. */
+  .blur-in:has(.ft) {
     height: 100%;
   }
 

@@ -13,12 +13,13 @@
 export function BrandLogo({ className }: { className?: string }) {
   return (
     <span className={className ? `brand-logo ${className}` : 'brand-logo'}>
-      {/* 저장소에 로고 자산이 없다. §8.1.2 폴백 규격(`자` 이니셜 원형).
-          Footer 폴백과 같은 색·굵기이고, 크기는 §7.2 스케일에서 84px 원에
-          가장 가까운 `text-h1`(28px)이다 — PRD에 폴백 글자 크기 규격이 없다. */}
-      <span className="text-h1 font-bold text-sundo-800" aria-hidden="true">
-        자
-      </span>
+      {/* 🔴 **W-21 P-6 — `자` 이니셜 폴백이 실물 로고로 바뀌었다.**
+          §8.1.2의 폴백 규격은 「저장소에 로고 자산이 없다」는 전제 위에 있었고
+          `public/DSHS.png`가 그 전제를 없앴다.
+          ⚠ **Splash와 S1이 이 컴포넌트를 공유한다**(W-06 §4) — 두 화면이 함께 바뀐다.
+          `alt=""`인 이유는 Footer와 같다: 바로 아래 `<h1 aria-label="자율생활부">`가
+          같은 정보를 준다. 이름을 넣으면 두 번 읽힌다. */}
+      <img src="/DSHS.png" alt="" className="h-full w-full object-cover" />
     </span>
   )
 }

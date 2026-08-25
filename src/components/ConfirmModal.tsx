@@ -1,6 +1,7 @@
 import { useContext, useId, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { cn } from '../lib/cn'
+import { splitSentences } from '../lib/sentences'
 import { useFocusTrap } from '../lib/useFocusTrap'
 import { useOverlayTransition } from '../lib/useOverlayTransition'
 import { OverlayRootContext } from './AppShell'
@@ -76,8 +77,15 @@ export function ConfirmModal({
         <div id={titleId} className="modal-title">
           {title}
         </div>
+        {/* 🔴 W-21 P-8 ② — 본문을 마침표 기준으로 나눠 **줄마다 한 문장**으로 그린다.
+            문자열은 그대로다(`lib/sentences.ts` 주석). 한 문장이면 줄이 하나라
+            기존 6개 본문 중 3개(`거절할까요?`·`로그아웃할까요?`·양도 비-강등)는 computed가 안 바뀐다. */}
         <div id={bodyId} className="modal-body">
-          {body}
+          {splitSentences(body).map((line) => (
+            <span key={line} className="block">
+              {line}
+            </span>
+          ))}
         </div>
         <div className="modal-actions">
           <button

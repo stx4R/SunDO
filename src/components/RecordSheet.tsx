@@ -281,10 +281,15 @@ export function RecordSheet({
           </div>
         )}
 
-        {/* §8.6.2 #4 학생 요약 카드. 아바타는 장식이라 이름 첫 글자를 읽히지 않는다. */}
+        {/* §8.6.2 #4 학생 요약 카드. 아바타는 장식이라 읽히지 않는다.
+            🔴 **W-21 P-7(결정 4) — 이 저장소에서 「일반 학생 아바타」는 여기 하나뿐이다.**
+            아바타 자리 5곳 중 넷(S2-1·S2·S8 부원·S10)은 전부 **가입한 계정**이고,
+            명부에서 온 학생이 그려지는 곳은 이 카드뿐이다(S5 학생 목록은 학번+이름만 그린다).
+            ⚠ 「이 학생이 앱에 가입했는가」를 판정하려면 `users`를 `memberStudentNo`로 찾는
+            **새 질의**가 필요하다 — 그것은 W-21B다. 지금은 명부 학생 = `DSHSS.png` 고정이다. */}
         <div className="rs-card">
           <span className="rs-avatar" aria-hidden="true">
-            {student?.name.slice(0, 1) ?? ''}
+            <img src="/DSHSS.png" alt="" className="h-full w-full object-cover" />
           </span>
           <span className="min-w-0">
             <span className="rs-name">{student?.name ?? ''}</span>

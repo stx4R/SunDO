@@ -3,6 +3,11 @@ import { ExternalLinkIcon } from './icons'
 
 interface FooterProps {
   variant: 'full' | 'compact'
+  /**
+   * 🔴 **W-21 P-6 — 기본값이 생겼다.** W-05까지는 저장소에 로고 자산이 없어 `자` 이니셜로
+   * 폴백했다(§8.1.2). `public/DSHS.png`가 들어오면서 그 폴백이 사라진다.
+   * prop은 남겨 둔다 — 다른 로고를 넣을 자리를 미리 닫지 않는다.
+   */
   logoSrc?: string
   /** 없으면 `<a href>`로 폴백한다. W-05가 라우터 링크로 교체한다. */
   onNavigate?: (path: string) => void
@@ -26,7 +31,7 @@ const POLICY: readonly PolicyLink[] = [
  * 배경을 깔지 않는다 — 스테이지 그라디언트가 비친다.
  * 독 여백 120px을 여기서 더하지 않는다 — `AppShell`이 이미 갖고 있다.
  */
-export function Footer({ variant, logoSrc, onNavigate }: FooterProps) {
+export function Footer({ variant, logoSrc = '/DSHS.png', onNavigate }: FooterProps) {
   const full = variant === 'full'
   const links = full ? POLICY : POLICY.slice(0, 2)
 
@@ -50,15 +55,12 @@ export function Footer({ variant, logoSrc, onNavigate }: FooterProps) {
         <>
           <div className="ft-hr" />
           <div className="flex items-center pt-[22px]">
+            {/* 🔴 W-21 P-6 — `alt=""`가 맞다. 바로 오른쪽의 `SunDO` / `자율생활부 ·
+                대전대신고등학교`가 같은 정보를 이미 텍스트로 준다. 이름을 넣으면 스크린리더가
+                두 번 읽는다. §8.10에 없는 문구를 새로 짓지 않는 것이 규약이고, 여기서는
+                **문구가 필요 없다는 것이 답**이다(보고서 §3 P-6). */}
             <span className="ft-logo">
-              {logoSrc ? (
-                <img src={logoSrc} alt="" className="h-full w-full object-cover" />
-              ) : (
-                /* 저장소에 로고 자산이 없다. §8.1.2 폴백 규격(`자` 이니셜 원형). */
-                <span className="text-label font-bold text-sundo-800" aria-hidden="true">
-                  자
-                </span>
-              )}
+              <img src={logoSrc} alt="" className="h-full w-full object-cover" />
             </span>
             <div className="ml-[10px]">
               <div className="text-button font-bold tracking-[-0.01em] text-sundo-800">SunDO</div>

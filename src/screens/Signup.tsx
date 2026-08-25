@@ -7,6 +7,7 @@ import { useAuth } from '../contexts/AuthProvider'
 import { auth } from '../lib/firebase'
 import { cn } from '../lib/cn'
 import { formatInviteCode, INVITE_CODE_LENGTH, isInviteCodeComplete } from '../lib/inviteCode'
+import { splitSentences } from '../lib/sentences'
 import { lookupInviteCode, newRequestId, submitSignup } from '../lib/signup'
 import { useOnline } from '../lib/useOnline'
 
@@ -63,6 +64,16 @@ const AGREE_JOIN = '과 '
 const AGREE_TAIL = '에 동의합니다'
 const AGREE_PATH_PRIVACY = '/policy/privacy'
 const AGREE_PATH_TERMS = '/policy/terms'
+/**
+ * 🔴 **W-21 P-11 ② — §8.10 사전에 없는 신규 문구다.** 사용자가 제시한 문안 그대로 쓴다.
+ * 코드 부여(`ER-xx`)는 st4R로 올렸다(보고서 §6 ④).
+ * 🔴 **사용자 원문은 `정책을 전부 읽고 체크박스를 클릭해주세요.`였다.** 사전의 인라인 에러는
+ * 전부 **마침표 없이** 끝나고 **`해 주세요`로 띄어 쓰므로**(`가입 코드를 입력해 주세요` ·
+ * `이름을 직접 입력해 주세요` · `부장에게 문의해 주세요`), 같은 자리에 뜨는 문구끼리
+ * 결이 갈리지 않도록 **사용자 확인을 받아** 두 곳을 맞췄다(W-21 §9 확인 2).
+ * 임의 수정이 아니다 — 물어보고 고친 것이다.
+ */
+const AGREE_REQUIRED = '정책을 전부 읽고 체크박스를 클릭해 주세요'
 
 /* 정책 화면으로 이동하면 이 화면이 언마운트돼 입력값이 사라진다. **그 한 번의 왕복만**
    건너게 하는 임시 보관이고 읽는 즉시 지운다 — 새로고침 복원 기능이 아니다.
@@ -110,10 +121,16 @@ export default function Signup() {
   const [code, setCode] = useState(() => draft?.code ?? '')
   const [name, setName] = useState(() => draft?.name ?? '')
   /* W-18 신규 — 동의 확인.
-     🔴 **W-19에서 Firestore에 남기기 시작했다**(결정 3). 이 체크박스가 곧 제출 조건이고
-     `lib/signup.ts`의 `agreement()`가 `agreedAt`·`agreedPolicyVersion`을 배치에 넣는다.
-     ⚠ 그래서 `disabled`에서 `agreed`를 빼지 마라 — 빼는 순간 동의 없이 동의 기록이 남는다. */
+     🔴 **W-19에서 Firestore에 남기기 시작했다**(결정 3). `lib/signup.ts`의 `agreement()`가
+     `agreedAt`·`agreedPolicyVersion`을 배치에 넣는다.
+
+     🔴 **W-21 P-11 ② — `disabled`에서 `agreed`를 뺐다.** W-18의 경고(「빼는 순간 동의 없이
+     동의 기록이 남는다」)는 여전히 유효하므로, 그 자리를 **`handleSubmit`의 첫 줄 가드**가
+     대신 받는다. 버튼이 활성이어야 탭을 받아 안내를 띄울 수 있고(사용자 요구),
+     쓰기 경로는 가드가 잠근다. **가드를 지우면 W-18의 경고가 그대로 실현된다.** */
   const [agreed, setAgreed] = useState(() => draft?.agreed ?? false)
+  /* 미동의로 제출을 시도했는가. 체크하는 순간 사라진다. */
+  const [agreeError, setAgreeError] = useState(false)
   const [checking, setChecking] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [banner, setBanner] = useState<string | null>(null)
@@ -160,8 +177,13 @@ export default function Signup() {
   const reactivate = status === 'withdrawn' || status === 'rejected'
 
   const codeFilled = code.length === INVITE_CODE_LENGTH
-  /* 🔴 `agreed`가 제출 조건에 들어간다 — 동의하지 않으면 신청을 보낼 수 없다. */
-  const disabled = !codeFilled || !online || !agreed
+  /**
+   * 🔴 **W-21 P-11 ② — `agreed`가 여기서 빠졌다.**
+   * 오프라인·코드 미입력은 **그대로 비활성**이다 — 두 경로에는 각각의 안내가 이미 있다
+   * (오프라인은 `OFFLINE_HINT` 줄, 코드는 `Field`의 인라인 에러).
+   * 미동의만 「활성 + 탭하면 안내」로 바뀐다. 동의 없는 제출은 `handleSubmit`이 잠근다.
+   */
+  const disabled = !codeFilled || !online
 
   const validateCode = (v: string): string | null => {
     if (!v) return CODE_REQUIRED
@@ -241,6 +263,13 @@ export default function Signup() {
   const handleSubmit = () => {
     if (submitLatch.current || submitting) return
     if (disabled || !uid) return
+    /* 🔴 **W-21 P-11 ② — 동의 없는 제출을 막는 유일한 빗장이다.**
+       `disabled`에서 `agreed`가 빠졌으므로(위 주석) 쓰기 경로의 잠금이 여기로 내려왔다.
+       **`submitLatch`보다 먼저 선다** — 빗장을 걸고 돌아가면 다음 탭이 통째로 죽는다. */
+    if (!agreed) {
+      setAgreeError(true)
+      return
+    }
     submitLatch.current = true
     setSubmitting(true)
     setBanner(null)
@@ -292,8 +321,6 @@ export default function Signup() {
     })()
   }
 
-  const initial = needsName ? '?' : resolvedName.charAt(0)
-
   return (
     <main data-screen="S2" aria-labelledby="scr-s2" className="flex min-h-full flex-col">
       <div className={cn('flex items-center', submitting && 'opacity-60')}>
@@ -329,7 +356,14 @@ export default function Signup() {
       {withdrawn && (
         <div className="s2-rejoin mt-6" role="alert" aria-live="assertive">
           <InfoIcon />
-          <span className="text-label font-medium leading-[1.45] text-sundo-800">{EC_39}</span>
+          {/* 🔴 W-21 P-8 ② — 안내 박스도 마침표 기준으로 나눈다. 지시서가 든 예가 이 문구다. */}
+          <span className="text-label font-medium leading-[1.45] text-sundo-800">
+            {splitSentences(EC_39).map((line) => (
+              <span key={line} className="block">
+                {line}
+              </span>
+            ))}
+          </span>
         </div>
       )}
 
@@ -343,9 +377,12 @@ export default function Signup() {
         )}
       >
         <div className="flex items-start gap-3">
-          {/* NG-13 — Google 프로필 사진을 쓰지 않는다. 이름 첫 글자로 만든다. */}
+          {/* NG-13 — Google 프로필 사진을 쓰지 않는다. 그 조항은 그대로다.
+              🔴 **W-21 P-7(결정 4)** — 이름 첫 글자 대신 **앱이 번들에 넣어 배포하는 정적 이미지**를
+              쓴다. 사용자에게서 사진을 받지 않으므로 §14.1 「프로필 사진을 수집하지 않습니다」와
+              어긋나지 않는다(보고서 §3 P-7의 처리방침 대조). */}
           <span className="s2-avatar" aria-hidden="true">
-            <span className="text-sheet font-bold text-white">{initial}</span>
+            <img src="/DSHS.png" alt="" className="h-full w-full object-cover" />
           </span>
 
           <div className="min-w-0 flex-1 pt-[3px]">
@@ -435,7 +472,13 @@ export default function Signup() {
             role="checkbox"
             aria-checked={agreed}
             aria-labelledby="s2-agree-label"
-            onClick={() => setAgreed((v) => !v)}
+            /* 체크하는 순간 안내가 사라진다 — 해소된 에러를 남겨 두지 않는다. */
+            onClick={() =>
+              setAgreed((v) => {
+                if (!v) setAgreeError(false)
+                return !v
+              })
+            }
             className="s2-cb"
           >
             <span className={cn('s2-cb-box', agreed && 's2-cb-on')}>
@@ -453,6 +496,14 @@ export default function Signup() {
             </button>
             {AGREE_TAIL}
           </p>
+        </div>
+
+        {/* 🔴 W-21 P-11 ② — 「가입 코드 에러와 같은 형태」가 요구다(사용자).
+            `Field`가 쓰는 `.ff-msgwrap`/`.ff-msg`를 그대로 재사용한다 — 새 표면을 만들지 않는다.
+            라이브 영역이 문구보다 먼저 존재해야 낭독되므로 노드는 **항상 마운트**한다
+            (`Field`와 같은 규율). 0fr→1fr 그리드라 닫힌 상태의 높이는 0이다. */}
+        <div role="alert" className={cn('ff-msgwrap', agreeError && 'ff-msgwrap-open')}>
+          <span className="ff-msg">{agreeError ? AGREE_REQUIRED : ''}</span>
         </div>
 
         <PrimaryButton

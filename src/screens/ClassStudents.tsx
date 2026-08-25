@@ -136,9 +136,17 @@ export default function ClassStudents() {
     tappingRef.current = false
   }
 
+  /* 🔴 **W-21 P-1 — `min-h-full`이 아니라 `h-full`이다.**
+     `min-height`로는 명부가 길어지는 순간 `main`이 함께 자라 「남는 높이」가 0이 되고,
+     `.list`의 `flex:1`이 아무것도 분배받지 못해 내부 스크롤이 서지 않는다(W-18 §6.2).
+     높이를 **확정**해야 `.list`가 남은 높이로 줄고 그 안에서 스크롤한다.
+     사슬의 윗단은 `.blur-in:has(> [data-screen='S5'])`가 잇는다(`index.css`). */
   return (
-    <main data-screen="S5" aria-labelledby="scr-s5" className="flex min-h-full flex-col">
-      {/* 🔴 §8.5.4 T-03 — `sticky` 헤더. 리스트에 자체 `overflow`를 걸지 않는다. */}
+    <main data-screen="S5" aria-labelledby="scr-s5" className="flex h-full flex-col">
+      {/* 🔴 §8.5.4 T-03 「헤더 고정, 리스트만 스크롤」 — **W-21 P-1에서 리스트 내부 스크롤로
+          바뀌었다.** W-11은 스크롤 주체가 `AppShell` 하나뿐이라 `sticky`로 같은 결과를 냈지만,
+          그 방식은 행이 유리 헤더 **뒤로 비쳐 지나가는** 것을 막지 못했다(사용자 보고).
+          이제 헤더는 흐름의 `flex:none`이고 행은 헤더 아래에서 잘린다 — design `1f` 원문 그대로다. */}
       <div className="s5-head">
         <div className="s5-headrow">
           <button

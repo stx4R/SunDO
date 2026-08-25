@@ -277,8 +277,10 @@ export default function Settings() {
             onClick={handleLockTap}
             aria-label={`${profile.name} · ${profile.email} · 변경할 수 없습니다`}
           >
+            {/* 🔴 W-21 P-7(결정 4) — 이름 첫 글자를 가입 계정 아바타로 바꿨다.
+                식별은 바로 옆 `.set-acct-name`·`.set-acct-mail`과 버튼의 `aria-label`이 맡는다. */}
             <span className="set-avatar" aria-hidden="true">
-              {profile.name.slice(0, 1)}
+              <img src="/DSHS.png" alt="" className="h-full w-full object-cover" />
             </span>
             <span className="set-acct-txt">
               <span className="set-acct-namerow">

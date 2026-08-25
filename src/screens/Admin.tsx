@@ -130,20 +130,6 @@ const ROLE_LABEL: Readonly<Record<string, string>> = {
 }
 
 /**
- * §8.8.3 #6 아바타 — 🔴 **역할 첫 글자다. 이름 첫 글자가 아니다.**
- * ⚠ `head`(부장)와 `member`(부원)가 같은 글자로 겹치지만 역할은 바로 아래 줄에
- * 텍스트로도 있어 정보가 사라지지 않는다(아바타는 `aria-hidden`이다 — §3.9).
- * ⚠ §9.3.1 NG-13 각주는 「아바타는 `name`의 첫 글자」라 적어 §8.8.3 #6과 어긋난다 —
- * design `9a`·`9c`·`9d`가 전부 역할 글자라 §8.8.3을 따랐다. 보고서 §7.
- */
-const ROLE_INITIAL: Readonly<Record<string, string>> = {
-  head: '부',
-  vice: '차',
-  member: '부',
-  teacher: '교',
-  dev: 'D',
-}
-
 /** §8.8.2 — ①은 부장·Dev만, ②는 부장·Dev·교사(교사는 읽기), ③은 차장 이상 전원. */
 const CAN_SEE_CODE = new Set(['head', 'dev'])
 /** 🔴 **차장은 ② 섹션 자체가 없다**(§8.8.2 표 그대로). */
@@ -563,8 +549,12 @@ function MemberSection({
               <li key={member.uid} className="mrow mrow-mem">
                 {/* 🔴 **역할 첫 글자**다(§8.8.3 #6). 역할은 아래 줄에 텍스트로도 있어
                     아바타는 장식이다 — `aria-hidden`(§3.9). */}
+                {/* 🔴 W-21 P-7(결정 4) — 역할 첫 글자를 **가입 계정 아바타**로 바꿨다.
+                    §8.8.3 #6의 「역할 첫 글자」와 §9.3.1 NG-13의 「이름 첫 글자」가 서로
+                    어긋나 st4R에 올라가 있던 항목인데, 결정 4가 **둘 다 덮었다**.
+                    역할은 바로 아래 `.mrow-sub` 텍스트가 그대로 전달한다. */}
                 <span className="mrow-av" aria-hidden="true">
-                  {ROLE_INITIAL[member.role] ?? '·'}
+                  <img src="/DSHS.png" alt="" className="h-full w-full object-cover" />
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="mrow-name">{member.name}</span>
