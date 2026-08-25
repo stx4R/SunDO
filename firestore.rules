@@ -73,6 +73,56 @@ service cloud.firestore {
               : data.reasonText == null);
     }
 
+    // §10.2 BR-07 — 🔴 **바꿀 수 있는 필드를 `hasOnly`로 못 박는다.**
+    //    `createdBy`·`createdAt`·`studentDocId`·`studentName`·`occurredAt`·`dateKey` 계열이
+    //    목록에 **없으므로** 한 글자도 바뀔 수 없다. 예전처럼 개별 등식 2개로 막으면
+    //    목록 밖 필드가 조용히 열린다 — BR-07은 「학생·일시·작성자는 **어떤 역할도**
+    //    변경할 수 없다」로 규정한다(RU-9·RU-10이 그 자리를 지킨다).
+    //
+    // ⚠ **`affectedKeys()`는 「값이 바뀐 키」다**(W-17 §4.6 · B-20). 같은 값을 다시 써도
+    //   여기에 걸리지 않는다 — 문서가 바뀌지 않았으므로 그것이 옳은 결과다.
+    function editsReasonOnly() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['reasonCode', 'reasonText', 'updatedBy', 'updatedAt'])
+        && validReason(request.resource.data)
+        // 🔴 이미 삭제된 기록의 사유는 고칠 수 없다(RU-19). `status`가 허용 키에 없으므로
+        //    이 조건은 「지금 active인가」만 본다 — 전이를 여는 것이 아니다.
+        && resource.data.status == 'active'
+        // §9.3.5 — 정정한 사람을 남긴다. 남의 uid로 적을 수 없다(RU-12).
+        && request.resource.data.updatedBy == request.auth.uid;
+    }
+
+    // BR-08 — 물리 삭제는 없다. 🔴 **`active → deleted` 한 방향만** 연다.
+    //
+    // 🔴 **되돌리기(`deleted → active`)를 열지 않았다**(RX-10). design `18`에도 §8.7에도
+    //    복구 UI가 없고, 여는 순간 「지운 것을 아무 흔적 없이 되살리는」 경로가 생긴다.
+    //    검증용 복구는 **콘솔**이 한다 — 절차는 `database_ToDo/W-21B.md` §5다.
+    //
+    // ⚠ `deleteReason`(§9.3.5 0~100자)을 허용 키에 넣지 않았다. 지금 그것을 쓰는 UI가
+    //   없고(MD-04에 입력란이 없다), 길이 검증 없이 키만 열면 임의 길이 문자열이 들어온다.
+    //   v1.1이 입력란을 만들 때 **키와 길이 조건을 함께** 연다.
+    function softDeletesRecord() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['status', 'deletedBy', 'deletedAt'])
+        && resource.data.status == 'active'
+        && request.resource.data.status == 'deleted'
+        && request.resource.data.deletedBy == request.auth.uid;
+    }
+
+    // 🔴 **W-21B 결정 4 — 「작성자 본인 · 차장 · 부장 · Dev」 넷이다.**
+    //
+    // ⚠ **PRD BR-05는 이것과 반대다** — 「작성자 본인은 수정·삭제할 수 **없다**」이고
+    //   BR-06은 권한을 `vice`·`head`·`dev`로 규정한다. 결정 4가 본인을 **더했다**.
+    //   §8.7.2 #7·§8.7.4 T-04·§8.10.5 S8 하단 문구도 함께 개정 대상이다(보고서 §8 ①).
+    //
+    // 🔴 **화면과 같은 문장이어야 한다.** `src/lib/records.ts`의 `canEditRecord()`가
+    //    이 함수의 사본이다 — 한쪽만 고치면 「눌렀는데 실패」나 「할 수 있는데 안 보임」이 된다
+    //    (W-17F 결함 1이 정확히 그 형태였다).
+    function canEditRecord() {
+      return isActive()
+        && (resource.data.createdBy == request.auth.uid || isVice());
+    }
+
     // ========================================================================
     //  users
     // ========================================================================
@@ -224,7 +274,24 @@ service cloud.firestore {
       //    배치 안의 연산 순서를 바꿔도 같다 — 순서가 없기 때문이다.
       //    ⇒ 「배치 안에서 자기 권한을 먼저 버리면 뒤 연산이 죽는다」는 걱정은
       //      이 스키마에서 성립하지 않는다. 그 사실에 기대고 있다는 것을 적어 둔다.
-      allow update: if isHead();
+      // 🔴 **W-21B 결정 5 — 필드로 가른다.**
+      //    같은 블록이 재발급(`activeInviteCodeId` · OP-10)과 양도(`headUid` · OP-11)를
+      //    둘 다 받는데 **권한이 다르다.** 넓은 쪽(`isHead()`)으로 두면 부장이 여전히
+      //    `activeInviteCodeId`를 바꿀 수 있어 결정 5의 통제가 **성립하지 않는다**(P-5).
+      //
+      // 🔬 가를 수 있는 근거 — 두 배치의 실제 페이로드가 정확히 두 형태다
+      //    (`src/lib/admin.ts` 재발급 `{activeInviteCodeId, updatedAt}` ·
+      //     양도 `{headUid, updatedAt}`). 겹치는 키는 `updatedAt` 하나뿐이다.
+      //
+      // 🔴 **두 필드를 한 번에 바꾸는 요청은 양쪽 `hasOnly`가 다 깨져 거부된다**(P-6·P-7).
+      //    「dev면 다 된다」로 뭉치지 않은 이유가 그것이다 — 우회로를 남기지 않는다.
+      allow update: if
+           (isDev()
+            && request.resource.data.diff(resource.data).affectedKeys()
+                 .hasOnly(['activeInviteCodeId', 'updatedAt']))
+        || (isHead()
+            && request.resource.data.diff(resource.data).affectedKeys()
+                 .hasOnly(['headUid', 'updatedAt']));
       allow delete: if false;
 
       // ----------------------------------------------------------------
@@ -248,8 +315,27 @@ service cloud.firestore {
 
         // 🔴 `data.code == codeId`를 강제한다(W-08 §2-1). 어긋나면 S2의 코드 조회가
         //    문서를 찾고도 값이 달라 판정이 무너진다.
-        allow create: if isHead() && request.resource.data.code == codeId;
-        allow update: if isHead() && request.resource.data.code == codeId;
+        //
+        // 🔴 **W-21B 결정 5 — 발급은 `dev`만이다.** 부장은 **복사만** 한다.
+        //    ⚠ **Dev가 없으면 아무도 가입 코드를 발급할 수 없다.** 사용자가 의도한
+        //      통제이고, 유일한 우회는 콘솔에서 문서를 직접 만드는 것이다
+        //      (`database_ToDo/W-21B.md` §4에 절차가 있다).
+        allow create: if isDev() && request.resource.data.code == codeId;
+
+        // 🔴 **`update`를 통째로 `isDev()`로 좁히면 부장의 가입 승인이 죽는다.**
+        //    승인 배치(OP-09)가 **같은 규칙으로** `useCount`를 +1 하기 때문이다
+        //    (`src/lib/admin.ts` `approveRequest` · 배치 테스트 B-1).
+        //    지시서 §3.4는 「create/update → `isDev()`」였으나 그대로 쓰면 승인이 막힌다.
+        //    → **필드로 갈랐다.** 만료 처리(BR-12 `isActive`·`revokedAt`)는 `dev`,
+        //      승인의 `useCount`만 `head`에게 남는다.
+        //
+        // 🔴 C-10이 급소를 지킨다 — 부장이 `useCount`와 `isActive`를 **함께** 써서
+        //    승인 문으로 만료를 끼워 넣는 경로. `hasOnly`가 그것을 막는다.
+        allow update: if request.resource.data.code == codeId
+          && (isDev()
+              || (isHead()
+                  && request.resource.data.diff(resource.data).affectedKeys()
+                       .hasOnly(['useCount'])));
         allow delete: if false;
       }
     }
@@ -274,13 +360,22 @@ service cloud.firestore {
         && request.resource.data.occurredAt <= request.time + duration.value(5, 'm')
         && validReason(request.resource.data);
 
-      // v1.1 사유 변경(BR-07b). 작성자·작성 시각은 불변이다.
-      allow update: if isVice()
-        && validReason(request.resource.data)
-        && request.resource.data.createdBy == resource.data.createdBy
-        && request.resource.data.createdAt == resource.data.createdAt;
+      // 🔴 **W-21B 기능 9 — 사유 변경(BR-07b)과 소프트 삭제(BR-08)가 여기로 온다.**
+      //    §17.1은 「기록 수정·삭제」를 MVP 제외로 규정했으나 결정 4가 v1.0.0으로 끌어올렸다.
+      //
+      // 🔴 **두 전이는 서로 배타적이다.** 사유 변경은 `status`를 건드릴 수 없고
+      //    (RU-11), 삭제는 `reasonCode`를 건드릴 수 없다(RX-8). 한 요청이 둘을
+      //    겸하면 양쪽 `hasOnly`가 모두 깨져 거부된다 — 그것이 의도다.
+      //
+      // 🔴 **BR-09(감사 로그 없이는 수정·삭제도 실패)를 규칙이 보장하지 않는다.**
+      //    규칙은 형제 연산을 볼 수 없다(Q-2). 보장하는 것은 **배치의 원자성**이고
+      //    (Q-3 — 한 연산이 걸리면 0/2), 배치를 만드는 것은 `src/lib/records.ts`다.
+      //    B-24가 「위조된 로그 하나로 정상 수정까지 죽는」 것을 잠근다.
+      allow update: if canEditRecord()
+        && (editsReasonOnly() || softDeletesRecord());
 
       // BR-08 — 물리 삭제는 없다. 삭제는 `status: 'deleted'` 전이(update)다.
+      // 🔴 `dev`도 예외가 아니다(RD-2). §14.3 파기 시점까지 문서는 보존된다.
       allow delete: if false;
     }
 

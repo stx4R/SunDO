@@ -97,11 +97,15 @@ export async function run() {
     return b.commit()
   })
 
-  describe('🔴 배치 조합 — 재발급 4연산 (W-15A §4.5)')
+  describe('🔴 배치 조합 — 재발급 4연산 (W-15A §4.5 · 🔴 W-21B 결정 5로 뒤집힘)')
   await seed()
-  await check('B-3', 'pass', '`head`의 재발급 배치 4연산 통째로', () => reissueBatch(as(UIDS.head), UIDS.head))
+  await check('B-3', 'deny', '🔴 **`head`의 재발급 배치 4연산** — 세 연산이 걸려 전체 거부(뒤집힘)', () =>
+    reissueBatch(as(UIDS.head), UIDS.head))
   await seed()
   await check('B-3b', 'deny', '`vice`의 재발급 배치', () => reissueBatch(as(UIDS.vice), UIDS.vice))
+  await seed()
+  await check('B-3c', 'pass', '🔴 **`dev`의 재발급 배치 4연산** — 유일하게 남은 발급 경로', () =>
+    reissueBatch(as(UIDS.dev), UIDS.dev))
 
   describe('🔴 배치 조합 — 양도 (W-15B §3.5)')
   await seed()
@@ -273,6 +277,113 @@ export async function run() {
       targetType: 'users', targetId: UIDS.member,
       before: { status: 'active' }, after: { status: 'withdrawn' }, createdAt: now,
     })
+    return b.commit()
+  })
+
+  /* ==========================================================================
+     🔴 W-21B 기능 9 — S7 사유 변경 · 소프트 삭제 **2연산**
+
+     BR-09가 「감사 로그 생성 실패 시 수정·삭제도 실패 처리한다」로 규정한다.
+     🔴 그것을 코드가 아니라 **배치의 원자성**(Q-3 실측)이 보장한다 — 한 연산이라도
+        거부되면 남은 문서가 0/2다.
+
+     🔴 `src/lib/records.ts`의 `updateRecordReason`·`deleteRecord`와 **같은 필드 집합**이다.
+        한 글자라도 다르면 이 테스트가 코드를 검증하지 못한다(파일 머리글 규율).
+
+     🔴 **`before`/`after`에 학생 이름·학번을 담지 않는다**(W-18 §2.1① · §14.3과 양립).
+        누구의 기록인지는 `targetId`(= recordId)로 역추적한다.
+     ========================================================================*/
+  describe('🔴 배치 조합 — S7 사유 변경 2연산 (W-21B · BR-07b · BR-09)')
+
+  function reasonEditBatch(db, actor, actorRole, { recordId = 'rec-seed', over = {}, logOver = {} } = {}) {
+    const b = writeBatch(db)
+    const now = serverTimestamp()
+    b.update(doc(db, 'records', recordId), {
+      reasonCode: 'SLIPPER', reasonText: null, updatedBy: actor, updatedAt: now, ...over,
+    })
+    b.set(doc(db, 'auditLogs', 'log-recedit'), {
+      actorUid: actor, actorName: '행위자', actorRole, action: 'RECORD_UPDATE',
+      targetType: 'records', targetId: recordId,
+      before: { reasonCode: 'DRESS', reasonText: null },
+      after: { reasonCode: 'SLIPPER', reasonText: null },
+      createdAt: now, ...logOver,
+    })
+    return b.commit()
+  }
+
+  await seed()
+  await check('B-21', 'pass', '🔴 **작성자 본인(`member`)의 사유 변경 2연산** — 결정 4가 연 경로', () =>
+    reasonEditBatch(as(UIDS.member), UIDS.member, 'member'))
+  await seed()
+  await check('B-22', 'pass', '`vice`의 사유 변경 2연산 (비작성자 권한자)', () =>
+    reasonEditBatch(as(UIDS.vice), UIDS.vice, 'vice'))
+  await seed()
+  await put('records/rec-other', recordPayload({ createdBy: UIDS.vice }))
+  await check('B-23', 'deny', '🔴 **비작성자 `member`** — `records` 연산이 걸려 전체 거부', () =>
+    reasonEditBatch(as(UIDS.member), UIDS.member, 'member', { recordId: 'rec-other' }))
+  await seed()
+  await check('B-24', 'deny', '🔴 정상 사유 변경 + **위조된 감사 로그** — 로그가 걸려 전체 거부(BR-09)', () =>
+    reasonEditBatch(as(UIDS.vice), UIDS.vice, 'vice', { logOver: { actorUid: UIDS.head } }))
+  await seed()
+  await check('B-25', 'deny', '🔴 잘못된 사유(`ETC` + `reasonText` 없음) + 정상 로그 — 전체 거부', () =>
+    reasonEditBatch(as(UIDS.vice), UIDS.vice, 'vice', { over: { reasonCode: 'ETC' } }))
+
+  describe('🔴 배치 조합 — S7 소프트 삭제 2연산 (W-21B · BR-08 · BR-09)')
+
+  function deleteBatch(db, actor, actorRole, { recordId = 'rec-seed', over = {} } = {}) {
+    const b = writeBatch(db)
+    const now = serverTimestamp()
+    b.update(doc(db, 'records', recordId), {
+      status: 'deleted', deletedBy: actor, deletedAt: now, ...over,
+    })
+    b.set(doc(db, 'auditLogs', 'log-recdel'), {
+      actorUid: actor, actorName: '행위자', actorRole, action: 'RECORD_DELETE',
+      targetType: 'records', targetId: recordId,
+      before: { status: 'active', reasonCode: 'DRESS' }, after: { status: 'deleted' },
+      createdAt: now,
+    })
+    return b.commit()
+  }
+
+  await seed()
+  await check('B-26', 'pass', '🔴 **작성자 본인(`member`)의 소프트 삭제 2연산**', () =>
+    deleteBatch(as(UIDS.member), UIDS.member, 'member'))
+  await seed()
+  await check('B-27', 'pass', '`head`의 소프트 삭제 2연산', () =>
+    deleteBatch(as(UIDS.head), UIDS.head, 'head'))
+  await seed()
+  await check('B-28', 'deny', '`teacher`의 소프트 삭제 2연산', () =>
+    deleteBatch(as(UIDS.teacher), UIDS.teacher, 'teacher'))
+  await seed()
+  await put('records/rec-other', recordPayload({ createdBy: UIDS.vice }))
+  await check('B-29', 'deny', '🔴 **비작성자 `member`**의 소프트 삭제 2연산', () =>
+    deleteBatch(as(UIDS.member), UIDS.member, 'member', { recordId: 'rec-other' }))
+
+  /**
+   * 🔴 **`recordCount` 감소를 넣으면 배치가 죽는다** — B-17과 같은 형태의 증명이다.
+   *
+   * 감소 대상은 `resource.data.createdBy`의 `users` 문서인데, **삭제자가 작성자가
+   * 아닐 수 있다**(차장이 부원 기록을 지운다). 그러면 `selfSync()`의 「본인 문서만」에
+   * 걸리고, `isHead()` 경로로 가려면 차장에게는 그 권한이 아예 없다.
+   * ⇒ 감소를 규칙으로 표현하려면 **「남의 카운터를 바꾸는」 새 문**을 열어야 한다.
+   *    그것이 W-16 §7의 v1.1 예약을 이 회차가 **닫지 않기로 한 근거**다(보고서 §6).
+   */
+  await seed()
+  await check('B-30', 'deny', '🔴 **`vice`가 삭제하면서 작성자의 `recordCount`를 −1** (전체 거부 — 판단 근거)', () => {
+    const db = as(UIDS.vice)
+    const b = writeBatch(db)
+    const now = serverTimestamp()
+    b.update(doc(db, 'records', 'rec-seed'), { status: 'deleted', deletedBy: UIDS.vice, deletedAt: now })
+    b.update(doc(db, 'users', UIDS.member), { recordCount: increment(-1), updatedAt: now })
+    return b.commit()
+  })
+  await seed()
+  await check('B-31', 'deny', '🔴 **작성자 본인**이 삭제하면서 자기 `recordCount`를 −1 (RC-3이 막는다)', () => {
+    const db = as(UIDS.member)
+    const b = writeBatch(db)
+    const now = serverTimestamp()
+    b.update(doc(db, 'records', 'rec-seed'), { status: 'deleted', deletedBy: UIDS.member, deletedAt: now })
+    b.update(doc(db, 'users', UIDS.member), { recordCount: increment(-1), updatedAt: now })
     return b.commit()
   })
 }

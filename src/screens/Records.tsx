@@ -1,17 +1,28 @@
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { ScrollRootContext } from '../components/AppShell'
 import { CenterNotice } from '../components/CenterNotice'
+import { ConfirmModal } from '../components/ConfirmModal'
 import { FilterEmptyIcon, LoadErrorIcon, RecordsEmptyIcon } from '../components/icons'
 import { NeuButton } from '../components/NeuButton'
+import { RecordActionSheet } from '../components/RecordActionSheet'
+import { ReasonEditSheet } from '../components/ReasonEditSheet'
+import { useToast } from '../components/Toast'
+import { useAuth } from '../contexts/AuthProvider'
+import { cn } from '../lib/cn'
 import { formatDateKeyLabel, formatTimeKst, toDateKey, toMonthKey, toWeekKey } from '../lib/dateKeys'
 import {
+  canEditRecord,
   clearRecordsCache,
+  deleteRecord,
   fetchRecordCounts,
   fetchRecordPage,
   fetchWithdrawnAuthors,
   retryPendingWrites,
   subscribeRecords,
+  updateRecordReason,
   watchPendingCount,
+  type ReasonCode,
+  type RecordActor,
   type RecordCountsResult,
   type RecordCursor,
   type RecordFilter,
@@ -33,8 +44,9 @@ import { usePullToRefresh } from '../lib/usePullToRefresh'
  * 🔴 **목록에 `overflow-y`를 붙이지 마라.** 스크롤 소유자는 `AppShell` 하나다.
  * 무한 스크롤의 `IntersectionObserver` `root`는 `ScrollRootContext`가 주는 그 노드다.
  *
- * 🔴 **이 화면은 v1.1의 수정·삭제를 만들지 않는다.** 롱프레스는 **전 역할에서
- * 아무 동작도 하지 않는다** — 차장 이상 분기를 미리 심지 마라(지시서 §0.4).
+ * 🔴 **W-21B 기능 9 — 롱프레스 액션이 여기서 생겼다**(§8.7.4 T-04~T-06).
+ * 권한은 `records.ts`의 `canEditRecord()` **하나**가 판정하고 그것은
+ * `firestore.rules`의 같은 이름 함수와 같은 문장이다. 여기에 역할 분기를 또 쓰지 마라.
  */
 
 /* §8.7.2 · §8.10 — 확정 문안이다. 새로 짓지 마라. */
@@ -78,6 +90,28 @@ const TAG: Readonly<Record<RecordRow['reasonCode'], { cls: string; label: string
   /* 🔴 `기타` 태그 라벨은 **`기타` 한 단어**다. 기입 내용을 태그에 넣지 않는다. */
   ETC: { cls: 'tage', label: '기타' },
 }
+
+/** §8.10.1 TS-03 · TS-04 · §8.10.4 MD-04 — W-21B 기능 9. */
+const TS_03 = '기록이 삭제되었습니다'
+const TS_04 = '사유가 변경되었습니다'
+const MD_04 = {
+  title: '기록 삭제',
+  body: '이 기록을 삭제할까요? 삭제 이력은 관리자에게 남습니다.',
+  confirm: '삭제',
+}
+/** §8.10.3에 수정·삭제 실패 코드가 없다. ER-07(저장 실패)을 그대로 쓴다. */
+const ER_07 = '저장에 실패했습니다. 다시 시도해 주세요'
+
+/** §8.7.4 T-04 — 「행 롱프레스 **0.5초**」. 규격이 값을 고정한다. */
+const LONG_PRESS_MS = 500
+/**
+ * 롱프레스를 취소하는 이동 거리(px).
+ *
+ * **규격에도 design에도 없는 신규 값이다**(보고서 §7). 없으면 목록을 스크롤하려고
+ * 손가락을 올린 0.5초가 그대로 액션 시트가 된다. 탭 판정의 관용 오차(보통 8~10px)와
+ * 같은 자리라 10px로 잡았다.
+ */
+const LONG_PRESS_MOVE_PX = 10
 
 /** §8.7.5 로딩 — 목록 5행 스켈레톤(design `6b`). */
 const SKELETON_ROWS = 5
@@ -133,6 +167,8 @@ function formatCount(n: number): string {
 
 export default function Records() {
   const online = useOnline()
+  const toast = useToast()
+  const { profile } = useAuth()
   /* 🔴 무한 스크롤의 `root`. `AppShell`이 노드만 노출한다(W-10 §5-1) — 화면이
      DOM을 거슬러 올라가 `overflow-y` 조상을 찾을 필요가 없다(보고서 §4-2). */
   const scrollRoot = useContext(ScrollRootContext)
@@ -178,6 +214,18 @@ export default function Records() {
   const [pagesLoaded, setPagesLoaded] = useState(0)
   /** ST-04 — 실시간 수신분. 서버 값(CountUp의 target)을 흔들지 않고 위에 더한다. */
   const [delta, setDelta] = useState({ today: 0, week: 0, month: 0 })
+
+  /* ── W-21B 기능 9 — 액션 시트 · 사유 변경 · 삭제 ─────────────────────── */
+  /** 🔴 닫힘 0.38s 동안 내용이 남아야 하므로 **시트를 닫을 때 비우지 않는다**. */
+  const [target, setTarget] = useState<RecordRow | null>(null)
+  const [actionOpen, setActionOpen] = useState(false)
+  const [editOpen, setEditOpen] = useState(false)
+  /** 열 때마다 올려 `ReasonEditSheet`를 새로 마운트한다 — 초기화가 한 곳에 모인다. */
+  const [editKey, setEditKey] = useState(0)
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
+  /* 🔴 상태가 아니라 ref다. `busy`는 같은 태스크의 연타를 막지 못한다(W-06 §5-4). */
+  const busyRef = useRef(false)
 
   const titleRef = useRef<HTMLHeadingElement>(null)
   /* 🔴 §3.7-4 — 첫 페이지의 마지막 문서에 **고정**한다. 새 기록이 밀고 들어와도
@@ -401,6 +449,135 @@ export default function Records() {
 
   usePullToRefresh(refresh)
 
+  /* ── W-21B 기능 9 — §8.7.4 T-04~T-06 ──────────────────────────────────── */
+
+  /**
+   * 🔴 **`records.ts`의 `canEditRecord()`가 유일한 판정자다.** 그 함수는
+   * `firestore.rules`의 같은 이름 함수와 같은 문장이고, 여기에 역할 조건을 또 쓰면
+   * 두 곳이 갈린다(W-17F 결함 1).
+   */
+  const actor = useMemo<RecordActor | null>(
+    () =>
+      profile
+        ? { uid: profile.uid, name: profile.name, role: profile.role, status: profile.status }
+        : null,
+    [profile],
+  )
+
+  /** 시트 전환 중 「다음에 무엇을 열 것인가」. 액션 시트가 닫힌 **뒤에** 연다. */
+  const nextActionRef = useRef<'edit' | 'delete' | null>(null)
+
+  /**
+   * 🔴 병합 Map은 **합집합**이라 스스로 줄어들지 않는다(§3.7-3). 소프트 삭제된 문서는
+   * 구독 질의(`status == 'active'`)에서 빠질 뿐이므로 목록에서 빼는 것은 여기 몫이다.
+   * `seenRef`에서도 빼야 같은 id가 다시 들어올 때 ST-04가 「신규」로 센다.
+   */
+  const dropRow = useCallback((id: string) => {
+    seenRef.current.delete(id)
+    setRows((prev) => {
+      const next = new Map(prev)
+      next.delete(id)
+      return next
+    })
+  }, [])
+
+  const openActions = useCallback(
+    (row: RecordRow) => {
+      /* 🔴 **오프라인에서는 열지 않는다.** §8.7.5가 오프라인 S7을 「캐시 목록」으로
+         규정하고 쓰기 경로가 없다. 무반응은 §8.7.2 #7의 「부원은 롱프레스 무반응」과
+         같은 처리다 — §8.10에 「오프라인에서는 수정할 수 없습니다」 문구가 없어
+         없는 문구를 지어내지 않았다(보고서 §6). */
+      if (!online) return
+      if (!canEditRecord(actor, row)) return
+      if (actionOpen || editOpen || confirmOpen) return
+      setTarget(row)
+      setActionOpen(true)
+    },
+    [online, actor, actionOpen, editOpen, confirmOpen],
+  )
+
+  /**
+   * 🔴 **액션 시트를 먼저 닫고, 닫힘이 끝난 뒤에 다음 시트를 연다.**
+   * `BottomSheet`는 열릴 때 히스토리 엔트리를 하나 쌓는다(N-02). 둘을 겹쳐 띄우면
+   * 엔트리 두 개가 쌓여 뒤로가기가 한 번 헛돈다.
+   */
+  const handleActionClosed = () => {
+    const next = nextActionRef.current
+    nextActionRef.current = null
+    if (next === 'edit') {
+      setEditKey((n) => n + 1)
+      setEditOpen(true)
+    } else if (next === 'delete') {
+      setConfirmOpen(true)
+    } else {
+      /* 그냥 닫혔다 — 이제 비워도 내용이 사라지는 것이 보이지 않는다. */
+      setTarget(null)
+    }
+  }
+
+  /** T-06 — 사유 변경 저장. 실패는 시트를 유지하지 않고 토스트로 알린다(ER-07). */
+  const handleReasonSave = (reasonCode: ReasonCode, reasonText: string | null) => {
+    if (!actor || !target || busyRef.current) return
+    busyRef.current = true
+    setBusy(true)
+    const row = target
+    void (async () => {
+      const result = await updateRecordReason(actor, row, reasonCode, reasonText)
+      busyRef.current = false
+      setBusy(false)
+      if (!result.ok) {
+        toast(ER_07)
+        return
+      }
+      /* 🔴 구독이 갱신본을 다시 실어 오지만, **현재 필터가 새 사유와 다르면 질의에서
+         빠져** 합집합 Map에 옛 값이 그대로 남는다. 그 경우에는 행을 뺀다. */
+      if (filter !== 'ALL' && filter !== reasonCode) {
+        dropRow(row.id)
+      } else {
+        setRows((prev) => {
+          const cur = prev.get(row.id)
+          if (!cur) return prev
+          const next = new Map(prev)
+          next.set(row.id, { ...cur, reasonCode, reasonText })
+          return next
+        })
+      }
+      setEditOpen(false)
+      toast(TS_04)
+    })()
+  }
+
+  /** T-05 — MD-04 확인 뒤 소프트 삭제. 목록 제거 + 카운터 감소 + TS-03. */
+  const handleDelete = () => {
+    if (!actor || !target || busyRef.current) return
+    busyRef.current = true
+    setBusy(true)
+    const row = target
+    void (async () => {
+      const result = await deleteRecord(actor, row)
+      busyRef.current = false
+      setBusy(false)
+      if (!result.ok) {
+        toast(ER_07)
+        return
+      }
+      dropRow(row.id)
+      /* T-05 「카운터 감소」 — 🔴 **ST-04의 증가와 정확히 대칭이다.** 서버 값
+         (CountUp의 target)을 흔들지 않고 `delta`에서 뺀다. 키가 일치하는 카운터만이다. */
+      const todayKey = toDateKey(now)
+      const weekKey = toWeekKey(now)
+      const monthKey = toMonthKey(now)
+      setDelta((prev) => ({
+        today: prev.today - (row.dateKey === todayKey ? 1 : 0),
+        week: prev.week - (row.weekKey === weekKey ? 1 : 0),
+        month: prev.month - (row.monthKey === monthKey ? 1 : 0),
+      }))
+      setConfirmOpen(false)
+      setTarget(null)
+      toast(TS_03)
+    })()
+  }
+
   /**
    * BR-41 — 두 근거의 **최댓값**. 합이 아니다: 같은 쓰기를 둘 다 보는 것이 정상이라
    * 더하면 두 배로 센다.
@@ -606,6 +783,11 @@ export default function Records() {
                     row={row}
                     withdrawn={withdrawn.has(row.createdBy)}
                     rising={risingIds.has(row.id)}
+                    /* 🔴 오프라인이면 권한이 있어도 롱프레스를 걸지 않는다 —
+                       `openActions`와 같은 판정을 여기서도 해야 `user-select` 잠금이
+                       열리지 않는다(누를 수 없는 행에 선택 금지를 걸지 않는다). */
+                    pressable={online && canEditRecord(actor, row)}
+                    onLongPress={openActions}
                   />
                 ))}
               </ul>
@@ -624,6 +806,48 @@ export default function Records() {
           </div>
         </div>
       )}
+
+      {/* ── W-21B 기능 9 — T-04 액션 시트 → T-05 삭제 / T-06 사유 변경 ── */}
+      <RecordActionSheet
+        open={actionOpen}
+        onClose={() => setActionOpen(false)}
+        onClosed={handleActionClosed}
+        row={target}
+        onEdit={() => {
+          nextActionRef.current = 'edit'
+          setActionOpen(false)
+        }}
+        onDelete={() => {
+          nextActionRef.current = 'delete'
+          setActionOpen(false)
+        }}
+      />
+
+      {/* 🔴 `key`가 마운트를 가른다 — 사유·기입값 초기화가 한 곳에 모인다(§3.5). */}
+      <ReasonEditSheet
+        key={editKey}
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+        onClosed={() => setTarget(null)}
+        row={target}
+        saving={busy}
+        onSave={handleReasonSave}
+      />
+
+      {/* §8.10.4 MD-04 — 좌 버튼은 항상 `취소`이고 `ConfirmModal`이 소유한다. */}
+      <ConfirmModal
+        open={confirmOpen}
+        title={MD_04.title}
+        body={MD_04.body}
+        confirmLabel={MD_04.confirm}
+        destructive
+        loading={busy}
+        onConfirm={handleDelete}
+        onCancel={() => {
+          setConfirmOpen(false)
+          setTarget(null)
+        }}
+      />
     </main>
   )
 }
@@ -676,17 +900,88 @@ function StatCard({
 /**
  * §8.7.2 #7 — 기록 행. design `20f` 원문.
  *
- * 🔴 **롱프레스 핸들러가 없다.** v1.1의 액션 시트가 붙을 자리이지만 지금은
- * 전 역할에서 아무 동작도 하지 않는다(지시서 §0.4). 역할 분기를 미리 심지 마라.
+ * 🔴 **W-21B — 롱프레스 0.5초가 여기서 붙었다**(§8.7.4 T-04).
+ *
+ * `pressable`이 거짓이면 타이머를 아예 걸지 않는다 — 권한 없는 행은 **무반응**이고
+ * 그것이 §8.7.2 #7 「부원은 롱프레스 무반응」의 형태다.
+ *
+ * ⚠ **키보드 진입 경로가 없다.** §8.7.4 T-04가 롱프레스만 규정하고 design `18`에도
+ *   다른 진입점이 없어 만들지 않았다 — 보고서 §8에 st4R로 올렸다.
+ *
+ * 🔬 **`pointercancel`이 스크롤 취소를 맡는다.** iOS는 스크롤이 시작되면 포인터를
+ *   취소하므로 타이머가 그때 풀린다. 그래도 `pointermove` 임계값을 함께 둔 이유는
+ *   데스크톱 마우스가 드래그해도 `pointercancel`을 쏘지 않기 때문이다.
  */
-function Row({ row, withdrawn, rising }: { row: RecordRow; withdrawn: boolean; rising: boolean }) {
+function Row({
+  row,
+  withdrawn,
+  rising,
+  pressable,
+  onLongPress,
+}: {
+  row: RecordRow
+  withdrawn: boolean
+  rising: boolean
+  pressable: boolean
+  onLongPress: (row: RecordRow) => void
+}) {
+  const timerRef = useRef<number | null>(null)
+  const startRef = useRef<{ x: number; y: number } | null>(null)
+
+  const cancelPress = useCallback(() => {
+    if (timerRef.current !== null) {
+      window.clearTimeout(timerRef.current)
+      timerRef.current = null
+    }
+    startRef.current = null
+  }, [])
+
+  /* 언마운트(필터 변경·삭제)에도 타이머가 남지 않게 한다. */
+  useEffect(() => cancelPress, [cancelPress])
+
+  const handleDown = (event: React.PointerEvent<HTMLLIElement>) => {
+    if (!pressable) return
+    /* 마우스는 주 버튼만 — 보조 버튼은 `contextmenu`가 받는다. */
+    if (event.pointerType === 'mouse' && event.button !== 0) return
+    cancelPress()
+    startRef.current = { x: event.clientX, y: event.clientY }
+    timerRef.current = window.setTimeout(() => {
+      timerRef.current = null
+      startRef.current = null
+      onLongPress(row)
+    }, LONG_PRESS_MS)
+  }
+
+  const handleMove = (event: React.PointerEvent<HTMLLIElement>) => {
+    const start = startRef.current
+    if (!start) return
+    if (
+      Math.abs(event.clientX - start.x) > LONG_PRESS_MOVE_PX ||
+      Math.abs(event.clientY - start.y) > LONG_PRESS_MOVE_PX
+    ) {
+      cancelPress()
+    }
+  }
+
   const tag = TAG[row.reasonCode]
   const author = `작성 ${row.createdByName}`
   /* AC-14 · §15.3 — 취소선만으로 구분하지 않는다. */
   const authorLabel = withdrawn ? author + WITHDRAWN_SUFFIX : undefined
   const authorClass = withdrawn ? 'rby rby-out' : 'rby'
   return (
-    <li className={rising ? 'rrow rrow-new' : 'rrow'}>
+    <li
+      className={cn('rrow', rising && 'rrow-new', pressable && 'rrow-press')}
+      onPointerDown={handleDown}
+      onPointerMove={handleMove}
+      onPointerUp={cancelPress}
+      onPointerCancel={cancelPress}
+      onPointerLeave={cancelPress}
+      /* 🔴 iOS는 롱프레스에 선택 핸들·콜아웃을 띄운다. 시트와 겹치면 둘 다 못 쓴다.
+         데스크톱의 우클릭도 같은 이벤트라 여기서 함께 막힌다. */
+      onContextMenu={(event) => {
+        if (pressable) event.preventDefault()
+      }}
+    >
       <div className="min-w-0 flex-1">
         <p className="rname">
           {row.studentName} <span className="rid">{row.studentNo}</span>

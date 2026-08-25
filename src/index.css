@@ -3863,6 +3863,128 @@
       transform: translateX(2px);
     }
   }
+
+  /* ======================================================================
+     S7 기록 액션 · 사유 변경 (W-21B 기능 9) — design `18b`·`18c`·`18d`
+
+     🔴 여백을 눈으로 맞추지 마라(W-17F). 아래 값은 전부 시안 원문이다.
+     ==================================================================== */
+
+  /* `18b` 원문 — S6의 `.rs-card`와 같은 규격이되 `margin-top`이 다르다.
+     시트에 제목이 없어 그랩 핸들(margin-bottom 18px) 바로 아래가 카드다. */
+  .rae-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 13px 16px;
+    border-radius: var(--radius-15);
+    background: var(--color-sundo-tint-08);
+  }
+
+  /* `18c`·`18d`는 제목(`사유 변경`) 아래에 오므로 16px 띄운다(시안 원문).
+     🔴 `.sheet-title ~`으로 잡지 않는다 — 형제 선택자는 시트 구조가 바뀌면
+     조용히 안 맞는다. 호출부가 명시적으로 붙인다. */
+  .rae-card-gap {
+    margin-top: 16px;
+  }
+
+  /* 1줄째 — 이름(15/700) + 학번(12/500 tabular). `18b` 원문 `gap:7px`. */
+  .rae-sum-top {
+    display: flex;
+    align-items: baseline;
+    gap: 7px;
+    font-size: var(--text-body);
+    font-weight: 700;
+    color: var(--color-sundo-900);
+  }
+
+  .rae-sum-no {
+    font-size: var(--text-label);
+    font-weight: 500;
+    color: var(--color-sundo-ink-70);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* 2줄째 — 🔴 **1줄 말줄임**이다. `18b` 원문 `white-space:nowrap;overflow:hidden;
+     text-overflow:ellipsis`. `기타` 기입 문구가 길어도 카드가 늘어나지 않는다. */
+  .rae-sum-bot {
+    display: block;
+    margin-top: 2px;
+    font-size: var(--text-label);
+    font-weight: 500;
+    color: var(--color-sundo-ink-70);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* `18b` 원문 `margin-top:16px`. 두 항목 사이 구분선은 항목이 갖는다. */
+  .rae-menu {
+    margin-top: 16px;
+  }
+
+  /* 🔴 높이 56px은 시안 원문이고 AC-05(최소 44px)를 이미 넘는다.
+     `min-height`로 두어 루트 32px에서 라벨이 넘치지 않게 한다 —
+     `.gbtn`의 고정 54px이 정확히 그 자리에서 문제가 됐다(W-21 §6 ⑧). */
+  .rae-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    min-height: 56px;
+    padding: 0 4px;
+    border-bottom: 1px solid var(--color-sundo-divider);
+    text-align: left;
+  }
+
+  .rae-item:last-child {
+    border-bottom: none;
+  }
+
+  .rae-item-label {
+    font-size: var(--text-body);
+    font-weight: 500;
+    color: var(--color-sundo-900);
+  }
+
+  /* AC-03 — 색만으로 구분하지 않는다. 라벨(`기록 삭제`)이 이미 위험을 말하고
+     아이콘도 휴지통이다. 색은 세 번째 신호다. */
+  .rae-item-danger .rae-item-label {
+    color: var(--color-sundo-danger);
+  }
+
+  /* `18b` 원문 `margin-top:12px;height:50px;border-radius:15px` + 유리 표면.
+     🔴 확인 모달의 좌 버튼(`취소`)과 **다른 요소**다 — 그쪽은 `ConfirmModal`이 갖는다. */
+  .rae-cancel {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    margin-top: 12px;
+    min-height: 50px;
+    border-radius: var(--radius-15);
+    background: var(--color-sundo-glass);
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    box-shadow: 0 4px 12px rgba(20, 53, 38, 0.06);
+    font-size: var(--text-button);
+    font-weight: 700;
+    color: var(--color-sundo-ink-70);
+    transition: transform 0.15s;
+  }
+
+  .rae-cancel:active {
+    transform: scale(0.97);
+  }
+
+  /* 🔴 §8.7.4 T-04 롱프레스가 걸린 행. iOS는 길게 누르면 선택 핸들과 콜아웃을
+     띄우는데, 시트와 겹치면 둘 다 못 쓰게 된다. **권한이 있는 행에만** 건다 —
+     누를 수 없는 행의 텍스트 선택까지 막을 이유가 없다.
+     ⚠ `touch-action`은 건드리지 않는다. 목록 스크롤이 죽는다. */
+  .rrow-press {
+    -webkit-touch-callout: none;
+    user-select: none;
+  }
 }
 
 /* design/index.html 원문 그대로 — 수정 금지 */

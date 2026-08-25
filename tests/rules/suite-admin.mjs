@@ -60,14 +60,29 @@ export async function run() {
   await check('A-9', 'deny', '신청 문서 삭제', () =>
     deleteDoc(doc(as(UIDS.head), 'approvalRequests', 'req-1')))
 
-  describe('inviteCodes — W-15A §4.3 · W-08 §2-1 (🔴 get ↔ list 분리)')
+  /* ==========================================================================
+     inviteCodes — W-15A §4.3 · W-08 §2-1 + 🔴 **W-21B 기능 12(결정 5)**
+
+     🔴 **세 케이스가 이 회차에 뒤집혔다** — C-1 · C-3 · (배치 B-3).
+        발급·만료는 이제 `dev`만이다. 부장은 **복사만** 한다.
+
+     🔴 **`update`를 통째로 `isDev()`로 좁히면 부장의 가입 승인이 죽는다.**
+        승인 배치(OP-09)가 같은 규칙으로 `useCount`를 +1 하기 때문이다
+        (`src/lib/admin.ts` `approveRequest` · 배치 테스트 B-1).
+        그래서 **필드로 갈랐다** — `useCount`만 `head`에게 남는다.
+     ========================================================================*/
+  describe('inviteCodes — W-15A §4.3 · W-08 §2-1 · 🔴 W-21B 결정 5')
   await seed()
-  await check('C-1', 'pass', '`head`가 새 코드 create (문서 ID = `code` 필드)', () =>
+  await check('C-1', 'deny', '🔴 **`head`가 새 코드 create** — 결정 5가 닫았다(뒤집힘)', () =>
     setDoc(code(as(UIDS.head), 'ABCD-2345'), codeDoc('ABCD-2345')))
-  await check('C-2', 'deny', '🔴 `code` 필드를 문서 ID와 **다르게** create', () =>
-    setDoc(code(as(UIDS.head), 'EFGH-6789'), codeDoc('WXYZ-1111')))
-  await check('C-3', 'pass', '`head`가 기존 코드를 `isActive: false` + `revokedAt`로 update (BR-12)', () =>
+  await check('C-1b', 'pass', '🔴 `dev`가 새 코드 create (유일한 발급 경로)', () =>
+    setDoc(code(as(UIDS.dev), 'ABCD-2345'), codeDoc('ABCD-2345')))
+  await check('C-2', 'deny', '🔴 `code` 필드를 문서 ID와 **다르게** create (`dev`도 못 한다)', () =>
+    setDoc(code(as(UIDS.dev), 'EFGH-6789'), codeDoc('WXYZ-1111')))
+  await check('C-3', 'deny', '🔴 **`head`가 기존 코드를 `isActive: false`로**(BR-12) — 뒤집힘', () =>
     updateDoc(code(as(UIDS.head), 'DJSN-2691'), { isActive: false, revokedAt: serverTimestamp() }))
+  await check('C-3b', 'pass', '🔴 `dev`가 기존 코드를 `isActive: false` + `revokedAt`로 (BR-12)', () =>
+    updateDoc(code(as(UIDS.dev), 'DJSN-2691'), { isActive: false, revokedAt: serverTimestamp() }))
   await seed()
   await check('C-4', 'pass', '`head`가 `inviteCodes` **list** (BR-16 레이트 리밋)', () =>
     getDocs(query(codes(as(UIDS.head)), where('isActive', '==', true))))
@@ -77,7 +92,7 @@ export async function run() {
     getDocs(query(codes(as(UIDS.pending)), where('isActive', '==', true))))
   await check('C-4d', 'deny', '`teacher`가 같은 **list**', () =>
     getDocs(query(codes(as(UIDS.teacher)), where('isActive', '==', true))))
-  await check('C-5', 'pass', '`head`가 `useCount`를 +1 update (승인 배치)', () =>
+  await check('C-5', 'pass', '🔴 `head`가 `useCount`만 +1 update — **승인 배치가 이 문을 쓴다**', () =>
     updateDoc(code(as(UIDS.head), 'DJSN-2691'), { useCount: 4 }))
   await check('C-6', 'pass', '🔴 학교 계정의 **단건 get** (S2 코드 검증 — W-08 §2-1)', () =>
     getDoc(code(as('uid-new'), 'DJSN-2691')))
@@ -85,7 +100,20 @@ export async function run() {
   await check('C-8', 'deny', '`member`가 코드를 create', () =>
     setDoc(code(as(UIDS.member), 'MMMM-2222'), codeDoc('MMMM-2222')))
   await check('C-9', 'deny', '코드 삭제 (BR-12 — 만료로만 무효화)', () =>
-    deleteDoc(code(as(UIDS.head), 'DJSN-2691')))
+    deleteDoc(code(as(UIDS.dev), 'DJSN-2691')))
+
+  /* 🔴 결정 5의 급소 — 「`useCount`만」이 정말 「만」인지. 부장이 이 문으로
+     만료 처리를 끼워 넣을 수 있으면 필드 분리가 아무 일도 하지 않는다. */
+  await seed()
+  await check('C-10', 'deny', '🔴 **`head`가 `useCount`와 `isActive`를 함께** — 승인 문으로 만료를 끼워 넣는다', () =>
+    updateDoc(code(as(UIDS.head), 'DJSN-2691'), { useCount: 4, isActive: false }))
+  await check('C-11', 'pass', '🔴 `dev`의 승인 배치 경로(`useCount` +1)도 그대로 열려 있다', () =>
+    updateDoc(code(as(UIDS.dev), 'DJSN-2691'), { useCount: 5 }))
+  await seed()
+  await check('C-12', 'deny', '`vice`가 `useCount`를 +1 (승인 권한이 없다 — A-3과 같은 문장)', () =>
+    updateDoc(code(as(UIDS.vice), 'DJSN-2691'), { useCount: 4 }))
+  await check('C-13', 'deny', '`teacher`가 `useCount`를 +1', () =>
+    updateDoc(code(as(UIDS.teacher), 'DJSN-2691'), { useCount: 4 }))
 
   describe('auditLogs — W-15A §4.4 · W-15B §3.4 · §14.5 3번')
   await seed()

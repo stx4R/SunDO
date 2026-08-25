@@ -135,6 +135,43 @@ export async function run() {
   await check('DP-2', 'deny', '`departments` 생성 (초기 시딩은 콘솔 — §9.7)', () =>
     setDoc(doc(as(UIDS.head), 'departments', 'other'), { headUid: UIDS.head }))
 
+  /* ==========================================================================
+     🔴 W-21B 기능 12 — `departments` update를 **필드로 가른다**(결정 5).
+
+     같은 규칙 블록이 재발급(`activeInviteCodeId` · OP-10)과 양도(`headUid` · OP-11)를
+     둘 다 받는데 **권한이 다르다.** 넓은 쪽(`isHead()`)으로 두면 부장이 여전히
+     `activeInviteCodeId`를 바꿀 수 있어 결정 5의 통제가 성립하지 않는다.
+
+     🔬 두 배치의 실제 페이로드가 정확히 두 형태다(`src/lib/admin.ts`) —
+        재발급 `{activeInviteCodeId, updatedAt}` · 양도 `{headUid, updatedAt}`.
+        그래서 `affectedKeys().hasOnly()`로 가를 수 있다.
+     ========================================================================*/
+  await seed()
+  await check('P-4', 'pass', '🔴 `dev`가 `activeInviteCodeId` 갱신 (재발급 배치)', () =>
+    updateDoc(doc(as(UIDS.dev), 'departments', DEPT), {
+      activeInviteCodeId: 'NEWC-3456', updatedAt: serverTimestamp(),
+    }))
+  await seed()
+  await check('P-5', 'deny', '🔴 **`head`가 `activeInviteCodeId` 갱신** — 결정 5가 닫은 문', () =>
+    updateDoc(doc(as(UIDS.head), 'departments', DEPT), {
+      activeInviteCodeId: 'NEWC-3456', updatedAt: serverTimestamp(),
+    }))
+  await seed()
+  await check('P-6', 'deny', '🔴 `head`가 두 필드를 **한 번에** 바꿔 우회한다', () =>
+    updateDoc(doc(as(UIDS.head), 'departments', DEPT), {
+      headUid: UIDS.member, activeInviteCodeId: 'NEWC-3456', updatedAt: serverTimestamp(),
+    }))
+  await seed()
+  await check('P-7', 'deny', '🔴 `dev`도 두 필드를 한 번에 바꿀 수 없다 (경로가 갈려 있다)', () =>
+    updateDoc(doc(as(UIDS.dev), 'departments', DEPT), {
+      headUid: UIDS.member, activeInviteCodeId: 'NEWC-3456', updatedAt: serverTimestamp(),
+    }))
+  await seed()
+  await check('P-8', 'deny', '허용 키 밖 필드(`academicYear`)를 바꾼다', () =>
+    updateDoc(doc(as(UIDS.dev), 'departments', DEPT), {
+      academicYear: 2027, updatedAt: serverTimestamp(),
+    }))
+
   describe('users create — S2 가입 신청')
   await seed()
   const newUser = (over = {}) => ({

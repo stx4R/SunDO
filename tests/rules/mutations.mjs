@@ -165,4 +165,151 @@ export const MUTATIONS = [
     to: '&& true',
     breaks: ['RE-5'],
   },
+
+  /* ==========================================================================
+     🔴 W-21B 신규 조건 역검증 — 기능 9(기록 수정·삭제) · 기능 12(코드 발급 권한)
+
+     이 회차가 규칙에 더한 **모든 조건**에 변형이 하나씩 있다(§4-3).
+     조건만 늘고 변형이 없으면 그 조건이 일하는지 아무도 모른다.
+     ========================================================================*/
+
+  /* --- 기능 9 · 권한 판정(`canEditRecord`) ------------------------------ */
+  {
+    name: 'record-owner-closed',
+    why: '🔴 결정 4가 연 **작성자 본인** 절을 되돌린다 — PRD BR-05 원문 상태로 좁힌다',
+    from: '        && (resource.data.createdBy == request.auth.uid || isVice());',
+    to: '        && isVice();',
+    breaks: ['RU-2', 'RX-1', 'B-21', 'B-26'],
+  },
+  {
+    name: 'record-edit-any-active',
+    why: '🔴 권한 판정을 `isActive()`로 넓힌다 — 남의 기록을 아무나 고치고 지운다',
+    from: '        && (resource.data.createdBy == request.auth.uid || isVice());',
+    to: '        && true;',
+    breaks: ['RU-5', 'RU-6', 'RX-5', 'RX-6', 'B-23', 'B-28', 'B-29'],
+  },
+
+  /* --- 기능 9 · 사유 변경(`editsReasonOnly`) ---------------------------- */
+  {
+    name: 'reason-keys-open',
+    why: '🔴 BR-07의 허용 키를 넓힌다 — 학생·일시·작성자·상태가 함께 바뀐다',
+    from: "               .hasOnly(['reasonCode', 'reasonText', 'updatedBy', 'updatedAt'])",
+    to: "               .hasOnly(['reasonCode', 'reasonText', 'updatedBy', 'updatedAt',\n                         'createdBy', 'occurredAt', 'studentDocId', 'studentName', 'status'])",
+    breaks: ['RU-8', 'RU-9', 'RU-10', 'RU-11'],
+  },
+  {
+    name: 'reason-updatedby-free',
+    why: '정정한 사람(`updatedBy`)이 본인이어야 한다는 조건을 뺀다',
+    from: '        && request.resource.data.updatedBy == request.auth.uid;',
+    to: '        && true;',
+    breaks: ['RU-12'],
+  },
+  {
+    name: 'reason-on-deleted',
+    why: '🔴 「지금 active인가」를 뺀다 — 이미 삭제된 기록의 사유가 고쳐진다',
+    from: "        && validReason(request.resource.data)\n        // 🔴 이미 삭제된 기록의 사유는 고칠 수 없다(RU-19). `status`가 허용 키에 없으므로\n        //    이 조건은 「지금 active인가」만 본다 — 전이를 여는 것이 아니다.\n        && resource.data.status == 'active'",
+    to: '        && validReason(request.resource.data)',
+    breaks: ['RU-19'],
+  },
+  {
+    name: 'reason-validation-off',
+    why: '🔴 사유 변경에서 `validReason()`을 뺀다 — create와 update의 문장이 갈린다(BR-07a)',
+    from: "        && validReason(request.resource.data)\n        // 🔴 이미 삭제된 기록의 사유는 고칠 수 없다(RU-19).",
+    to: "        && true\n        // 🔴 이미 삭제된 기록의 사유는 고칠 수 없다(RU-19).",
+    breaks: ['RU-15', 'RU-16', 'RU-17', 'RU-18', 'B-25'],
+  },
+
+  /* --- 기능 9 · 소프트 삭제(`softDeletesRecord`) ------------------------ */
+  {
+    name: 'delete-keys-open',
+    why: '🔴 삭제 허용 키에 사유를 더한다 — 지우면서 사유를 몰래 바꾼다',
+    from: "               .hasOnly(['status', 'deletedBy', 'deletedAt'])",
+    to: "               .hasOnly(['status', 'deletedBy', 'deletedAt', 'reasonCode', 'reasonText'])",
+    breaks: ['RX-8'],
+  },
+  {
+    /**
+     * 🔬 **실측이 예상을 뒤집었다.** 처음에 이 변형의 기대를 `RX-10`(되돌리기)으로 적었는데
+     * **아무것도 빨개지지 않았다.** RX-10을 막고 있는 것은 출발지 조건이 아니라
+     * **목적지 조건**(`request.resource.data.status == 'deleted'`)이었다 — `status: 'active'`로
+     * 쓰는 요청은 그쪽에서 먼저 걸린다.
+     *
+     * 🔴 그래서 이 조건이 **실제로** 막는 것을 다시 찾아 RX-11로 잠갔다:
+     *    **이미 삭제된 기록의 `deletedBy`를 다른 사람 것으로 덮어쓰는** 경로다.
+     *    `status`가 안 바뀌면 `affectedKeys()`에 들어가지 않아(B-20의 성질) 나머지 조건이
+     *    전부 통과하는데, 출발지 조건만이 그것을 세운다.
+     * ⇒ 「무엇을 막는 조건인가」를 변형이 고쳐 준 사례다(W-16 Q-5와 같은 종류).
+     */
+    name: 'delete-source-active-off',
+    why: '🔴 출발지 조건(`resource.data.status == active`)을 뺀다 — 삭제자 기록이 덮어써진다',
+    from: "               .hasOnly(['status', 'deletedBy', 'deletedAt'])\n        && resource.data.status == 'active'",
+    to: "               .hasOnly(['status', 'deletedBy', 'deletedAt'])",
+    breaks: ['RX-11'],
+  },
+  {
+    /**
+     * 🔬 **여기서도 실측이 예상을 고쳤다.** 「두 status 조건을 함께 빼면 되돌리기(RX-10)가
+     * 열린다」로 적었는데 **RX-10은 그대로 초록이었다.**
+     *
+     * 🔴 **되돌리기를 막는 것은 세 조건의 합이고, 세 번째가 `deletedBy == auth.uid`다.**
+     *    되돌리는 요청은 `deletedBy`를 `null`로 비우는데(그것이 되돌리기의 정의다)
+     *    `null == request.auth.uid`가 거짓이라 거기서 선다.
+     * ⇒ **어느 하나만 벗겨도 RX-10은 열리지 않는다.** 세 조건이 각자 다른 것을 막고
+     *   (RX-9 · RX-11 · RX-7), 되돌리기는 그 셋이 겹치는 자리에서 막힌다.
+     */
+    name: 'delete-status-guards-off',
+    why: '🔴 출발지·목적지 조건을 **둘 다** 뺀다 — 🔬 그래도 되돌리기(RX-10)는 안 열린다',
+    from: "        && resource.data.status == 'active'\n        && request.resource.data.status == 'deleted'\n        && request.resource.data.deletedBy == request.auth.uid;",
+    to: '        && request.resource.data.deletedBy == request.auth.uid;',
+    breaks: ['RX-9', 'RX-11'],
+  },
+  {
+    name: 'delete-any-status',
+    why: "목적지가 `deleted`여야 한다는 조건을 뺀다 — `status`에 임의 값이 들어간다",
+    from: "        && request.resource.data.status == 'deleted'\n        && request.resource.data.deletedBy == request.auth.uid;",
+    to: '        && request.resource.data.deletedBy == request.auth.uid;',
+    breaks: ['RX-9'],
+  },
+  {
+    name: 'delete-deletedby-free',
+    why: '지운 사람(`deletedBy`)이 본인이어야 한다는 조건을 뺀다',
+    from: "        && request.resource.data.status == 'deleted'\n        && request.resource.data.deletedBy == request.auth.uid;",
+    to: "        && request.resource.data.status == 'deleted';",
+    breaks: ['RX-7'],
+  },
+
+  /* --- 기능 12 · 코드 발급 권한 ----------------------------------------- */
+  {
+    name: 'invitecodes-head-issue',
+    why: '🔴 결정 5를 되돌린다 — 부장이 다시 코드를 **발급**한다',
+    from: 'allow create: if isDev() && request.resource.data.code == codeId;',
+    to: 'allow create: if isHead() && request.resource.data.code == codeId;',
+    breaks: ['C-1'],
+  },
+  {
+    name: 'invitecodes-head-update-wide',
+    why: "🔴 `useCount`만 열어 둔 부장 절에서 `hasOnly`를 뺀다 — 승인 문으로 **만료 처리**가 들어온다",
+    from: "              || (isHead()\n                  && request.resource.data.diff(resource.data).affectedKeys()\n                       .hasOnly(['useCount'])));",
+    to: '              || isHead());',
+    breaks: ['C-3', 'C-10', 'B-3'],
+  },
+
+  /* --- 기능 12 · `departments` 필드 분리 -------------------------------- */
+  {
+    /* 🔴 **역할 절만** 넓힌다 — 키 목록은 그대로다. 그래서 P-6·P-7(두 필드 동시)은
+       여전히 막히고 **P-5 하나만** 빨개진다. 「무엇이 무엇을 막고 있나」가 여기서 갈린다. */
+    name: 'departments-issue-to-head',
+    why: '🔴 재발급 필드(`activeInviteCodeId`)의 역할을 `isDev()` → `isHead()`로 되돌린다',
+    from: "           (isDev()\n            && request.resource.data.diff(resource.data).affectedKeys()\n                 .hasOnly(['activeInviteCodeId', 'updatedAt']))",
+    to: "           (isHead()\n            && request.resource.data.diff(resource.data).affectedKeys()\n                 .hasOnly(['activeInviteCodeId', 'updatedAt']))",
+    breaks: ['P-5'],
+  },
+  {
+    /* 🔴 W-16D 이전 상태로 통째로 되돌린다 — 필드 분리가 **전부** 사라진다. */
+    name: 'departments-field-split-off',
+    why: '🔴 필드 분리를 되돌려 `isHead()` 하나로 뭉친다 — 결정 5의 통제가 통째로 사라진다',
+    from: "      allow update: if\n           (isDev()\n            && request.resource.data.diff(resource.data).affectedKeys()\n                 .hasOnly(['activeInviteCodeId', 'updatedAt']))\n        || (isHead()\n            && request.resource.data.diff(resource.data).affectedKeys()\n                 .hasOnly(['headUid', 'updatedAt']));",
+    to: '      allow update: if isHead();',
+    breaks: ['P-5', 'P-6', 'P-7', 'P-8'],
+  },
 ]

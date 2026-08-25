@@ -677,3 +677,176 @@ export async function fetchWithdrawnAuthors(
   for (const uid of new Set(uids)) if (authorWithdrawnCache.get(uid) === true) withdrawn.add(uid)
   return withdrawn
 }
+
+/* ============================================================================
+   S7 기록 수정·삭제 (W-21B 기능 9) — §8.7.4 T-04~T-06 · §10.2 · design `18b`~`18d`
+   ==========================================================================*/
+
+/**
+ * 🔴 **`admin.ts`의 `Actor`를 import하지 않는다.** 구조가 같아 값은 그대로 통하지만,
+ * import하면 S8 전용 모듈(`fetchMembers`·`subscribePendingRequests`·양도 배치)이
+ * S7 청크로 끌려 들어온다. 타입이 겹치는 것과 모듈이 겹치는 것은 다른 문제다.
+ */
+export interface RecordActor {
+  uid: string
+  name: string
+  role: string
+  status: string
+}
+
+export type RecordWriteResult = { ok: true } | { ok: false; code: string }
+
+/** §9.3.8 `action` 유니온에서 **이번 회차가 소비자를 만드는 두 값**(W-20 §2.1② 해소). */
+type RecordAuditAction = 'RECORD_UPDATE' | 'RECORD_DELETE'
+
+/** BR-06 승계분. 🔴 `member`는 여기 없다 — 본인 기록은 아래 소유자 절이 연다. */
+const EDITOR_ROLES = new Set(['vice', 'head', 'dev'])
+
+/**
+ * 🔴 **`firestore.rules`의 `canEditRecord()`와 같은 문장이다.**
+ *
+ * ```
+ * isActive() && (resource.data.createdBy == request.auth.uid || isVice())
+ * ```
+ *
+ * 한쪽만 고치면 화면이 규칙보다 넓어져 「눌렀는데 실패」가 되거나, 좁아져
+ * 「할 수 있는데 안 보임」이 된다 — W-17F 결함 1이 정확히 그 형태였다.
+ * **둘을 함께 고쳐라.** 규칙 쪽 근거와 PRD BR-05 충돌은 그 파일 주석에 있다.
+ */
+export function canEditRecord(
+  actor: RecordActor | null,
+  row: Pick<RecordRow, 'createdBy'>,
+): boolean {
+  if (!actor || actor.status !== 'active') return false
+  return row.createdBy === actor.uid || EDITOR_ROLES.has(actor.role)
+}
+
+/**
+ * §9.3.8 감사 로그 1건을 배치에 **넣기만** 한다(`admin.ts`의 `appendAudit`과 같은 계약).
+ *
+ * 🔴 **`before`/`after`에 학생 이름·학번을 담지 마라**(W-18 §2.1① · §14.3 익명화와 양립).
+ * 누구의 기록인지는 `targetId`(= 문서 ID)로 역추적한다.
+ *
+ * ⚠ `reasonText`는 담는다 — BR-07b가 「정정 이력은 `before`/`after`와 함께 남긴다」로
+ * **명시**한다. 정정 전 문구가 감사 로그에 영구 보존된다는 뜻이고(감사 로그는 수정·삭제
+ * 전면 금지), 그것이 BR-07b가 원하는 바다. 학생을 특정하는 값은 여전히 들어가지 않는다.
+ */
+function appendRecordAudit(
+  batch: ReturnType<typeof writeBatch>,
+  actor: RecordActor,
+  action: RecordAuditAction,
+  recordId: string,
+  before: Record<string, unknown>,
+  after: Record<string, unknown>,
+): void {
+  batch.set(doc(db, 'auditLogs', crypto.randomUUID()), {
+    actorUid: actor.uid,
+    actorName: actor.name,
+    actorRole: actor.role,
+    action,
+    targetType: 'records',
+    targetId: recordId,
+    before,
+    after,
+    createdAt: serverTimestamp(),
+  })
+}
+
+/**
+ * T-06 사유 변경 — **배치 2연산**(`records` update + `auditLogs` create).
+ *
+ * 🔴 **BR-09를 보장하는 것은 배치의 원자성이다.** 「감사 로그 생성 실패 시 수정도 실패
+ * 처리한다」를 규칙은 표현할 수 없다(형제 연산을 못 본다 — Q-2). 한 연산이라도 거부되면
+ * 남는 문서가 **0/2**라는 Q-3 실측이 그 자리를 대신한다. B-24가 그것을 잠근다.
+ *
+ * 🔴 **BR-07a — `ETC`가 아니면 `reasonText`는 `null`이다.** 호출부가 트림해 넘기고
+ * 여기서 다시 판정하지 않는다. 규칙의 `validReason()`이 마지막 관문이다.
+ *
+ * 🔴 **`writeRecord`와 달리 `await`한다.** S6의 「기다리면 스피너가 영원히 돈다」는
+ * **오프라인 저장을 허용하기 때문에** 성립하는 계약이다(W-12 §2.3). S7의 수정·삭제는
+ * 오프라인에서 **진입 자체를 막으므로**(§8.7.5 · `Records.tsx`) 같은 함정에 걸리지 않고,
+ * 결과를 알아야 토스트·목록 갱신을 가를 수 있다. `admin.ts`의 배치 4종과 같은 형태다.
+ */
+export async function updateRecordReason(
+  actor: RecordActor,
+  row: RecordRow,
+  reasonCode: ReasonCode,
+  reasonText: string | null,
+): Promise<RecordWriteResult> {
+  const batch = writeBatch(db)
+  const now = serverTimestamp()
+
+  /* 🔴 **규칙의 허용 키 4개와 정확히 같다**(`editsReasonOnly`). 하나라도 더 쓰면
+     `hasOnly`에 걸려 배치가 통째로 죽는다 — `account.ts`의 탈퇴 3키와 같은 규율이다. */
+  batch.update(doc(db, 'records', row.id), {
+    reasonCode,
+    reasonText,
+    updatedBy: actor.uid,
+    updatedAt: now,
+  })
+
+  appendRecordAudit(
+    batch,
+    actor,
+    'RECORD_UPDATE',
+    row.id,
+    { reasonCode: row.reasonCode, reasonText: row.reasonText },
+    { reasonCode, reasonText },
+  )
+
+  try {
+    await batch.commit()
+  } catch (error: unknown) {
+    return { ok: false, code: errorCode(error, 'firestore/record-update-failed') }
+  }
+  return { ok: true }
+}
+
+/**
+ * T-05 소프트 삭제 — **배치 2연산**. BR-08: 문서를 지우지 않는다.
+ *
+ * S7 목록 질의가 `status == 'active'`이므로 삭제된 문서는 **질의에서 저절로 빠진다**
+ * (W-13). 🔴 다만 화면의 병합 Map은 **합집합**이라 스스로 지워지지 않는다 —
+ * 목록에서 빼는 것은 호출부의 몫이다(`Records.tsx`의 `dropRow`).
+ *
+ * 🔴 **`users.recordCount`를 감소시키지 않는다.**
+ * ① 삭제자가 작성자가 아닐 수 있는데(차장이 부원 기록을 지운다) 규칙의 자기 갱신
+ *    경로(`selfSync`)는 **본인 문서만** 연다. 남의 카운터를 내리려면 「남의 카운터를
+ *    임의로 바꾸는 문」을 새로 열어야 한다 — B-30이 그것을 실측으로 보여 준다.
+ * ② 본인이 지우는 경우도 규칙이 「+1만」이라 −1이 거부된다(RC-3 · B-31).
+ * ③ 화면에 `recordCount`를 그리는 자리가 **0곳**이다(소비자 조사 — 보고서 §6).
+ * ⇒ `recordCount`는 「작성 횟수」이지 「현재 유효 기록 수」가 아니다. W-16 §7의 v1.1
+ *   예약을 이 회차가 **닫지 않는다**. 근거는 보고서 §6에 있다.
+ */
+export async function deleteRecord(
+  actor: RecordActor,
+  row: RecordRow,
+): Promise<RecordWriteResult> {
+  const batch = writeBatch(db)
+  const now = serverTimestamp()
+
+  /* 🔴 규칙의 허용 키 3개와 정확히 같다(`softDeletesRecord`).
+     ⚠ `updatedAt`을 **쓰지 않는다** — §9.3.5가 그 쌍을 「사유 변경 시 기록」으로
+     규정하고, 규칙의 허용 키에도 없어 쓰면 배치가 죽는다. */
+  batch.update(doc(db, 'records', row.id), {
+    status: 'deleted',
+    deletedBy: actor.uid,
+    deletedAt: now,
+  })
+
+  appendRecordAudit(
+    batch,
+    actor,
+    'RECORD_DELETE',
+    row.id,
+    { status: 'active', reasonCode: row.reasonCode },
+    { status: 'deleted' },
+  )
+
+  try {
+    await batch.commit()
+  } catch (error: unknown) {
+    return { ok: false, code: errorCode(error, 'firestore/record-delete-failed') }
+  }
+  return { ok: true }
+}

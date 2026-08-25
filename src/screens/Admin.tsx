@@ -62,12 +62,25 @@ const BTN_TRANSFER = '양도'
 /** §8.10.5 — 상시 안내 문구. */
 const HINT_CODE = '재발급 시 이전 코드는 즉시 만료됩니다'
 /**
+ * 🔴 **W-21B 결정 5 — 부장이 볼 안내.** 발급이 `dev` 전용이 되면서 위 문구가
+ * 부장에게는 참이 아니게 됐다(부장은 재발급 자체를 할 수 없다).
+ * §8.10에 자리가 없어 **사용자에게 물어 확정한 신규 문안**이다 — 보고서 §8 ⑤.
+ * ⚠ 사용자 원문의 마침표는 §8.10 사전 스타일(마침표 없음)에 맞춰 뗐다
+ *   (W-21 §9 3번이 같은 판단을 선례로 남겼다).
+ */
+const HINT_CODE_NO_ISSUE = '코드 재발급은 개발자에게 문의하세요'
+/**
  * §8.8.3 #8. ⚠ **Dev가 볼 때도 이 문구는 그대로다** — §8.10.5 확정 문안이라 바꾸지 않는다.
  * Dev가 양도해도 Dev 본인은 부원이 되지 않으므로 문장이 Dev에게는 참이 아니다.
  * 🔴 그렇다고 새 문구를 지어내지 않는다(§4-4). §7 신규 항목으로 올렸다.
  */
 const HINT_TRANSFER = '부장 권한을 양도하면 내 계정은 일반 부원으로 전환됩니다'
-const HINT_BOTTOM = '기록 수정·삭제는 부장·차장만 가능합니다'
+/**
+ * 🔴 **W-21B 결정 4로 교체됐다.** 원문은 `기록 수정·삭제는 부장·차장만 가능합니다`인데
+ * 작성자 본인이 권한자로 들어오면서 **사실이 아니게 됐다.**
+ * §8.10.5 개정이 필요하다 — 보고서 §8 ①. 「차장 이상」은 §8.9.2·EM-06이 이미 쓰는 어법이다.
+ */
+const HINT_BOTTOM = '기록 수정·삭제는 작성자 본인과 차장 이상만 가능합니다'
 /**
  * 🔴 결정 1(W-15B) — design `9b`·`9c`의 읽기 전용 안내 3종. **§8.10에 없던 문구이고
  * 사용자가 확정 문안으로 채택했다.** `열람 전용 계정입니다`는 S5(§8.5.2 #5)가 이미 쓴다.
@@ -287,9 +300,23 @@ function CodeSection({
   const rateLimited = recent !== null && recent >= REISSUE_LIMIT_PER_HOUR
   const canCopy = typeof navigator !== 'undefined' && !!navigator.clipboard
   const codeId = state?.kind === 'ok' ? state.codeId : null
+  /**
+   * 🔴 **W-21B 결정 5 — 발급은 `dev`만이다.** 부장은 **복사만** 한다.
+   *
+   * `firestore.rules`의 `inviteCodes` create/update가 `isDev()`이고 `departments`의
+   * `activeInviteCodeId`도 `isDev()`다 — 화면과 규칙의 판정이 **같은 문장**이어야 한다.
+   *
+   * ⚠ **Dev가 없으면 아무도 가입 코드를 발급할 수 없다.** 사용자가 의도한 통제이고
+   *   유일한 우회는 콘솔 수동 생성이다(`database_ToDo/W-21B.md` §4).
+   */
+  const canIssue = profile?.role === 'dev'
 
   const doReissue = async () => {
     if (lockRef.current) return
+    /* 🔴 **강제 탭 방어**(W-15A §6 ③). 버튼을 렌더하지 않아도 DOM을 만져 모달을 열 수
+       있으므로 실행 직전에 한 번 더 선다. 규칙이 마지막 관문이지만 여기서 멈추면
+       사용자가 「실패한 요청」 대신 아무 일도 없는 것을 본다. */
+    if (!canIssue) return
     /* 🔴 강제 탭(비활성 우회)에서도 여기서 선다. E-3002는 규격 문구다. */
     if (rateLimited) {
       toast(E_3002)
@@ -355,19 +382,25 @@ function CodeSection({
             >
               {BTN_COPY}
             </NeuButton>
-            <NeuButton
-              radius={15}
-              className="adm-btn"
-              disabled={!online || busy || rateLimited}
-              onClick={() => setModal(true)}
-            >
-              {BTN_REISSUE}
-            </NeuButton>
+            {/* 🔴 **W-21B 결정 5 — 부장에게는 이 버튼이 렌더되지 않는다.**
+                `disabled`로 두지 않는다: 비활성 버튼은 「지금은 안 되지만 언젠가 된다」를
+                뜻하는데 부장에게는 영영 안 된다. W-15A §4-4의 「읽기 전용은 부재」와
+                같은 판단이고, 규칙이 `isDev()`로 막고 있어 화면과 규칙의 판정이 같다. */}
+            {canIssue && (
+              <NeuButton
+                radius={15}
+                className="adm-btn"
+                disabled={!online || busy || rateLimited}
+                onClick={() => setModal(true)}
+              >
+                {BTN_REISSUE}
+              </NeuButton>
+            )}
           </div>
         </>
       )}
 
-      <p className="adm-note">{HINT_CODE}</p>
+      <p className="adm-note">{canIssue ? HINT_CODE : HINT_CODE_NO_ISSUE}</p>
 
       {/* §8.10.4 MD-01. 좌 버튼은 항상 `취소`이고 `ConfirmModal`이 소유한다. */}
       <ConfirmModal
