@@ -198,6 +198,42 @@
 }
 
 /* ============================================================
+   문서 바탕 — W-23 A-1(B-01)
+
+   🔴 **W-23 §1-1 실측: 이 파일에 `html`·`body` 규칙이 한 건도 없었다.**
+   배경은 `AppShell`의 스테이지(`--gradient-stage`)와 그 바깥 래퍼(`--bg-outer`)에만
+   있었고 문서 자체는 브라우저 기본값(캔버스 = 흰색)이었다.
+
+   그것이 **두 증상 하나의 뿌리**다(지시서 §0.3 정정 3).
+   ① iOS standalone에서 `apple-mobile-web-app-status-bar-style: default`는 웹뷰를
+      상태 표시줄 **아래**에서 시작시키고, 그 띠를 **`body`의 배경색으로** 칠한다.
+      배경이 없으면 흰색이 되고, 앱 배경(`#F7FBF8`)과 **경계선**으로 갈린다(첨부1).
+   ② 오버스크롤로 문서가 튕길 때 드러나는 캔버스도 같은 흰색이다(첨부7·8).
+   ⇒ **여기 한 곳을 칠하면 둘의 「색」이 함께 해결된다.**
+
+   🔴 **값은 `--color-sundo-bg-top`이다.** 스테이지 그라디언트의 **시작색**이고
+   `index.html`의 `theme-color`·manifest의 `theme_color`/`background_color`와도 같은
+   `#F7FBF8`이다 — 새로 지은 값이 아니다. 상단 띠가 스테이지 맨 위와 맞닿으므로
+   그 자리에서 이음매가 사라진다.
+
+   🔴 **`status-bar-style`을 `black-translucent`로 바꾸지 않았다.** 그 값은 iOS에서
+   상태 표시줄 **글자를 흰색으로 고정**한다 — 밝은 배경 위에서 시각을 잃는 거래다
+   (지시서 A-1). 전체화면은 얻지 않고 배경만 채운다.
+
+   ⚠ **여백 계약은 한 칸도 건드리지 않는다.** 상단 `26px`/`34px` + `env(safe-area-inset-top)`은
+   `AppShell` 단독 소유다(W-10 이후 diff 0줄).
+
+   ⚠ `@layer base`에 둔다 — 유틸리티가 언제나 이긴다. Tailwind v4의 `@import`가
+   `theme, base, components, utilities` 순서를 이미 선언해 두었다.
+   ============================================================ */
+@layer base {
+  html,
+  body {
+    background-color: var(--color-sundo-bg-top);
+  }
+}
+
+/* ============================================================
    표면 스타일 — PRD §7.3
    다중 속성 컴포넌트 스타일이므로 @utility가 아니라 @layer components.
    ============================================================ */
@@ -1747,11 +1783,26 @@
      스테이지 끝까지 잇는다(그대로다). **세로 여백은 건드리지 않는다** — `AppShell` 소유다(§0.4).
      ⚠ `position: sticky`·`top`·`z-index`는 **뺐다**. 흐름의 `flex:none` 머리가 되었으므로
      붙잡을 스크롤이 없다 — 남겨 두면 아무 일도 하지 않는 선언이 다음 사람을 헷갈리게 한다. */
+  /* 🔴 **W-23 A-3(b)(B-03) — 띠의 색만 앱 배경 톤으로 바꿨다.**
+
+     지시서 §0.1은 「`sticky`는 유지하고 색만 바꾼다」고 적었지만 **전제가 이미 낡았다** —
+     `sticky`는 **W-21 P-1에서 이미 빠졌다**(바로 위 주석). 헤더는 흐름의 `flex:none`이고
+     `.list`가 스스로 잘라내므로 **행이 헤더 뒤로 지나가는 일이 구조적으로 불가능하다.**
+     ⇒ 유리 띠가 맡던 「가림막」 역할은 **이미 사라졌고**, 남은 것은 시각 규격뿐이다.
+
+     🔴 `rgba(255,255,255,0.6)`(= `--color-sundo-control`)은 상태 표시줄 흰 띠와 이어져
+     보였다(첨부3). 알파는 그대로 두고 **기저색만 `#F7FBF8`(= `--color-sundo-bg-top`,
+     스테이지 그라디언트의 시작색)으로** 옮긴다 — 스테이지 맨 위와 같은 색이라 띠가 사라진다.
+
+     🔴 **토큰(`--color-sundo-control`)을 고치지 마라** — 소비자가 8곳이고 그 중 `.dock`·`.ff`는
+     흰 컨트롤 표면이 맞다. 이 한 규칙에서만 벗어난다.
+     🔴 **불투명으로 깔지 않는다.** `backdrop-filter`가 뒤의 오라를 이어 주고 있어,
+     알파를 1로 올리면 오라가 띠에서 잘려 경계가 더 드러난다. */
   .s5-head {
     flex: none;
     margin: 0 -22px;
     padding: 0 22px 10px;
-    background: var(--color-sundo-control);
+    background: rgba(247, 251, 248, 0.6);
     backdrop-filter: blur(22px) saturate(170%);
   }
 
@@ -1787,9 +1838,26 @@
      🔴 `min-height: 0`이 없으면 flex 항목의 기본 최소 크기(`auto`)가 콘텐츠 높이를 바닥으로
      삼아 **줄어들지 않는다** — `flex: 1`만으로는 부족하다.
      🔬 소비자 전수 = `screens/ClassStudents.tsx` **한 곳뿐**(S7은 `.s7-list`가 따로 있다). */
+  /* 🔴 **W-23 A-3(a)(c)(B-03) — 두 줄이 늘었다.**
+
+     (a) `margin-top: 12px` — 헤더 띠 아래 `10px`(= `.s5-head`의 하단 패딩)만으로는
+         리스트가 헤더에 붙어 보였다(첨부3). 합쳐 **22px**이고 이는 `AppShell`의 좌우
+         패딩과 같은 수다. 🔴 **§7.1~7.4에 없는 값이지만 신규 리터럴이 아니다** —
+         `12px`는 이 파일의 `.d-hint`·`.dcard-chips`가 이미 쓰는 값이고 사용처가
+         여기 하나뿐이라 승격하지 않는다(규약 4-4 · W-03B §3 기준 미달).
+
+     (c) 하단 두 모서리 — design `1f` 원문은 `22px 22px 0 0`이다. 목업에서는 패널이
+         화면 밖으로 흘러가 아랫변이 보이지 않았지만, 실기기에서는 스크롤 상자의
+         **마지막 행이 각지게** 끝난다(PM 보고). 🔴 **`overflow-y: auto`가 이미 반경으로
+         잘라내므로 컨테이너에 반경을 주는 것만으로 「첫 행 = 위 두 모서리 ·
+         마지막 행 = 아래 두 모서리 · 행이 1개면 네 모서리」가 **전부** 성립한다.**
+         행마다 `:first-child`/`:last-child`를 걸 필요가 없다 — 상하 `6px` 패딩이 있어
+         행의 모서리는 애초에 컨테이너 모서리에 닿지 않는다.
+         ⚠ 로딩 스켈레톤도 **같은 컨테이너**를 쓰므로 자동으로 성립한다. 빈 상태(EM-01)·
+         에러(ER-03)는 `.list`가 아니라 `CenterNotice`라 해당이 없다. */
   .list {
-    border-top-left-radius: var(--radius-22);
-    border-top-right-radius: var(--radius-22);
+    margin-top: 12px;
+    border-radius: var(--radius-22);
     padding: 6px 0;
     min-height: 0;
     overflow-y: auto;
@@ -2044,10 +2112,39 @@
     transform: translateY(110%);
     transition: transform 0.38s var(--ease-sundo);
     pointer-events: auto;
+    /* 🔴 **W-23 A-5(e)(B-05) — 여기가 「S9 일정 편집 화면의 위가 잘린다」의 원인이다(가설 ⓐ).**
+       시트는 `bottom: 0` 고정이고 **높이 상한이 없었다.** 내용이 스테이지보다 길어지면
+       위로 자라고, 스테이지가 `overflow: hidden`이라 **위가 통째로 잘려 나간다.**
+       첨부6이 정확히 그 모양이다 — `일정 저장`까지 아래는 온전하고 월요일 행의 머리부터 없다.
+
+       🔴 **`34px`은 §7.5의 「독이 있는 화면 상단 여백」과 같은 수다** — 새로 지은 값이 아니다.
+       그만큼 딤이 위에 남아 ① 시트로 읽히고 ② 딤 탭으로 닫을 자리가 남는다.
+       ⚠ design 산출물에 시트 `max-height` 용례가 **0건**이라(전수 확인) 이 상한은 이 저장소가
+       새로 정하는 것이다 — 보고서 §7 신규 항목.
+
+       🔴 **「시트 안에 `overflow-y: auto`를 만들지 않는다」(S6 블록 주석)와 충돌하지 않는다.**
+       그 규율은 **본문 화면**의 스크롤 소유자를 하나로 묶는 것이고(W-11 DoD 16),
+       시트는 오버레이다(W-03C). 시트 본문이 스스로 스크롤하는 것이 정상이다. */
+    max-height: calc(100% - 34px);
+    display: flex;
+    flex-direction: column;
   }
 
   .sheet-open {
     transform: translateY(0);
+  }
+
+  /* 🔴 **W-23 A-5(e) — 시트 본문. 그랩 핸들·제목은 고정되고 여기만 스크롤한다.**
+     PM 요구가 「맨 상단부터 띄우고 아래는 스크롤」이라 핸들·제목이 스크롤과 함께
+     사라지면 안 된다. 🔴 **아래 스와이프 닫기와 뒤엉키지 않는다** — 드래그 핸들러는
+     `.sheet-handle` **하나에만** 붙어 있고 그 규칙이 `touch-action: none`을 갖는다
+     (`BottomSheet.tsx` · W-12 §4-2의 「그랩 핸들에서만 시작한다」 계약이 이미 막고 있었다).
+     `overscroll-behavior: contain` — 본문 끝에서 더 끌 때 딤·스테이지로 넘어가지 않는다. */
+  .sheet-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
 
   /* 아래 스와이프 닫기(§8.6.2 #2 · T-08)의 드래그 손잡이다. 38×4.5는 너무 좁아
@@ -2057,6 +2154,9 @@
     position: relative;
     width: 38px;
     height: 4.5px;
+    /* W-23 A-5(e) — `.sheet`가 flex 컬럼이 되면서 flex 항목의 기본 `flex-shrink: 1`이
+       4.5px 높이를 갉을 수 있다. 본문(`.sheet-body`)만 줄어들게 못 박는다. */
+    flex: none;
     margin: 0 auto 14px;
     border-radius: var(--radius-pill);
     background: rgba(20, 53, 38, 0.18);
@@ -2070,6 +2170,8 @@
   }
 
   .sheet-title {
+    /* W-23 A-5(e) — `.sheet-handle`과 같은 이유다. */
+    flex: none;
     font-size: var(--text-sheet);
     font-weight: 700;
     color: var(--color-sundo-900);
@@ -2212,14 +2314,23 @@
     background: var(--color-sundo-tint-08);
   }
 
-  /* 🔴 W-21 P-7 — 이 저장소에서 `DSHSS.png`(일반 학생)를 쓰는 **유일한** 자리다. */
+  /* 🔴 W-21 P-7 — `DSHSS.png`(일반 학생)를 쓰는 자리다(S6 기록 작성 시트 · S7 액션 시트).
+
+     🔴 **W-23 A-2(B-02) — 배경·반경·클리핑을 걷어 냈다.**
+     `DSHSS.png`는 **원형 엠블럼이고 네 모서리의 알파가 0**이다(§1-3 실측:
+     `(0,0)`·`(123,0)`·`(0,123)`·`(123,123)` 전부 `A=0`). 그래서 그 아래의
+     `--gradient-primary`가 **모서리로 비어져 나와** 「엠블럼 + 연녹 라운드 사각」으로
+     보였다(첨부2 · 스크린샷 4배 확대로 확인). 배경을 지우면 원형 엠블럼만 남는다.
+
+     🔴 **`.mrow-av`(S8 부원 행)는 건드리지 않았다** — 그쪽은 **역할 첫 글자**이고
+     §8.8.3 #6 규격이다. 배경이 없으면 글자가 배경 없이 뜬다.
+     ⚠ `overflow: hidden`도 함께 뺐다 — 자식 `img`가 `h-full w-full`(34×34 정확)이라
+     넘칠 것이 없고, 반경이 사라진 이상 클리핑이 하는 일이 0이다.
+     ⚠ 가운데 정렬·글꼴 선언은 남긴다. 지우면 이미지가 없을 때(로드 실패)의 배치가 함께 사라진다. */
   .rs-avatar {
     width: 34px;
     height: 34px;
     flex: none;
-    border-radius: var(--radius-11);
-    overflow: hidden;
-    background: var(--gradient-primary);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -2785,6 +2896,26 @@
     font-weight: 700;
     /* 🔴 알파는 원문 0.5가 아니라 0.70이다(W-21 결정 3 · AC-01). */
     color: var(--color-sundo-ink-70);
+  }
+
+  /* 🔴 **W-23 A-5(d)(B-05) — `.d-week`가 `오늘 순찰` 카드 안으로 들어왔다.**
+     크기·굵기(§8.9.2 #2 `12px/700`)는 **한 글자도 바뀌지 않았다.** 바뀐 것은 색뿐이고,
+     그것은 배경이 스테이지(밝음)에서 `.dcard`(진초록 그라디언트)로 바뀌었기 때문이다 —
+     `--color-sundo-ink-70`을 그대로 두면 카드 위에서 읽히지 않는다.
+     값은 발명이 아니라 **같은 카드의 `.dcard-top`이 이미 쓰는 흰색 0.75**다.
+     🔬 대비: `#fff` 0.75 위 `#1F5138` 기준 **7.4:1** — §15.2 AC-01(4.5:1)을 넘긴다. */
+  .d-week-on-card {
+    color: #fff;
+    opacity: 0.75;
+  }
+
+  /* W-23 A-5(d) — 카드 첫 줄. 왼쪽 `오늘 순찰 · {요일}요일`, 오른쪽 주차 표기.
+     `.d-head`가 쓰던 배치를 그대로 옮겼다(`baseline` + `space-between` + `gap:12px`). */
+  .dcard-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
   }
 
   /* `1j` 원문 `padding:20px;border-radius:22px;background:linear-gradient(160deg,#2E6B4C,#1F5138);
@@ -3643,7 +3774,11 @@
     text-align: center;
   }
 
-  /* `20a` 원문 `margin-top:26px` + 구분선. Footer 아래 120px은 `AppShell` 소유다. */
+  /* `20a` 원문 `margin-top:26px` + 구분선. Footer 아래 120px은 `AppShell` 소유다.
+     🔴 **W-23 A-4(B-04) — 여기에 패딩을 더하지 않았다.** 원인은 여백 부족이 아니라
+     `.blur-in:has(.ft)`가 S10에서 `main`을 넘쳐 흐르게 만들어 `AppShell`의 120px이
+     **스크롤 범위에서 사라진 것**이었다(그 규칙 옆 주석에 실측이 있다). 원인을 지우면
+     120px이 그대로 돌아오므로, 그 위에 화면 패딩을 또 얹으면 **여백이 두 번 세어진다.** */
   .set-footer {
     margin-top: 26px;
     border-top: 1px solid rgba(20, 53, 38, 0.06);
@@ -3714,6 +3849,30 @@
      design `20a`가 `overflow-y:auto` 단순 흐름이라 **그것이 시안대로다.** 밀어 올리지 않는다. */
   .blur-in:has(.ft) {
     height: 100%;
+  }
+
+  /* 🔴 **W-23 A-4(B-04) — S10만 되돌린다. 여기가 「Footer가 독에 가린다」의 진짜 원인이다.**
+
+     바로 위 규칙이 `.ft`를 후손으로 가진 `.blur-in`을 **전부** `height: 100%`로 굳힌다.
+     S1·S2-1은 그것이 필요하다(둘 다 `flex flex-1` 자식으로 푸터를 바닥에 붙인다).
+     🔴 **S10은 `flex-1` 자식이 하나도 없다** — 위 주석이 이미 「밀어 올리지 않는다」고 적었다.
+     그런데 높이가 굳으면서 **`main`(1,628.5px)이 `.blur-in`(720px)을 넘쳐 흐른다.**
+
+     🔬 CDP 실측(수정 전) — `scrollHeight` **1,663** = `34 + 1,628.5`.
+     `34 + 720 + 120`(= 874)이 아니다. ⇒ **스크롤 영역의 `padding-bottom: 120px`이
+     스크롤 범위에서 사라진다.** 넘쳐 흐른 **후손**의 상자는 스크롤 오버플로에 들어가지만
+     컨테이너의 끝쪽 패딩은 그 뒤에 붙지 않기 때문이다. 최하단에서 `main` 아랫변이
+     스테이지 바닥(874)에 닿고, 독 상단(874 − (34+16+66) = **758**)이 저작권 줄을 가른다.
+     🔬 첨부4 역산이 정확히 그 자리를 가리켰다(`.ft` top = 640 → 콘텐츠 아랫변 873.5).
+
+     🔴 **iOS의 문제가 아니다.** Chrome 151에서도 그대로 재현된다 — 같은 CSS를
+     `.blur-in` 없이 두면 `padding-bottom`이 정상적으로 120px 들어간다(통제 실험).
+     ⇒ **`AppShell`의 120px을 화면 패딩으로 덧대는 것은 증상 처리다.** 원인을 지운다.
+
+     ⚠ 특이도를 `main[data-screen='S10']`으로 올려 **선언 순서에 의존하지 않게** 했다 —
+     `:has(.ft)`와 같은 특이도로 두면 규칙 순서가 바뀌는 날 조용히 되살아난다. */
+  .blur-in:has(> main[data-screen='S10']) {
+    height: auto;
   }
 
   /* 🔴 `min-height`가 아니라 **`height`**다. `min-height:100%`로 두면 높이가 여전히
@@ -4035,14 +4194,14 @@
     color: var(--color-sundo-700);
   }
 
-  /* §8.9.2 #3 — `pill soft`. 🔴 부장에게만 렌더된다(부재로 처리). */
-  .d-edit {
-    flex: none;
-    margin-left: 10px;
-  }
-
-  .d-edit:disabled {
-    opacity: 0.45;
+  /* 🔴 **W-23 A-5(a)(b)(c)(B-05) — `.d-edit`(`pill soft`, 우상단)를 지우고 이것으로 바꿨다.**
+     PM 요구가 「`기록 저장` 버튼과 같은 디자인」이라 `PrimaryButton`(§7.3 `btnp`)을
+     **그대로 재사용**한다 — 새 표면 클래스를 만들지 않았다(규약 4-2).
+     여기 있는 것은 **자리(위쪽 여백)뿐**이고 그 값은 이 버튼이 대신한 `.d-hint`의 `12px`이다.
+     ⚠ 비활성 표현(`opacity: 0.45`)은 `PrimaryButton`이 이미 갖고 있다 — 다시 적지 않는다.
+     ⚠ design R-01(「흰 버튼에 `shine`을 쓰지 않는다」)은 여기 해당 없다. `btnp`는 진초록이다. */
+  .d-editbtn {
+    margin-top: 12px;
   }
 
   /* --- 편집 시트 (design `19a`~`19c`) --- */

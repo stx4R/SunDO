@@ -3,6 +3,7 @@ import { CenterNotice } from '../components/CenterNotice'
 import { DutyEditSheet } from '../components/DutyEditSheet'
 import { DutyEmptyIcon, LoadErrorIcon } from '../components/icons'
 import { NeuButton } from '../components/NeuButton'
+import { PrimaryButton } from '../components/PrimaryButton'
 import { useToast } from '../components/Toast'
 import { useAuth } from '../contexts/AuthProvider'
 import { formatWeekLabel, toDayKey, toWeekdayKo, toWeekKey } from '../lib/dateKeys'
@@ -263,30 +264,14 @@ export default function Duty() {
 
   return (
     <main data-screen="S9" aria-labelledby="scr-s9" className="flex min-h-full flex-col">
+      {/* 🔴 **W-23 A-5(b)(d)(B-05) — 이 줄에서 둘이 나갔다.**
+          ① 주차 표기(`8월 4주차`)는 `오늘 순찰` 카드 **안 우상단**으로 옮겼다(PM 요구).
+             🔴 `weekId`를 다시 계산하지 않는다 — `formatWeekLabel(now)` **같은 호출**이 자리만 옮겼다.
+          ② `일정 편집`은 우상단에서 **완전히 빠져** 요일 카드 아래로 내려갔다(§8.9.2 #3 위치 개정). */}
       <div className="d-head">
         <h1 ref={titleRef} id="scr-s9" tabIndex={-1} className="d-title">
           {TITLE}
         </h1>
-        {/* §8.9.2 #2 — 로딩 중에는 스켈레톤. `weekId`는 이미 알지만 문서 상태와 함께 뜬다. */}
-        {duty === null ? (
-          <span className="skel" aria-hidden="true" />
-        ) : (
-          <p className="d-week">{formatWeekLabel(now)}</p>
-        )}
-        {/* §8.9.2 #3 — 🔴 **부장에게만 렌더한다.** 차장·부원·교사에게는 `disabled`가
-            아니라 **부재**다(W-15A §4-4 · W-21B §6.3과 같은 판단).
-            ⚠ §8.9.5 오프라인 행은 「`일정 편집` 비활성」을 규정하므로 그쪽은 `disabled`다 —
-            오프라인은 「지금은 안 되지만 곧 된다」이고 역할은 「영영 안 된다」다. */}
-        {canEdit && duty !== null && !failed && !empty && (
-          <button
-            type="button"
-            className="pill d-edit"
-            disabled={!online || saving}
-            onClick={openEdit}
-          >
-            {BTN_EDIT}
-          </button>
-        )}
       </div>
 
       {failed ? (
@@ -331,7 +316,12 @@ export default function Duty() {
           {weekend ? (
             /* T-04 — 오늘 카드 **자리에** 종료 안내가 온다. 다음 주 미리보기가 그 안에 붙는다. */
             <section className="dcard" aria-label={WEEKEND_DONE}>
-              <p className="dcard-top">{WEEKEND_DONE}</p>
+              <div className="dcard-head">
+                <p className="dcard-top">{WEEKEND_DONE}</p>
+                {/* W-23 A-5(d) — 주차 표기. §8.9.2 #2의 `12px/700`은 그대로이고 색만
+                    카드 표면(진초록)에 맞춘다. 🔴 `weekId` 재계산 0. */}
+                <span className="d-week d-week-on-card">{formatWeekLabel(now)}</span>
+              </div>
               {preview && (
                 <>
                   <div className="dcard-chips">
@@ -349,7 +339,11 @@ export default function Duty() {
                🔴 **W-21C — 끼니 블록 2개.** 담당자가 없는 끼니는 **블록 자체를 그리지 않는다**
                (§8.10에 「석식 없음」 문구가 없고, 빈 라벨만 남기면 고장으로 보인다). */
             <section className="dcard">
-              <p className="dcard-top">{TODAY_PREFIX + toWeekdayKo(now) + '요일'}</p>
+              <div className="dcard-head">
+                <p className="dcard-top">{TODAY_PREFIX + toWeekdayKo(now) + '요일'}</p>
+                {/* W-23 A-5(d) — 주차 표기가 `.d-head`에서 여기로 왔다. */}
+                <span className="d-week d-week-on-card">{formatWeekLabel(now)}</span>
+              </div>
               {MEALS.map((meal) => {
                 const names = schedule?.assigneeNames[todayKey]?.[meal.key] ?? []
                 const l = patrolLine(schedule, defaults, meal.key)
@@ -407,7 +401,25 @@ export default function Duty() {
             })}
           </ul>
 
-          <p className="d-hint">{HINT}</p>
+          {/* 🔴 **W-23 A-5(a)(b)(c)(B-05) — 안내 문구 자리에 `일정 편집`이 들어왔다.**
+              PM 지시는 「문구를 지우고 그 자리에 버튼」이지만, 버튼은 **부장에게만** 렌더된다
+              (부재 처리 — 아래 `disabled` 단서 참조). 문구를 전원에게서 지우면 부장이 아닌
+              사람은 그 자리에 **아무것도 보지 못하고** 「다음 주는 누가 등록하는가」를 알 길이
+              없어진다 — §8.10.5 조항이 통째로 사라지는 것이다. ⇒ **사용자 확정: 부장은 버튼,
+              나머지는 기존 문구.** 보고서 §2에 근거를 적었다.
+              🔴 **디자인은 `PrimaryButton`(§7.3 `btnp`) 그대로다 — 새 스타일을 만들지 않았다.**
+              ⚠ 오프라인·저장 중에는 `disabled`다. 역할은 「영영 안 된다」(부재)이고
+              오프라인은 「지금은 안 되지만 곧 된다」(비활성)라 표현이 갈린다(§8.9.5). */}
+          {canEdit ? (
+            <PrimaryButton
+              label={BTN_EDIT}
+              onClick={openEdit}
+              disabled={!online || saving}
+              className="d-editbtn"
+            />
+          ) : (
+            <p className="d-hint">{HINT}</p>
+          )}
         </>
       )}
 
@@ -440,7 +452,12 @@ function DutySkeleton() {
   return (
     <div aria-hidden="true">
       <section className="glass rounded-22 dcard-skel">
-        <span className="skel w-[92px]" />
+        {/* W-23 A-5(d) — 주차 표기가 카드 안으로 들어오면서 로딩 자리도 함께 왔다.
+            §8.9.2 #2의 「로딩 중에는 스켈레톤」이 `.d-head`에서 여기로 옮겨진 것이다. */}
+        <div className="dcard-head">
+          <span className="skel w-[92px]" />
+          <span className="skel h-[12px] w-[60px]" />
+        </div>
         <div className="dcard-chips">
           <span className="skel h-[33px] w-[74px] rounded-pill" />
           <span className="skel h-[33px] w-[74px] rounded-pill" />

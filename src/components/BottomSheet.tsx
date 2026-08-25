@@ -199,7 +199,12 @@ export function BottomSheet({ open, onClose, title, onClosed, children }: Bottom
             {title}
           </div>
         )}
-        {children}
+        {/* 🔴 **W-23 A-5(e)(B-05) — 내용물이 스테이지보다 길면 시트가 위로 자라 잘렸다.**
+            `.sheet`가 `max-height` + flex 컬럼이 되고 본문만 스크롤한다. 그랩 핸들과 제목은
+            위에 고정된다 — 스크롤과 함께 사라지면 아래 스와이프 닫기의 시작점이 사라진다.
+            ⚠ 드래그 핸들러는 아래 `.sheet-handle` **하나에만** 붙어 있어 본문 스크롤과
+            충돌하지 않는다(W-12 §4-2 계약이 이미 그렇게 만들어 두었다). */}
+        <div className="sheet-body">{children}</div>
       </div>
     </>,
     overlayRoot,

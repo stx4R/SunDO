@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useContext, useEffect, useState } from 'react'
 import {
   createBrowserRouter,
   Navigate,
@@ -7,7 +7,7 @@ import {
   useMatches,
   useParams,
 } from 'react-router'
-import { AppShell } from './components/AppShell'
+import { AppShell, ScrollRootContext } from './components/AppShell'
 import { Splash } from './components/Splash'
 import { ToastProvider, useToast } from './components/Toast'
 import { AuthProvider, useAuth } from './contexts/AuthProvider'
@@ -101,9 +101,39 @@ function AuthGate({ onRetry }: { onRetry: () => void }) {
  * 경로가 바뀌면 래퍼가 새 노드로 바뀌어 애니메이션이 처음부터 돈다.
  * **`DockLayout`보다 안쪽에 둔다** — 바깥에 두면 탭을 옮길 때마다 독까지
  * 다시 마운트되어 활성 알약의 가로 슬라이드가 죽는다.
+ *
+ * 🔴 **W-23 A-5(f)(B-05) — 라우트가 바뀌면 스크롤을 맨 위로 되돌린다.**
+ *
+ * 스크롤 노드는 `AppShell` 소유라(W-10 `ScrollRootContext`) **화면이 언마운트돼도
+ * 살아 있다.** 그래서 아래로 스크롤한 뒤 독으로 탭을 옮기면 새 화면이 **중간부터** 보였다.
+ * 🔬 §1-5 전수: 저장소 전체에 `scrollTo`·`scrollTop` 리셋이 **0건**이었다 —
+ * S9만의 문제가 아니라 **전역**이었다.
+ *
+ * 🔴 **`AppShell`에 prop을 만들지 않는다**(W-10 §5-1 — 여백 단독 소유자에게 정책이 붙는다).
+ * `ScrollRootContext`의 **소비자**인 이 컴포넌트가 처리한다. `usePullToRefresh`가
+ * 같은 컨텍스트를 같은 방식으로 쓰고 있어 새 통로를 내지 않았다.
+ *
+ * 🔴 **`useLayoutEffect`가 아니라 `useEffect`인 것이 중요하다.** 화면들이 `useEffect`에서
+ * 제목으로 포커스를 옮기는데(§15.3), `focus()`는 대상이 화면 밖이면 **스스로 스크롤한다.**
+ * 패시브 효과는 자식 → 부모 순이라 여기가 마지막에 돌아 최종 위치를 갖는다.
+ *
+ * ⚠ **시트는 영향을 받지 않는다.** `BottomSheet`의 N-02 히스토리 엔트리는 **같은 `pathname`**에
+ * `state`만 얹으므로 이 효과가 다시 돌지 않는다 — 시트를 열고 닫아도 스크롤이 튀지 않는다.
+ * ⚠ 당겨서 새로고침(T-05)과 무관하다 — 그쪽은 터치 제스처이고 여기는 경로 변경이다.
  */
 function ScreenTransition() {
   const { pathname } = useLocation()
+  const scrollRoot = useContext(ScrollRootContext)
+
+  useEffect(() => {
+    /* 첫 렌더에는 노드가 `null`이다(W-10 계약). 다음 렌더에서 다시 돈다.
+       ⚠ `scrollTop = 0` 대입이 아니라 `scrollTo(0, 0)`이다 — oxlint의
+       `react(immutability)`가 `useContext()` 반환값에 대한 **대입**을 경고한다.
+       규칙을 끄지 않고(규약 4-6) 같은 일을 하는 메서드로 바꿨다. `scroll-behavior`를
+       어디에도 주지 않으므로 기본값 `auto`(즉시)이고 결과는 대입과 같다. */
+    scrollRoot?.scrollTo(0, 0)
+  }, [pathname, scrollRoot])
+
   return (
     <div key={pathname} className="blur-in">
       <Outlet />
