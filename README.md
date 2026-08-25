@@ -1,4 +1,4 @@
-# SunDO. v0.10.0
+# SunDO. v0.14.0
 
 안녕하십니까?  **SunDO**의 개발자 유이준입니다.  
 해당 마크다운 문서에서는 업데이트 로그, 사용법, F&Q, 오픈소스 라이선스를 서술하고 있습니다.
@@ -7,37 +7,42 @@
 (Status Bar, Dynamic Island, Home Indicator, etc...)  
 
 ## 업데이트 로그
-<pre><code>v0.0.1 Project Scaffolding ( 진행 완료 )  
-v0.0.2 Design Token Track ( 진행 완료 )  
-v0.0.3 Layer, Appshell, Field, Switch ( 진행 완료 )    
-v0.0.4 Surface Component, Dock, Footer ( 진행 완료 )  
-v0.0.5 Toast, BottomSheet, ConfirmModal ( 진행 완료 )  
-v0.0.6 Firebase, Google OAuth ( 진행 완료 )  
-v0.0.7 Routing, Role ( 진행 완료 )  
-v0.0.8 SignUp Page ( 진행 완료 )  
-v0.0.9 AccessPage ( 진행 완료 )  
-v0.1.0 OfflineBannerSlot ( 진행 완료 )  
-v0.1.1 Main Page, GradeSelect ( 진행 완료 )  
-v0.2.0 ClassSelect, StudentSelect ( 진행 완료 )  
-v0.3.0 Record Page ( 진행 완료 )  
-v0.4.0 Schedule Page ( 진행 완료 )  
-v0.5.0 Admin Page, SignUpAccessLogic, SignUpCode ( 진행 완료 )  
-v0.6.0 Admin Page, MemberSlot, Permission ( 진행 완료 )  
-v0.7.0 Security Rules, Index ( 진행 완료 )  
-v0.8.0 Demo Deploy ( 진행 완료 )  
-v0.9.0 Setting Page, DeleteAccount ( 진행 완료 )  
-v0.9.1 Bug Fixed ( 진행 완료 )  
-v0.10.1 License Page ( 진행 완료 )  
-v0.11.0 PWA Settings ( 진행 대기 )  
-v0.12.0 OfflinefixedLogic ( 진행 대기 )  
-v0.13.0 UI/UX Patches ( 진행 대기 )  
-**v1.0.0 DEPLOY** ( 진행 대기 )  </code></pre>
+<pre><code>( 진행 완료 ) v0.0.1 Project Scaffolding   
+( 진행 완료 ) v0.0.2 Design Token Track   
+( 진행 완료 ) v0.0.3 Layer, Appshell, Field, Switch     
+( 진행 완료 ) v0.0.4 Surface Component, Dock, Footer    
+( 진행 완료 ) v0.0.5 Toast, BottomSheet, ConfirmModal   
+( 진행 완료 ) v0.0.6 Firebase, Google OAuth   
+( 진행 완료 ) v0.0.7 Routing, Role   
+( 진행 완료 ) v0.0.8 SignUp Page   
+( 진행 완료 ) v0.0.9 AccessPage   
+( 진행 완료 ) v0.1.0 OfflineBannerSlot   
+( 진행 완료 ) v0.1.1 Main Page, GradeSelect   
+( 진행 완료 ) v0.2.0 ClassSelect, StudentSelect  
+( 진행 완료 ) v0.3.0 Record Page   
+( 진행 완료 ) v0.4.0 Schedule Page   
+( 진행 완료 ) v0.5.0 Admin Page, SignUpAccessLogic, SignUpCode   
+( 진행 완료 ) v0.6.0 Admin Page, MemberSlot, Permission   
+( 진행 완료 ) v0.7.0 Security Rules, Index   
+( 진행 완료 ) v0.8.0 Demo Deploy   
+( 진행 완료 ) v0.9.0 Setting Page, DeleteAccount    
+( 진행 완료 ) v0.9.1 Bug Fixed   
+( 진행 완료 ) v0.10.1 License Page   
+( 진행 완료 ) v0.11.0 PWA Settings   
+( 진행 완료 ) v0.12.0 OfflinefixedLogic   
+( 진행 완료 ) v0.13.0 UI/UX Patches  
+( 진행 완료 ) v0.14.0 LOTS OF BUGS FIXED.  
+( 진행 중 ) v0.15.0 Functions Added. 
+( 진행 대기 ) **v1.0.0 DEPLOY**   </code></pre>
 
 ## 남은 작업
-<pre><code>1. PWA 접근성 및 편의성 패치  
-2. 오프라인 시, 기기에 임시 저장 로직  
-3. 접근성 점검  
-4. **배포** (이때부터 사용 가능) </code></pre>
+<pre><code>1. 온라인 / 오프라인 멤버 확인 기능  
+2. 차장 role 생성  
+3. 선도 일정 범위화  
+4. 선도 인원 부장 확인  
+5. AI 챗봇  
+6. 화면 모바일 기기 최적화 및 스크롤 범위 제한  
+7. PWA 편의성 패치 (복사 불가, 확대 불가, 자동 전체 화면(ui 숨기기))</code></pre>
 
 ## 미결정 사항들
 1. 현재 여러 UI/UX 패치를 하다보니 부득이하게 '프로필 사진' 기능을 추가하였습니다.  
