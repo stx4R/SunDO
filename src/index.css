@@ -230,6 +230,41 @@
   html,
   body {
     background-color: var(--color-sundo-bg-top);
+
+    /* 🔴 **W-23 B-11 — 화면 밖으로 튕기는 것을 여기서 막는다.**
+       첨부7·8은 **문서 자체**가 고무줄처럼 끌린 것이다(스테이지는 `h-dvh`라 문서에
+       스크롤할 것이 없는데도 iOS는 바운스를 준다). 안쪽 스크롤 영역이 끝에 닿아
+       넘긴 델타도 문서로 이어지므로(스크롤 체이닝) **문서에서 끊으면 둘 다 멈춘다.**
+       🔴 **당겨서 새로고침(T-05)은 죽지 않는다** — `usePullToRefresh`는 리스너가 전부
+       `passive`이고 `preventDefault`를 부르지 않는다(W-10 §4-7). 브라우저의 **시각적
+       바운스**만 사라지고 `touchstart/move/end`는 그대로 온다(§B 실측).
+       ⚠ iOS Safari 지원은 16.4+다. 그 아래에서는 **아무 일도 일어나지 않는다** —
+       고정 body 기법은 `AppShell`의 여백 계약을 깨므로 채택하지 않았다(지시서 §B-11). */
+    overscroll-behavior: none;
+  }
+
+  /* 🔴 **W-23 B-9(a)(B-09) — 길게 눌러도 복사되지 않는다.**
+     `-webkit-touch-callout`은 표준 대응 속성이 **없어** 손으로 적는다 —
+     `.rrow-press`가 이미 같은 이유로 그렇게 하고 있다. `user-select`는 표준이므로
+     접두사를 적지 않는다(lightningcss가 붙인다 · W-02 §4-1).
+
+     🔴 **`touch-action: manipulation`을 함께 둔다** — B-9(b)의 절반이다.
+     `viewport`의 `maximum-scale`만으로는 iOS가 **더블탭 줌**을 막지 않는다. */
+  body {
+    -webkit-touch-callout: none;
+    user-select: none;
+    touch-action: manipulation;
+  }
+
+  /* 🔴 **입력 요소는 반드시 예외다.** 선택이 죽으면 `Field`의 편집·캐럿 복원이 깨진다
+     (W-08 §5-2 — 학번 4자리 자동 이동이 캐럿 위치를 직접 다룬다).
+     ⚠ 이 저장소에 `textarea`·`contenteditable`은 없지만(전수 확인) 함께 적는다 —
+     생기는 날 조용히 깨지는 것보다 낫다. */
+  input,
+  textarea,
+  [contenteditable] {
+    -webkit-touch-callout: default;
+    user-select: text;
   }
 }
 
@@ -299,17 +334,43 @@
      성립한다(흰색보다 밝은 색이 없다).
      🔬 대비 실측(`.btnp` 그라디언트의 밝은 끝 `#2E6B4C` 기준): 기저 0.82 → **4.80:1**.
      §15.2 AC-01(18px 미만 4.5:1)을 넘긴다. 순백 띠는 6.24:1이라 더 안전하다. */
+  /* 🔴 **W-23 B-7(B-07) — ShinyText의 시각 공식으로 갈아 끼웠다. 의존성은 0이다.**
+
+     🔬 §1-4 전수: `.shine`의 소비자는 **`PrimaryButton` 라벨 한 곳뿐**이고,
+     W-21 P-2가 이미 `background-clip: text`로 바꿔 두었다 —
+     🔴 **지시서 Q-2의 전제(「`.shine`은 표면 광택이고 ShinyText는 텍스트다, 다른 것이다」)는
+     이미 낡았다.** 둘은 같은 종류이고, 남은 차이는 **정지점·이동 범위**뿐이었다.
+
+     | ShinyText 사양 | 이전 | 지금 |
+     | --- | --- | --- |
+     | `linear-gradient(${spread}deg, c 0%, c 35%, shine 50%, c 65%, c 100%)` | `100deg, 0.82 40%, #fff 50%, 0.82 60%` | ✅ 정지점 5개 |
+     | `background-size: 200% auto` | `200% 100%` | ✅ (그라디언트에서 `auto`와 `100%`는 같은 높이다) |
+     | `background-clip: text` | ✅ 이미 | ✅ |
+     | `background-position: 150% → -50%` | `130% → -30%` | ✅ `@keyframes shineText` |
+     | `speed`(주기) · `delay`(정지) · `direction` | 2.8s · 정지 없음 · 정방향 | **유지**(사용자 확정) |
+
+     🔴 **`motion` 패키지를 설치하지 않았다**(규약 4-1 · 결함 E-3 · `package.json` diff 0줄).
+     ShinyText 원본은 `useAnimationFrame`(rAF)이라 **`prefers-reduced-motion`을 스스로 지키지 않는다** —
+     CSS 애니메이션은 아래 reduce 블록이 그대로 이긴다. **결과가 같고 위험이 하나 적다.**
+
+     🔴 **`spread`는 `100deg` 그대로다.** ShinyText가 그 값을 규정하지 않고(파라미터다)
+     `100deg`는 design `@keyframes shine`과 짝을 이루던 이 저장소의 값이다 — 없는 기본값을 짓지 않는다.
+     🔴 **기저색 `rgba(255,255,255,0.82)`도 그대로다.** ShinyText의 `color`(기저) 자리이고,
+     `.btnp` 그라디언트의 밝은 끝(`#2E6B4C`) 위에서 **4.80:1**로 §15.2 AC-01을 넘긴다(W-21 P-2 실측).
+     🔴 **`yoyo`·`pauseOnHover`는 만들지 않았다** — 소비자가 0개다. */
   .shine {
     display: inline-block;
     background-image: linear-gradient(
       100deg,
-      rgba(255, 255, 255, 0.82) 40%,
+      rgba(255, 255, 255, 0.82) 0%,
+      rgba(255, 255, 255, 0.82) 35%,
       #fff 50%,
-      rgba(255, 255, 255, 0.82) 60%
+      rgba(255, 255, 255, 0.82) 65%,
+      rgba(255, 255, 255, 0.82) 100%
     );
-    background-size: 200% 100%;
+    background-size: 200% auto;
     background-repeat: no-repeat;
-    animation: shine 2.8s linear infinite;
+    animation: shineText 2.8s linear infinite;
   }
 
   /* 🔴 **`color: transparent`를 맨몸으로 쓰지 마라.** `background-clip:text`가 없는 환경에서
@@ -4136,9 +4197,12 @@
     transform: scale(0.97);
   }
 
-  /* 🔴 §8.7.4 T-04 롱프레스가 걸린 행. iOS는 길게 누르면 선택 핸들과 콜아웃을
-     띄우는데, 시트와 겹치면 둘 다 못 쓰게 된다. **권한이 있는 행에만** 건다 —
-     누를 수 없는 행의 텍스트 선택까지 막을 이유가 없다.
+  /* 🔴 §8.7.4 T-04가 걸린 행 — **W-23 B-6에서 롱프레스가 「단일 탭」으로 바뀌었다.**
+     iOS는 길게 누르면 선택 핸들과 콜아웃을 띄우는데, 탭으로 여는 시트와 겹치면 둘 다 못 쓴다.
+     **권한이 있는 행에만** 건다 — 누를 수 없는 행의 텍스트 선택까지 막을 이유가 없다.
+     ⚠ **W-23 B-9(a)가 `body`에 같은 두 줄을 전역으로 깔았지만 이 규칙을 지우지 않는다.**
+     전역 차단은 언제든 예외가 늘 수 있고(입력 요소가 이미 예외다), 이 행은 **탭 대상**이라
+     선택이 살아나면 시트와 선택 핸들이 겹친다 — 화면이 자기 조건을 명시적으로 갖는다.
      ⚠ `touch-action`은 건드리지 않는다. 목록 스크롤이 죽는다. */
   .rrow-press {
     -webkit-touch-callout: none;
@@ -4606,13 +4670,29 @@
   }
 }
 
-/* design/index.html 원문 그대로 — 수정 금지 */
+/* design/index.html 원문 그대로 — 수정 금지.
+   🔴 **W-23 B-7 — 소비자가 0이 됐지만 지우지 않는다.** 이것은 design 산출물의 원문이고
+   DS-01(시각 원본은 `design/`)의 대상이다. 고쳐서 쓰면 원문이 사라지므로, **건드리지 않고
+   옆에 `shineText`를 새로 두었다.** `.shine`의 **적용 규칙**은 처음부터 이 저장소 소유였다
+   (🔬 design 전수: `@keyframes shine`은 있으나 적용 규칙 **0건** · W-21 P-2). */
 @keyframes shine {
   from {
     background-position: 130% 0;
   }
   to {
     background-position: -30% 0;
+  }
+}
+
+/* 🔴 **W-23 B-7(B-07) — ShinyText의 이동 범위.** 위 `shine`(130% → -30%, 이동 1.6×)보다
+   넓은 **2.0×**라 같은 2.8초 안에서 띠가 더 빠르게 지나가고 주기 사이의 정지 구간이 길어진다 —
+   ShinyText가 `delay` 없이도 「반짝」으로 읽히는 이유가 그 여백이다. */
+@keyframes shineText {
+  from {
+    background-position: 150% 0;
+  }
+  to {
+    background-position: -50% 0;
   }
 }
 

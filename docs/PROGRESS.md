@@ -251,8 +251,8 @@ v0.18.0
       보고서 `reports/W-21C.md` · 콘솔 요청서 `database_ToDo/W-21C.md`
 
 ## 진행 중
-- 🔴 **W-23 진행 중 (버그 12건 · 3단계).** §A(시각·레이아웃) **1단계 커밋 완료**.
-  다음은 §B(조작·전역·인프라) · §C(저장소 정리, **승인 뒤**).
+- 🔴 **W-23 진행 중 (버그 12건 · 3단계).** §A·§B **커밋 완료**.
+  다음은 §C(저장소 정리) — 🔴 **표를 제출하고 승인을 받은 뒤에만 실행한다.**
 
   ### 착수 전 5문의 답 (§0.2 · 사용자 확정)
   | # | 답 |
@@ -299,12 +299,46 @@ v0.18.0
   - **B-08** `splitSentences`가 `[.?!]`로. 🔬 사전 전수에서 **실제로 갈리는 것은 MD-04 하나**이고
     문자열 끝 빈 줄 0 · 연속 구분자 이중 줄바꿈 0 · 소수·URL 미해당을 역검증했다.
 
-  ### 🔴 §A에서 드러난 것 — st4R 신규
+  ### ✅ §B(2단계)가 닫은 것 — **의존성 추가 0 · `package.json` diff 0줄**
+  - 🔴 **B-10의 원인을 실측으로 특정했다 — 코드 수정 0줄.**
+    `identitytoolkit` 공개 설정에 `authorizedDomains = [localhost, …firebaseapp.com, …web.app]`이고
+    **`sundo.today`가 없다** ⇒ `auth/unauthorized-domain`(진단표 ②). 콘솔에서 1분이면 끝난다.
+    🔴 **④(`authDomain`이 `…web.app`)도 함께 참이다** — W-21 P-0(iOS standalone 무한 루프)이
+    다시 열려 있다. 🔴 **지시서 §4-5에 따라 바꾸지 않고 판단을 올렸다**(`database_ToDo/W-23.md` §2).
+  - **B-06** 롱프레스 → **단일 탭**. `pointer*` 타이머 경로가 통째로 사라졌다(둘을 함께 두면
+    시트가 두 번 열린다). 권한 없는 행에는 **핸들러·`role`·`tabIndex`를 아예 붙이지 않는다**(부재).
+    연속 탭 빗장은 **`ref`**(`tappingRef`)이고 시트가 완전히 닫힐 때 푼다.
+    ⚠ **W-21B가 st4R로 올린 「키보드 진입 경로 없음」이 여기서 닫혔다** — `role="button"` +
+    Enter/Space + `aria-label`(`{학생} {학번} 기록 관리`).
+  - **B-07** ShinyText **공식만** 이식(정지점 5개 · `200% auto` · `150% → -50%`), 타이밍은 유지.
+    🔴 **`motion` 미설치**(규약 4-1). `@keyframes shine`(design 원문)은 **건드리지 않고**
+    `shineText`를 옆에 두었다. 🔬 reduce에서 글자가 사라지지 않는다 — **대비 6.78:1**(픽셀 실측).
+  - **B-09(a)** `body`에 `user-select: none` + `-webkit-touch-callout: none`.
+    🔬 `input`·`textarea`·`[contenteditable]` 예외 실측(캐럿 이동·전체 선택 정상) ·
+    **접근성 트리 영향 0**(`Accessibility.getFullAXTree`로 확인).
+  - **B-09(b)** 🔴 **핀치까지 차단(사용자 확정) — W-03A DoD 6을 폐기했다.**
+    `viewport`의 `maximum-scale=1, user-scalable=no` + `body { touch-action: manipulation }` +
+    `src/lib/zoom.ts`의 `gesturestart` 차단(iOS는 viewport 두 값을 무시한다).
+    **대체 경로는 AC-05**(루트 글꼴 미고정 → 시스템 글자 크기를 따른다).
+  - **B-09(c)** 3분기. `beforeinstallprompt`를 잡으면 **`원클릭 설치`**, 못 잡으면(iOS) **기존 안내**,
+    이미 standalone이면 `설치됨`. 🔴 **PM 지시(위젯 폐기)를 그대로 따르지 않았다** —
+    iOS에는 그 이벤트가 없어 폐기하면 iPhone에서 설치가 불가능해진다. 근거는 보고서 §3.
+  - **B-11** `html`·`body`에 `overscroll-behavior: none`(배경색과 **같은 규칙**이다).
+    🔬 **T-05가 죽지 않았다** — CDP 실제 터치 120px 드래그로 1회 발화 확인.
+    ⚠ 스크롤 영역에는 걸지 못했다 — `AppShell` diff 0줄(DoD 5) 때문이다. 실기기에서 밀림이
+    남으면 다음 회차가 거기 `overscroll-behavior: contain` 한 줄을 더한다.
+
+  ### 🔴 §A·§B에서 드러난 것 — st4R 신규
   1. 🔴 **`AppShell`의 120px은 「넘쳐 흐르는 화면」에서 언제든 사라질 수 있다.** S10은 원인을
      지웠지만 구조는 그대로다 — 제대로 된 해법은 120px을 **스페이서 자식**으로 옮기는 것이다.
   2. **`.ss-avatar`(학생 검색 시트)에 `.rs-avatar`와 똑같은 초록 배경 결함이 남아 있다** —
      B-02의 범위가 「S6만」이라 건드리지 않았다.
   3. **`README.md`의 버전이 v0.16.1에서 멈춰 있다**(버전 3곳에 포함되지 않는 파일이다).
+  4. 🔴 **§8.7.4 T-04의 문언(「행 롱프레스 0.5초」)이 사실이 아니게 됐다** — 조항 개정 대상.
+  5. ⚠ **S7 기록 행이 `<li role="button">`이라 `<ul>`의 리스트 의미가 약해졌다.**
+     행을 버튼으로 알리는 쪽을 택했고(S5가 이미 `<button className="srow">`다), 되돌리려면
+     `<li>` 안에 상호작용 자식을 넣고 `.rrow:last-child` 규칙을 옮겨야 한다.
+  6. **§8.10 신규 문구 2건** — `기록 관리`(행 접근 이름 · 화면에 안 보인다) · `원클릭 설치`(S10 칩).
 
 - 🔴 **W-22B 완료 — 커밋 `SunDO v0.17.0`.** 남은 것은 **PM의 콘솔 5건과 W-22A 스모크**다.
 

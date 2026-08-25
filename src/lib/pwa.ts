@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 
 /**
  * PWA 런타임 — W-19 · PRD §18.2 · EC-24 · EC-30.
@@ -130,16 +130,92 @@ export function useServiceWorkerUpdate(): { updateReady: boolean; applyUpdate: (
   }
 }
 
+/* ── W-23 B-9(c)(B-09) — 원클릭 설치 ──────────────────────────────────────
+   🔴 **W-19의 「`beforeinstallprompt`를 잡아 두지 않는다」 결정을 되돌린다.**
+   그때의 근거는 「잡으면 Chrome 기본 설치 UI가 사라지는데 **대체할 것이 없다**」였다.
+   이제 대체가 생겼다 — S10의 `원클릭 설치` 행이다. 근거가 사라졌으므로 결정도 바뀐다.
+
+   🔴 **PM 지시(「설치 가이드 위젯과 기능을 폐기하라」)를 그대로 따르지 않았다.**
+   iOS Safari에는 `beforeinstallprompt`가 **존재하지 않는다.** 통째로 폐기하면
+   **iPhone 사용자는 설치 방법을 알 길이 없어지고**, M-01의 측정 기기가 바로 iPhone Safari다
+   (§17.1 DoD). ⇒ **분기한다.** 근거는 `reports/W-23.md` §3에 있고 판단을 받는다.
+
+   ⚠ **이벤트는 한 번 쓰면 소모된다.** `prompt()` 뒤에는 버리고, 브라우저가 다시 쏘면 다시 잡는다.
+   ⚠ **`main.tsx`에서 부른다** — 이 이벤트는 React가 마운트되기 **전에** 도착할 수 있다.
+   ⚠ `useSyncExternalStore`를 쓴 것은 취향이 아니다. `useState` + `useEffect` 구독은
+   oxlint의 `set-state-in-effect`를 새로 하나 늘린다(기준선 18 유지 · 규약 4-6).
+   ────────────────────────────────────────────────────────────────────── */
+
+/** 표준이 아니다 — Chromium 전용이라 `lib.dom`에 타입이 없다. 필요한 두 멤버만 적는다. */
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>
+}
+
+let deferredPrompt: BeforeInstallPromptEvent | null = null
+const promptListeners = new Set<() => void>()
+const emitPrompt = () => {
+  for (const listener of promptListeners) listener()
+}
+
+/** 🔴 `main.tsx`에서 **렌더보다 먼저** 부른다. */
+export function captureInstallPrompt(): void {
+  if (typeof window === 'undefined') return
+  window.addEventListener('beforeinstallprompt', (event) => {
+    /* 기본 UI를 미루고 우리가 쥔다. 이것을 부르지 않으면 브라우저가 자체 배너를 띄운다. */
+    event.preventDefault()
+    deferredPrompt = event as BeforeInstallPromptEvent
+    emitPrompt()
+  })
+  /* 설치가 끝나면 더 이상 권할 것이 없다. `isStandalone()`은 **다음 실행**에야 참이 되므로
+     이 이벤트가 없으면 설치 직후에도 버튼이 남는다. */
+  window.addEventListener('appinstalled', () => {
+    deferredPrompt = null
+    emitPrompt()
+  })
+}
+
+function subscribePrompt(onChange: () => void): () => void {
+  promptListeners.add(onChange)
+  return () => {
+    promptListeners.delete(onChange)
+  }
+}
+
+const promptSnapshot = () => deferredPrompt !== null
+
+/**
+ * §8.11.2 「홈 화면에 추가」 행이 쓴다. `available`이 거짓이면 **기존 안내 시트**로 간다
+ * (iOS가 그 경우다 — 지우면 iPhone에서 설치가 불가능해진다).
+ */
+export function useInstallPrompt(): {
+  available: boolean
+  promptInstall: () => Promise<void>
+} {
+  const available = useSyncExternalStore(subscribePrompt, promptSnapshot, () => false)
+
+  const promptInstall = useCallback(async () => {
+    const event = deferredPrompt
+    if (!event) return
+    /* 🔴 **먼저 버린다.** `prompt()`는 두 번 부를 수 없고, 사용자가 두 번 탭하면
+       두 번째 호출이 예외를 던진다. */
+    deferredPrompt = null
+    emitPrompt()
+    await event.prompt()
+    await event.userChoice
+  }, [])
+
+  return { available, promptInstall }
+}
+
 /**
  * EC-24 · §18.2 「전역 설치 배너 1회 노출」 — design `10d`.
  *
  * 🔴 **iOS에서만 뜬다**(사용자 결정). design 부제 `공유 버튼 → 홈 화면에 추가`는
  * iOS의 실제 경로이고, Android/Chrome에는 그런 흐름이 없다. Android용 문구는
- * §8.10 사전에 **없으므로 만들지 않는다**(규약 4-4). Chrome은 브라우저 자체 설치 UI가
- * 그 자리를 대신한다.
- *
- * 🔴 **`beforeinstallprompt`를 잡아 두지 않는다.** 잡아 두면 Chrome의 기본 설치 UI가
- * 사라지는데, 대체할 안내 문구가 규격에 없다 — 지금 잡는 것은 순손실이다.
+ * §8.10 사전에 **없으므로 만들지 않는다**(규약 4-4).
+ * ⚠ **W-23에서도 이 배너는 그대로다.** B-09(c)가 바꾼 것은 S10의 **행**이고
+ * 이 배너는 iOS 전용이라 `beforeinstallprompt`와 애초에 겹치지 않는다.
  */
 export function useInstallGuide(): { show: boolean; dismiss: () => void } {
   const [dismissed, setDismissed] = useState(() => {

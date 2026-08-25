@@ -10,7 +10,7 @@ import { Switch } from '../components/Switch'
 import { useToast } from '../components/Toast'
 import { useAuth } from '../contexts/AuthProvider'
 import { refreshSessionCaches, saveNotificationPrefs, withdrawAccount } from '../lib/account'
-import { isStandalone } from '../lib/pwa'
+import { isStandalone, useInstallPrompt } from '../lib/pwa'
 import { fetchDepartment } from '../lib/stats'
 import { useOnline } from '../lib/useOnline'
 
@@ -54,6 +54,11 @@ const ROW_A2HS = '홈 화면에 추가'
 const CHIP_A2HS = '설치 안내'
 /** §8.11.3 #6 — standalone이면 값이 바뀌고 비활성이다. */
 const CHIP_A2HS_DONE = '설치됨'
+/**
+ * 🔴 **W-23 B-9(c)** — `beforeinstallprompt`를 잡은 환경에서만 쓰는 칩.
+ * §8.10 사전에 **없다** — PM 원문 그대로이고 보고서 §7 신규 항목이다(규약 4-5).
+ */
+const CHIP_A2HS_ONECLICK = '원클릭 설치'
 const ROW_REFRESH = '데이터 새로고침'
 
 const BTN_LOGOUT = '로그아웃'
@@ -131,6 +136,8 @@ export default function Settings() {
   const navigate = useNavigate()
   const toast = useToast()
   const online = useOnline()
+  /* 🔴 W-23 B-9(c) — `beforeinstallprompt`를 잡았는가. 훅이므로 `if (!profile)`보다 위다. */
+  const { available: installAvailable, promptInstall } = useInstallPrompt()
 
   const titleRef = useRef<HTMLHeadingElement>(null)
   /* §3.5 — 되돌릴 수 없는 조작의 동기 빗장. 양도(S8)와 같은 급이다. */
@@ -180,6 +187,20 @@ export default function Settings() {
   const pushOn = pushSupported()
   const standalone = isStandalone()
   const showApproval = APPROVAL_ROLES.has(role)
+
+  /**
+   * §8.11.2 「홈 화면에 추가」 행 — 🔴 **W-23 B-9(c)의 3분기.**
+   * `standalone`이면 버튼이 `disabled`라 여기까지 오지 않지만, 계약을 한 곳에 모아 둔다.
+   */
+  const handleA2hsTap = () => {
+    if (standalone) return
+    if (installAvailable) {
+      void promptInstall()
+      return
+    }
+    /* iOS 등 — 기존 안내 시트. 🔴 이 갈래를 지우면 iPhone에서 설치 경로가 사라진다. */
+    setA2hsOpen(true)
+  }
 
   /* T-02 — 아무 동작도 하지 않고 자물쇠만 0.2s 1회 흔든다. */
   const handleLockTap = () => {
@@ -360,14 +381,25 @@ export default function Settings() {
               {/* GT-07 — `package.json`에서 빌드 시각에 주입된다(`vite.config.ts`). */}
               <span className="set-rowver">{__APP_VERSION__}</span>
             </div>
+            {/* 🔴 **W-23 B-9(c)(B-09) — 3분기다.**
+                | 환경 | 칩 | 탭 |
+                | --- | --- | --- |
+                | 이미 standalone | `설치됨` | **비활성**(§8.11.3 #6 기존 규정 그대로) |
+                | `beforeinstallprompt`를 잡았다(Android/Chrome) | **`원클릭 설치`** | `prompt()` |
+                | 잡지 못했다(**iOS 등**) | `설치 안내` | 기존 안내 시트 |
+                🔴 **세 번째 줄을 지우지 않은 것이 이 분기의 요점이다.** iOS Safari에는
+                `beforeinstallprompt`가 없어 원클릭 설치가 **물리적으로 불가능**하고,
+                안내를 없애면 iPhone에서 설치 경로가 통째로 사라진다(§8.11.2 · M-01). */}
             <button
               type="button"
               className="set-row set-row-tap"
-              onClick={() => !standalone && setA2hsOpen(true)}
+              onClick={handleA2hsTap}
               disabled={standalone}
             >
               <span className="set-rowname">{ROW_A2HS}</span>
-              <Chip>{standalone ? CHIP_A2HS_DONE : CHIP_A2HS}</Chip>
+              <Chip>
+                {standalone ? CHIP_A2HS_DONE : installAvailable ? CHIP_A2HS_ONECLICK : CHIP_A2HS}
+              </Chip>
             </button>
             <button
               type="button"

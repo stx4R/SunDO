@@ -6,7 +6,19 @@
          `favicon.svg`는 팔레트 밖(#863bff)이라 참조하지 않는다. -->
     <link rel="icon" href="/favicon.ico" sizes="64x64" />
     <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon-180.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <!-- 🔴 **W-23 B-9(b)(B-09) — `maximum-scale`·`user-scalable`이 여기서 붙었다(PM 확정: 핀치까지 차단).**
+         🔴 **이것은 W-03A DoD 6(「`maximum-scale`·`user-scalable` 부재 0건」 · §15 접근성 조치)을
+         폐기하는 결정이다.** 사용자가 명시 요구했고, 보고서 `reports/W-23.md` §3에 폐기 사실과
+         근거를 적었다.
+         🔴 **대체 접근성 경로가 살아 있다** — AC-05가 루트 글꼴을 고정하지 않아(`index.css` §7.2 주석)
+         시스템 글자 크기 설정이 그대로 앱 전체를 키운다. 32px 루트·200%에서 가로 스크롤 0임을
+         W-15B §4-7이 실측했다. 저시력 사용자가 완전히 막히지는 않는다.
+         ⚠ iOS Safari는 iOS 10부터 이 두 값을 **무시한다.** 핀치는 `src/lib/zoom.ts`의
+         `gesturestart` 차단이 맡고, 더블탭 줌은 `body { touch-action: manipulation }`이 맡는다. -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no"
+    />
     <!-- §7.1 --bg-top. manifest의 theme_color·background_color와 같은 값이다. -->
     <meta name="theme-color" content="#F7FBF8" />
     <!-- PRD §18.2 iOS 메타. `display: standalone`만으로는 iOS가 홈 화면 실행을

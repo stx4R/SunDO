@@ -102,16 +102,19 @@ const MD_04 = {
 /** §8.10.3에 수정·삭제 실패 코드가 없다. ER-07(저장 실패)을 그대로 쓴다. */
 const ER_07 = '저장에 실패했습니다. 다시 시도해 주세요'
 
-/** §8.7.4 T-04 — 「행 롱프레스 **0.5초**」. 규격이 값을 고정한다. */
-const LONG_PRESS_MS = 500
 /**
- * 롱프레스를 취소하는 이동 거리(px).
- *
- * **규격에도 design에도 없는 신규 값이다**(보고서 §7). 없으면 목록을 스크롤하려고
- * 손가락을 올린 0.5초가 그대로 액션 시트가 된다. 탭 판정의 관용 오차(보통 8~10px)와
- * 같은 자리라 10px로 잡았다.
+ * 🔴 **W-23 B-6(B-06)** — 기록 행의 접근 가능한 이름 꼬리.
+ * 액션 시트가 하는 일(사유 변경 · 기록 삭제)을 한 낱말로 묶은 것이고
+ * §8.10 사전에 이 문자열은 **없다** — 보고서 §7 신규 항목이다(규약 4-5).
+ * ⚠ 화면에 **보이지 않는다.** 스크린리더만 읽는다.
  */
-const LONG_PRESS_MOVE_PX = 10
+const ROW_ACTION = '기록 관리'
+
+/* 🔴 **W-23 B-6(B-06)** — `LONG_PRESS_MS`(500)와 `LONG_PRESS_MOVE_PX`(10)가 여기 있었다.
+   진입이 「행 탭」이 되면서 **둘 다 소비자가 0이 됐다.** 값만 남겨 두면 다음 사람이
+   「롱프레스가 아직 어딘가 있다」고 읽는다.
+   🔴 **§8.7.4 T-04의 문언(「행 롱프레스 0.5초」)이 사실이 아니게 됐다** — 조항 개정 대상이고
+   보고서 §9(st4R)에 올렸다. PRD 파일은 이 회차가 고치지 않는다(§0.4). */
 
 /** §8.7.5 로딩 — 목록 5행 스켈레톤(design `6b`). */
 const SKELETON_ROWS = 5
@@ -481,15 +484,32 @@ export default function Records() {
     })
   }, [])
 
+  /**
+   * 🔴 **W-23 B-6(B-06) — 연속 탭 빗장. 상태가 아니라 `ref`다**(W-06 §5-4).
+   *
+   * 롱프레스(0.5초)일 때는 같은 태스크 안에서 두 번 발화할 수 없었지만 **탭은 된다** —
+   * 더블탭의 두 번째 `click`이 리렌더 **전에** 도착하면 `actionOpen`은 아직 `false`라
+   * 상태 조건이 통과하고 시트가 두 번 열린다(히스토리 엔트리도 두 개 쌓인다).
+   * S5의 `tappingRef`(W-11 §4-7 · W-12 §3.6)와 같은 장치다.
+   */
+  const tappingRef = useRef(false)
+
   const openActions = useCallback(
     (row: RecordRow) => {
+      /* 🔴 **동기 빗장이 맨 앞이다.** 아래 상태 조건들보다 먼저 봐야 같은 태스크의 연타를 막는다. */
+      if (tappingRef.current) return
       /* 🔴 **오프라인에서는 열지 않는다.** §8.7.5가 오프라인 S7을 「캐시 목록」으로
-         규정하고 쓰기 경로가 없다. 무반응은 §8.7.2 #7의 「부원은 롱프레스 무반응」과
+         규정하고 쓰기 경로가 없다. 무반응은 §8.7.2 #7의 「부원은 남의 기록에 무반응」과
          같은 처리다 — §8.10에 「오프라인에서는 수정할 수 없습니다」 문구가 없어
-         없는 문구를 지어내지 않았다(보고서 §6). */
+         없는 문구를 지어내지 않았다(보고서 §6).
+         ⚠ 오프라인이면 행에 탭 핸들러 자체가 붙지 않지만(`pressable`), 온라인 → 오프라인
+         전환과 탭이 겹치는 한 프레임이 있어 여기서도 본다. 두 곳이 **같은 판정**이다. */
       if (!online) return
       if (!canEditRecord(actor, row)) return
       if (actionOpen || editOpen || confirmOpen) return
+      /* 빗장은 여기서 건다 — 위 조건에서 되돌아간 탭은 잠그지 않는다.
+         푸는 곳은 `handleActionClosed` 하나다(시트가 완전히 닫힌 뒤). */
+      tappingRef.current = true
       setTarget(row)
       setActionOpen(true)
     },
@@ -502,6 +522,9 @@ export default function Records() {
    * 엔트리 두 개가 쌓여 뒤로가기가 한 번 헛돈다.
    */
   const handleActionClosed = () => {
+    /* 🔴 W-23 B-6 — 연속 탭 빗장을 여기서 푼다. 액션 시트가 **완전히** 사라진 뒤이고,
+       이어서 사유 변경·삭제로 넘어가는 경우에는 그쪽 상태가 이미 서 있어 재진입이 막힌다. */
+    tappingRef.current = false
     const next = nextActionRef.current
     nextActionRef.current = null
     if (next === 'edit') {
@@ -783,11 +806,11 @@ export default function Records() {
                     row={row}
                     withdrawn={withdrawn.has(row.createdBy)}
                     rising={risingIds.has(row.id)}
-                    /* 🔴 오프라인이면 권한이 있어도 롱프레스를 걸지 않는다 —
+                    /* 🔴 오프라인이면 권한이 있어도 탭을 걸지 않는다 —
                        `openActions`와 같은 판정을 여기서도 해야 `user-select` 잠금이
                        열리지 않는다(누를 수 없는 행에 선택 금지를 걸지 않는다). */
                     pressable={online && canEditRecord(actor, row)}
-                    onLongPress={openActions}
+                    onOpen={openActions}
                   />
                 ))}
               </ul>
@@ -900,87 +923,60 @@ function StatCard({
 /**
  * §8.7.2 #7 — 기록 행. design `20f` 원문.
  *
- * 🔴 **W-21B — 롱프레스 0.5초가 여기서 붙었다**(§8.7.4 T-04).
+ * 🔴 **W-23 B-6(B-06) — 롱프레스 0.5초를 걷어내고 「단일 탭」으로 바꿨다**(PM 요구).
  *
- * `pressable`이 거짓이면 타이머를 아예 걸지 않는다 — 권한 없는 행은 **무반응**이고
- * 그것이 §8.7.2 #7 「부원은 롱프레스 무반응」의 형태다.
+ * 🔴 **둘을 함께 두지 않았다.** 롱프레스는 손을 뗄 때 `click`도 함께 발화하므로
+ * 남겨 두면 시트가 **두 번** 열린다. `pointer*` 타이머 경로는 통째로 사라졌다.
  *
- * ⚠ **키보드 진입 경로가 없다.** §8.7.4 T-04가 롱프레스만 규정하고 design `18`에도
- *   다른 진입점이 없어 만들지 않았다 — 보고서 §8에 st4R로 올렸다.
+ * 🔴 **권한 조건은 W-21B 그대로다.** `pressable`이 거짓이면 `onClick`·`role`·`tabIndex`를
+ * **아예 붙이지 않는다** — 「아무 일도 없다」는 `disabled`가 아니라 **부재**이고
+ * 그것이 §8.7.2 #7 「부원은 남의 기록에 무반응」의 형태다(W-15A §4-4와 같은 판단).
+ * 판정자는 여전히 `records.ts`의 `canEditRecord()` **하나**다.
  *
- * 🔬 **`pointercancel`이 스크롤 취소를 맡는다.** iOS는 스크롤이 시작되면 포인터를
- *   취소하므로 타이머가 그때 풀린다. 그래도 `pointermove` 임계값을 함께 둔 이유는
- *   데스크톱 마우스가 드래그해도 `pointercancel`을 쏘지 않기 때문이다.
+ * ⚠ **키보드 진입 경로가 생겼다.** W-21B가 st4R로 올린 항목(「롱프레스만 있어 키보드로
+ *   닿을 수 없다」)이 여기서 닫힌다 — 탭이 되는 순간 `role="button"`이 자연스럽고,
+ *   `role`만 주고 키를 받지 않으면 그것이 오히려 접근성 함정이다.
+ * ⚠ **접근 가능한 이름에 대상이 들어간다** — `{학생} {학번} 기록 관리`.
+ *   W-15A의 `{이름} 가입 승인`과 같은 조립 방식이고 새 문장을 짓지 않았다.
  */
 function Row({
   row,
   withdrawn,
   rising,
   pressable,
-  onLongPress,
+  onOpen,
 }: {
   row: RecordRow
   withdrawn: boolean
   rising: boolean
   pressable: boolean
-  onLongPress: (row: RecordRow) => void
+  onOpen: (row: RecordRow) => void
 }) {
-  const timerRef = useRef<number | null>(null)
-  const startRef = useRef<{ x: number; y: number } | null>(null)
-
-  const cancelPress = useCallback(() => {
-    if (timerRef.current !== null) {
-      window.clearTimeout(timerRef.current)
-      timerRef.current = null
-    }
-    startRef.current = null
-  }, [])
-
-  /* 언마운트(필터 변경·삭제)에도 타이머가 남지 않게 한다. */
-  useEffect(() => cancelPress, [cancelPress])
-
-  const handleDown = (event: React.PointerEvent<HTMLLIElement>) => {
-    if (!pressable) return
-    /* 마우스는 주 버튼만 — 보조 버튼은 `contextmenu`가 받는다. */
-    if (event.pointerType === 'mouse' && event.button !== 0) return
-    cancelPress()
-    startRef.current = { x: event.clientX, y: event.clientY }
-    timerRef.current = window.setTimeout(() => {
-      timerRef.current = null
-      startRef.current = null
-      onLongPress(row)
-    }, LONG_PRESS_MS)
-  }
-
-  const handleMove = (event: React.PointerEvent<HTMLLIElement>) => {
-    const start = startRef.current
-    if (!start) return
-    if (
-      Math.abs(event.clientX - start.x) > LONG_PRESS_MOVE_PX ||
-      Math.abs(event.clientY - start.y) > LONG_PRESS_MOVE_PX
-    ) {
-      cancelPress()
-    }
-  }
-
   const tag = TAG[row.reasonCode]
   const author = `작성 ${row.createdByName}`
   /* AC-14 · §15.3 — 취소선만으로 구분하지 않는다. */
   const authorLabel = withdrawn ? author + WITHDRAWN_SUFFIX : undefined
   const authorClass = withdrawn ? 'rby rby-out' : 'rby'
+  /* 🔴 권한 없는 행에는 이 객체 자체가 붙지 않는다 — `onClick`도 `role`도 `tabIndex`도 없다. */
+  const interactive = pressable
+    ? {
+        role: 'button' as const,
+        tabIndex: 0,
+        'aria-label': `${row.studentName} ${row.studentNo} ${ROW_ACTION}`,
+        onClick: () => onOpen(row),
+        onKeyDown: (event: React.KeyboardEvent<HTMLLIElement>) => {
+          /* `role="button"`의 계약 — Enter와 Space 둘 다다.
+             Space는 기본 동작(스크롤)을 막아야 목록이 튀지 않는다. */
+          if (event.key !== 'Enter' && event.key !== ' ') return
+          event.preventDefault()
+          onOpen(row)
+        },
+      }
+    : null
   return (
     <li
       className={cn('rrow', rising && 'rrow-new', pressable && 'rrow-press')}
-      onPointerDown={handleDown}
-      onPointerMove={handleMove}
-      onPointerUp={cancelPress}
-      onPointerCancel={cancelPress}
-      onPointerLeave={cancelPress}
-      /* 🔴 iOS는 롱프레스에 선택 핸들·콜아웃을 띄운다. 시트와 겹치면 둘 다 못 쓴다.
-         데스크톱의 우클릭도 같은 이벤트라 여기서 함께 막힌다. */
-      onContextMenu={(event) => {
-        if (pressable) event.preventDefault()
-      }}
+      {...interactive}
     >
       <div className="min-w-0 flex-1">
         <p className="rname">
