@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router'
 import { OverlayRootContext } from '../components/AppShell'
 import { GlassCard } from '../components/GlassCard'
 import { NeuButton } from '../components/NeuButton'
+import { StudentSearchSheet } from '../components/StudentSearchSheet'
 import { useToast } from '../components/Toast'
 import { useAuth } from '../contexts/AuthProvider'
 import { spawnSparkle } from '../lib/sparkle'
@@ -44,6 +45,11 @@ const OFFLINE_SUFFIX = ' (오프라인)'
 const ER_08 = '현황을 불러오지 못했습니다. 당겨서 새로고침'
 /** §8.10.1 TS-14. */
 const TS_14 = '해당 학년 명부가 아직 등록되지 않았습니다'
+/**
+ * 🔴 **§8.10에 없다.** 돋보기 버튼은 아이콘뿐이라 접근 가능한 이름이 필요하다(AC-09).
+ * W-06의 칩 X와 같은 판단으로 **동작**을 담았다 — 보고서 §9 ③.
+ */
+const SEARCH_LABEL = '학번 또는 이름으로 학생을 찾습니다'
 
 /** §12.3 「앱 30분 이상 백그라운드 후 복귀」 → N-06이 T-05와 같은 경로를 탄다. */
 const STALE_MS = 30 * 60 * 1000
@@ -76,6 +82,10 @@ export default function Home() {
   /* T-05·N-06이 값을 바꾸지 않고도 CountUp을 다시 돌리게 하는 열쇠다.
      T-02(탭 재진입)는 화면이 통째로 다시 마운트되므로 이것이 필요 없다. */
   const [runKey, setRunKey] = useState(0)
+
+  /* W-21C 기능 4 — 학생 검색 시트. 🔴 `key`로 재마운트해 검색어·결과를 초기화한다. */
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchKey, setSearchKey] = useState(0)
 
   const titleRef = useRef<HTMLHeadingElement>(null)
   /* N-06 판정용. 마지막으로 **서버에서** 받아 온 시각이다. */
@@ -186,14 +196,35 @@ export default function Home() {
         )}
       </p>
 
-      <h1
-        ref={titleRef}
-        id="scr-s3"
-        tabIndex={-1}
-        className="mt-1 mb-[18px] text-h1 font-bold text-sundo-900 outline-none"
-      >
-        {TITLE}
-      </h1>
+      {/* 🔴 **W-21C 기능 4 — 진입점은 제목 줄의 돋보기다.**
+          `AppShell`·`Dock`을 **열지 않았다**(지시서 §3.2). 독은 §6.2가 5탭으로 고정하고
+          있어 여섯 번째 자리가 없고, 검색은 화면이지 탭이 아니다 — S3 안에서 뜨는 시트다. */}
+      <div className="s3-titlerow">
+        <h1
+          ref={titleRef}
+          id="scr-s3"
+          tabIndex={-1}
+          className="text-h1 font-bold text-sundo-900 outline-none"
+        >
+          {TITLE}
+        </h1>
+        <button
+          type="button"
+          className="s3-search"
+          aria-label={SEARCH_LABEL}
+          /* 🔴 부서 조회가 끝나기 전에는 훑을 반 목록을 모른다. 열어도 빈 검색이 된다. */
+          disabled={dept?.kind !== 'ok'}
+          onClick={() => {
+            setSearchKey((k) => k + 1)
+            setSearchOpen(true)
+          }}
+        >
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+            <circle cx="8.8" cy="8.8" r="6" stroke="#1F5138" strokeWidth="2.1" />
+            <path d="M13.3 13.3l3.7 3.7" stroke="#1F5138" strokeWidth="2.1" strokeLinecap="round" />
+          </svg>
+        </button>
+      </div>
 
       {/* §8.3.2 #3·#4 — 통계 카드 **2장**. `이번 달`은 S7이다(§12.1). */}
       <div className="mb-[22px] flex gap-2.5">
@@ -262,6 +293,17 @@ export default function Home() {
           )
         })}
       </div>
+
+      {/* 기능 4 — 오버레이라 레이아웃에 관여하지 않는다. `AppShell`은 손대지 않았다. */}
+      {dept?.kind === 'ok' && (
+        <StudentSearchSheet
+          key={searchKey}
+          open={searchOpen}
+          onClose={() => setSearchOpen(false)}
+          academicYear={dept.academicYear}
+          classCountByGrade={dept.classCountByGrade}
+        />
+      )}
     </main>
   )
 }

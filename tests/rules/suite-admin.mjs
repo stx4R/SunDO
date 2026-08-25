@@ -141,18 +141,102 @@ export async function run() {
   await check('L-7', 'deny', '`member`가 감사 로그를 읽는다', () =>
     getDocs(query(collection(as(UIDS.member), 'auditLogs'))))
 
-  describe('dutySchedules — W-14 §3')
+  /* ==========================================================================
+     dutySchedules — W-14 §3 + 🔴 **W-21C 결정 2(편집은 부장만) · 중식/석식**
+
+     🔴 **D-3이 이 회차에 뒤집힌다** — `vice`의 편성 update가 통과에서 거부로.
+        §8.9.2 #3은 「차장 이상 노출」이었으나 결정 2가 **부장만**으로 좁혔다.
+
+     🔬 **규약 4-2를 먼저 실행했다** — 앱 소스에서 `dutySchedules`를 만지는 곳은
+        `src/lib/duty.ts:119`의 `getDoc` **하나뿐이고 쓰기 경로가 0건**이다.
+        그래서 좁혀도 깨질 화면이 없다(보고서 §2.1).
+     ========================================================================*/
+  describe('dutySchedules — W-14 §3 · 🔴 W-21C 결정 2')
+
+  /** `src/lib/duty.ts`의 `saveDutySchedule`과 **같은 필드 집합**이다. */
+  const dutyEdit = (uid, over = {}) => ({
+    assignmentsByMeal: { mon: { lunch: [UIDS.member], dinner: [] } },
+    assigneeNamesByMeal: { mon: { lunch: ['부원1'], dinner: [] } },
+    patrolTimeByMeal: { lunch: '12:30', dinner: '18:30' },
+    patrolPlaceByMeal: { lunch: '중앙 현관', dinner: '급식실' },
+    updatedBy: uid,
+    updatedAt: serverTimestamp(),
+    ...over,
+  })
+  const duty = (uid, id = '2026-W35') => doc(as(uid), 'dutySchedules', id)
+
   await seed()
   await check('D-1', 'pass', 'active 부서원의 단건 조회', () =>
     getDoc(doc(as(UIDS.member), 'dutySchedules', '2026-W35')))
   await check('D-2', 'deny', '`pending`의 단건 조회', () =>
     getDoc(doc(as(UIDS.pending), 'dutySchedules', '2026-W35')))
-  await check('D-3', 'pass', '`vice`의 편성 update (v1.1 S9 편집)', () =>
-    updateDoc(doc(as(UIDS.vice), 'dutySchedules', '2026-W35'), { mon: { name: '부원1' } }))
+
+  await seed()
+  await check('D-3', 'deny', '🔴 **`vice`의 편성 update** — 결정 2가 닫았다(뒤집힘)', () =>
+    updateDoc(duty(UIDS.vice), dutyEdit(UIDS.vice)))
+  await seed()
   await check('D-4', 'deny', '`member`의 편성 update', () =>
-    updateDoc(doc(as(UIDS.member), 'dutySchedules', '2026-W35'), { mon: { name: '부원1' } }))
+    updateDoc(duty(UIDS.member), dutyEdit(UIDS.member)))
+  await seed()
+  await check('D-4b', 'deny', '`teacher`의 편성 update', () =>
+    updateDoc(duty(UIDS.teacher), dutyEdit(UIDS.teacher)))
+  await seed()
+  await check('D-4c', 'pass', '🔴 **`head`의 편성 update** — 유일하게 남은 편집 경로', () =>
+    updateDoc(duty(UIDS.head), dutyEdit(UIDS.head)))
+  await seed()
+  await check('D-4d', 'pass', '`dev`의 편성 update (BR-23 복구 경로와 같은 층)', () =>
+    updateDoc(duty(UIDS.dev), dutyEdit(UIDS.dev)))
+
+  describe('🔴 dutySchedules — 바꿀 수 있는 필드를 `hasOnly`가 못 박는다')
+  await seed()
+  await check('D-6', 'deny', '🔴 `weekId`를 함께 바꾼다 (주차 키 불변)', () =>
+    updateDoc(duty(UIDS.head), dutyEdit(UIDS.head, { weekId: '2026-W36' })))
+  await seed()
+  await check('D-7', 'deny', '🔴 `startDate`·`endDate`를 함께 바꾼다', () =>
+    updateDoc(duty(UIDS.head), dutyEdit(UIDS.head, { startDate: '2026-01-01', endDate: '2026-01-05' })))
+  /* 🔬 **처음에 `createdBy: UIDS.head`로 적었다가 통과해서 알았다** — 시드의
+     `createdBy`가 이미 `head`라 **값이 안 바뀌어 `affectedKeys()`에 들어가지 않았다**
+     (B-20이 문서화한 성질 · W-17 §4.6). 실제 위반을 재현하려면 **값이 달라야** 한다. */
+  await seed()
+  await check('D-8', 'deny', '🔴 `createdBy`를 **다른 값으로** 함께 바꾼다 (최초 편성자 불변)', () =>
+    updateDoc(duty(UIDS.head), dutyEdit(UIDS.head, { createdBy: UIDS.vice })))
+  await seed()
+  await check('D-9', 'deny', '🔴 `updatedBy`를 남의 uid로 위조', () =>
+    updateDoc(duty(UIDS.head), dutyEdit(UIDS.vice)))
+  await seed()
+  await check('D-10', 'deny', '🔴 **옛 필드**(`patrolTime`)를 새 앱이 건드린다 — 마이그레이션 산출물은 불변', () =>
+    updateDoc(duty(UIDS.head), dutyEdit(UIDS.head, { patrolTime: '09:00' })))
+
+  describe('🔴 dutySchedules — create (§8.9.5 EM-06 `지금 등록하기`)')
+  await seed()
+  /** 문서가 없는 주차. `saveDutySchedule`이 `create` 경로로 간다. */
+  const newDuty = (uid, over = {}) => ({
+    weekId: '2026-W40', startDate: '2026-09-28', endDate: '2026-10-02',
+    assignmentsByMeal: { mon: { lunch: [UIDS.member], dinner: [] } },
+    assigneeNamesByMeal: { mon: { lunch: ['부원1'], dinner: [] } },
+    patrolTimeByMeal: { lunch: '12:30', dinner: '18:30' },
+    patrolPlaceByMeal: { lunch: '중앙 현관', dinner: '급식실' },
+    createdBy: uid, updatedBy: uid, updatedAt: serverTimestamp(),
+    ...over,
+  })
+  await check('D-11', 'pass', '🔴 `head`가 새 주차를 create', () =>
+    setDoc(doc(as(UIDS.head), 'dutySchedules', '2026-W40'), newDuty(UIDS.head)))
+  await seed()
+  await check('D-12', 'deny', '🔴 `vice`가 새 주차를 create (결정 2)', () =>
+    setDoc(doc(as(UIDS.vice), 'dutySchedules', '2026-W40'), newDuty(UIDS.vice)))
+  await seed()
+  await check('D-13', 'deny', '🔴 `weekId`가 문서 ID와 다르다', () =>
+    setDoc(doc(as(UIDS.head), 'dutySchedules', '2026-W40'), newDuty(UIDS.head, { weekId: '2026-W41' })))
+  await seed()
+  await check('D-14', 'deny', '🔴 `createdBy`를 남의 uid로 위조해 create', () =>
+    setDoc(doc(as(UIDS.head), 'dutySchedules', '2026-W40'), newDuty(UIDS.head, { createdBy: UIDS.vice })))
+
+  await seed()
   await check('D-5', 'pass', '`head`의 삭제', () =>
     deleteDoc(doc(as(UIDS.head), 'dutySchedules', '2026-W35')))
+  await seed()
+  await check('D-5b', 'deny', '`vice`의 삭제', () =>
+    deleteDoc(doc(as(UIDS.vice), 'dutySchedules', '2026-W35')))
 
   describe('students — 🔴 부록 B의 `allow write` 뭉치기를 풀었다')
   await seed()

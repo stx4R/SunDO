@@ -111,7 +111,26 @@ export async function seed(overrides = {}) {
         studentNo: '20303',
         isActive: true,
       }),
-      put('dutySchedules/2026-W35', { weekId: '2026-W35', mon: {}, tue: {}, wed: {}, thu: {}, fri: {} }),
+      /* 🔴 **W-21C — 실 문서와 같은 형태로 맞췄다.** 옛 픽스처(`{mon:{},…}`)는 §9.3.6
+         어느 쪽과도 맞지 않았고, **픽스처가 스키마보다 좁으면 결함이 코드로 오해된다**
+         (W-15B §6 ④). 🔬 실 Firestore 실측값(`2026-W35`)을 그대로 옮기고
+         마이그레이션 산출물 4필드를 더했다. */
+      put('dutySchedules/2026-W35', {
+        weekId: '2026-W35',
+        startDate: '2026-08-24',
+        endDate: '2026-08-28',
+        assignments: { mon: [UIDS.head], tue: [UIDS.head], wed: [UIDS.head], thu: [UIDS.head], fri: [UIDS.head] },
+        assigneeNames: { mon: ['유이준'], tue: ['유이준'], wed: ['유이준'], thu: ['유이준'], fri: ['유이준'] },
+        patrolTime: '07:50',
+        patrolPlace: '중앙 현관',
+        assignmentsByMeal: { mon: { lunch: [UIDS.head], dinner: [] } },
+        assigneeNamesByMeal: { mon: { lunch: ['유이준'], dinner: [] } },
+        patrolTimeByMeal: { lunch: '07:50', dinner: null },
+        patrolPlaceByMeal: { lunch: '중앙 현관', dinner: null },
+        createdBy: UIDS.head,
+        updatedBy: UIDS.head,
+        updatedAt: new Date(),
+      }),
       put('records/rec-seed', recordPayload({ createdBy: UIDS.member })),
       put('auditLogs/log-seed', {
         actorUid: UIDS.head,

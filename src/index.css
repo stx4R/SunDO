@@ -3985,6 +3985,466 @@
     -webkit-touch-callout: none;
     user-select: none;
   }
+
+  /* ======================================================================
+     S9 순찰 일정 — 중식/석식 (W-21C 기능 3) · design `19a`~`19e`
+
+     🔴 여백을 눈으로 맞추지 마라(W-17F). `19a` 원문 값을 그대로 옮겼고,
+        시안에 없는 것(끼니 라벨·두 줄 구조)은 보고서 §9 ③에 전량 올렸다.
+     ==================================================================== */
+
+  /* --- S9 조회 (기존 `.dcard`·`.drow` 위에 끼니가 얹힌다) --- */
+
+  /* 오늘 카드 안의 끼니 블록. 두 번째부터 위로 14px 띄운다. */
+  .dcard-meal + .dcard-meal {
+    margin-top: 14px;
+  }
+
+  /* 🔴 끼니 라벨 — **시안에 없는 신설 요소**다. `19a`의 요일 배지(13/700)보다
+     한 단 작은 11px/700으로 두어 배지와 경쟁하지 않게 했다. */
+  .dcard-meal-label {
+    font-size: var(--text-micro);
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: rgba(255, 255, 255, 0.78);
+    margin-bottom: 6px;
+  }
+
+  /* 요일 행 — 🔴 결정 3: 배지 옆이 **두 줄**이 된다. `19a`의 1줄 구조에서
+     `align-items`를 가운데에서 위로 옮긴 것이 유일한 변경이다. */
+  .drow-meals {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .drow-meal {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  /* 조회 쪽 끼니 라벨 — 유리 표면 위라 카드 안(흰색)과 색이 다르다. */
+  .dmeal {
+    flex: none;
+    font-size: var(--text-micro);
+    font-weight: 700;
+    color: var(--color-sundo-700);
+  }
+
+  /* §8.9.2 #3 — `pill soft`. 🔴 부장에게만 렌더된다(부재로 처리). */
+  .d-edit {
+    flex: none;
+    margin-left: 10px;
+  }
+
+  .d-edit:disabled {
+    opacity: 0.45;
+  }
+
+  /* --- 편집 시트 (design `19a`~`19c`) --- */
+
+  /* `19a` 원문 — 제목과 주차 칩이 한 줄에서 양끝으로 벌어진다. */
+  .de-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .de-title {
+    font-size: var(--text-sheet);
+    font-weight: 700;
+    color: var(--color-sundo-900);
+  }
+
+  /* `19a` 원문 `padding:6px 12px;radius:999px;12px/700;tabular-nums`. */
+  .de-week {
+    flex: none;
+    padding: 6px 12px;
+    border-radius: var(--radius-pill);
+    background: var(--color-sundo-tint-10);
+    font-size: var(--text-label);
+    font-weight: 700;
+    color: var(--color-sundo-700);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .de-days {
+    margin-top: 16px;
+  }
+
+  /* `19a` 원문 `padding:14px 0;border-bottom:1px solid rgba(20,53,38,0.06)`.
+     🔴 `align-items`가 `center`에서 `flex-start`로 바뀐 것이 두 줄 구조의 대가다. */
+  .de-day {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--color-sundo-divider);
+  }
+
+  .de-day:last-child {
+    border-bottom: none;
+  }
+
+  /* `19a` 원문 `34×34;radius:12;background:rgba(31,81,56,0.08);13px/700`. */
+  .de-badge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    flex: none;
+    border-radius: var(--radius-12);
+    background: var(--color-sundo-tint-08);
+    font-size: var(--text-subtitle);
+    font-weight: 700;
+    color: var(--color-sundo-700);
+  }
+
+  .de-meals {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .de-meal {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  /* 🔴 신설. 칩 높이(33px)의 가운데에 맞춰 위로 8px 민다. */
+  .de-meal-label {
+    flex: none;
+    padding-top: 8px;
+    min-width: 2.2em;
+    font-size: var(--text-micro);
+    font-weight: 700;
+    color: var(--color-sundo-ink-70);
+  }
+
+  /* `19a` 원문 `display:flex;flex-wrap:wrap;gap:6px`. */
+  .de-chips {
+    display: flex;
+    flex: 1;
+    flex-wrap: wrap;
+    gap: 6px;
+    min-width: 0;
+  }
+
+  /* `19a` 원문 `padding:7px 10px 7px 12px;radius:999px;background:rgba(31,81,56,0.10);
+     12px/700`. X는 12px SVG이고 칩 전체가 해제 버튼이다. */
+  .de-chip {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 10px 7px 12px;
+    border-radius: var(--radius-pill);
+    background: var(--color-sundo-tint-10);
+    font-size: var(--text-label);
+    font-weight: 700;
+    color: var(--color-sundo-700);
+  }
+
+  /* `19a` 원문 `padding:7px 12px;border:1px dashed rgba(31,81,56,0.35);
+     12px/700;color:rgba(20,53,38,0.70)`. */
+  .de-add {
+    display: flex;
+    align-items: center;
+    padding: 7px 12px;
+    border-radius: var(--radius-pill);
+    border: 1px dashed rgba(31, 81, 56, 0.35);
+    font-size: var(--text-label);
+    font-weight: 700;
+    color: var(--color-sundo-ink-70);
+  }
+
+  /* §8.9.3 담당자 검증 문구. `19c`의 필드 에러(11px/500 danger)와 같은 규격이다. */
+  .de-err {
+    margin-top: 8px;
+    font-size: var(--text-micro);
+    font-weight: 500;
+    color: var(--color-sundo-danger);
+  }
+
+  /* 🔴 규격 공백 ② — `19a`의 시간·장소 한 줄을 **끼니마다 한 줄씩** 쌓았다. */
+  .de-patrol {
+    margin-top: 18px;
+  }
+
+  /* `19a` 원문 `display:flex;gap:10px` — 두 필드가 반씩 나눈다. */
+  .de-patrol-row {
+    display: flex;
+    gap: 10px;
+  }
+
+  /* `Field`가 자기 폭을 갖지 않으므로 여기서 나눈다. 🔴 `min-width:0`이 없으면
+     긴 장소 이름이 필드를 밀어 시트가 가로로 넘친다. */
+  .de-patrol-row > * {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .de-save {
+    margin-top: 20px;
+  }
+
+  /* --- 담당자 팝오버 (design `19d`·`19e`) --- */
+
+  /* 배경 탭으로 닫는다. 딤은 시트가 이미 갖고 있어 **투명**이다 —
+     여기서 한 겹 더 어둡게 하면 시안보다 짙어진다. */
+  .ap-scrim {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+  }
+
+  /* `19d` 원문 `left/right:22px;top:132px;radius:20;padding:16px` +
+     `background:rgba(255,255,255,0.55);backdrop-filter:blur(18px) saturate(160%)`.
+     🔴 `top`은 시트 기준이다 — 시트가 `position:absolute`의 컨테이닝 블록이다.
+     ⚠ `max-height`는 시안에 없다. 부원이 40명이면 목록이 시트를 넘으므로
+        내부 스크롤을 뒀다(보고서 §9 ③). */
+  .ap {
+    position: absolute;
+    left: 22px;
+    right: 22px;
+    top: 132px;
+    z-index: 2;
+    box-sizing: border-box;
+    max-height: 60vh;
+    display: flex;
+    flex-direction: column;
+    padding: 16px;
+    border-radius: var(--radius-20);
+    background: var(--color-sundo-glass);
+    backdrop-filter: blur(18px) saturate(160%);
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    box-shadow:
+      0 20px 50px rgba(20, 53, 38, 0.25),
+      var(--highlight-top);
+    animation: popIn 0.25s var(--ease-sundo) both;
+  }
+
+  /* design 원문 그대로 — `from{opacity:0;transform:scale(.96)}to{…scale(1)}`.
+     🔴 이 저장소에 없던 키프레임이다(`19d`가 처음 쓴다). AC-07 정지는 아래 reduce 블록. */
+  @keyframes popIn {
+    from {
+      opacity: 0;
+      transform: scale(0.96);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  /* `19d` 원문 `margin-top:12px`. 목록만 스크롤한다. */
+  .ap-list {
+    margin-top: 12px;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  /* `19d` 원문 `padding:10px 2px;gap:12px;border-bottom:1px solid rgba(20,53,38,0.06)`.
+     🔴 AC-05 — 시안 높이가 52px이라 44px을 이미 넘는다. */
+  .ap-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    min-height: 52px;
+    padding: 10px 2px;
+    border-bottom: 1px solid var(--color-sundo-divider);
+    text-align: left;
+  }
+
+  .ap-list li:last-child .ap-row {
+    border-bottom: none;
+  }
+
+  /* `19d` 원문 `32×32;radius:50%;12px/700`. 선택되면 그라디언트 + 흰 글자. */
+  .ap-avatar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    flex: none;
+    border-radius: 50%;
+    background: var(--color-sundo-tint-10);
+    font-size: var(--text-label);
+    font-weight: 700;
+    color: var(--color-sundo-700);
+  }
+
+  .ap-avatar-on {
+    background: var(--gradient-primary);
+    color: #fff;
+  }
+
+  .ap-who {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .ap-name {
+    display: block;
+    font-size: var(--text-body);
+    font-weight: 700;
+    color: var(--color-sundo-900);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .ap-role {
+    display: block;
+    font-size: var(--text-micro);
+    font-weight: 500;
+    color: var(--color-sundo-ink-70);
+  }
+
+  /* `19d` 원문 `22×22;radius:50%`. 미선택은 1px 외곽선, 선택은 그라디언트 + 체크. */
+  .ap-check {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    flex: none;
+    border-radius: 50%;
+    border: 1px solid rgba(20, 53, 38, 0.18);
+  }
+
+  .ap-check-on {
+    border-color: transparent;
+    background: var(--gradient-primary);
+  }
+
+  /* ======================================================================
+     S3 학생 검색 (W-21C 기능 4) — design `19d`·`19e`의 **방식**
+     ==================================================================== */
+
+  /* 🔴 제목 줄이 한 줄에서 양끝으로 벌어진다. `h1`의 아래 여백을 여기로 옮겼다 —
+     `mb`를 그대로 두면 버튼이 제목보다 아래로 밀린다. */
+  .s3-titlerow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 4px;
+    margin-bottom: 18px;
+  }
+
+  /* AC-05 — 44×44. 아이콘은 20px이고 나머지는 탭 영역이다. */
+  .s3-search {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    flex: none;
+    border-radius: var(--radius-15);
+    background: var(--color-sundo-glass);
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    box-shadow: var(--shadow-glass);
+    transition: transform 0.15s;
+  }
+
+  .s3-search:active {
+    transform: scale(0.95);
+  }
+
+  .s3-search:disabled {
+    opacity: 0.45;
+  }
+
+  .ss-field {
+    margin-top: 16px;
+  }
+
+  /* S6 하단 안내(`.rs-hint`)와 같은 규격 — 11px/500 · line-height 1.45. */
+  .ss-hint {
+    margin-top: 8px;
+    font-size: var(--text-micro);
+    font-weight: 500;
+    line-height: 1.45;
+    color: var(--color-sundo-ink-70);
+    text-wrap: pretty;
+  }
+
+  .ss-partial {
+    margin-top: 8px;
+    font-size: var(--text-micro);
+    font-weight: 500;
+    color: var(--color-sundo-danger);
+  }
+
+  /* 🔴 결과 목록이 길어지면 시트가 아니라 **목록이** 스크롤한다.
+     시트 전체를 늘리면 검색 입력이 화면 밖으로 밀린다. */
+  .ss-list {
+    margin-top: 14px;
+    max-height: 46vh;
+    overflow-y: auto;
+  }
+
+  /* `.ap-row`와 같은 규격이되 아바타가 `DSHSS.png`다(W-21 결정 4 · W-21B §6.6). */
+  .ss-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    min-height: 56px;
+    padding: 10px 2px;
+    border-bottom: 1px solid var(--color-sundo-divider);
+    text-align: left;
+  }
+
+  .ss-list li:last-child .ss-row {
+    border-bottom: none;
+  }
+
+  .ss-avatar {
+    width: 34px;
+    height: 34px;
+    flex: none;
+    border-radius: var(--radius-11);
+    overflow: hidden;
+    background: var(--gradient-primary);
+  }
+
+  .ss-who {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .ss-name {
+    display: block;
+    font-size: var(--text-body);
+    font-weight: 700;
+    color: var(--color-sundo-900);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .ss-meta {
+    display: block;
+    margin-top: 1px;
+    font-size: var(--text-label);
+    font-weight: 500;
+    color: var(--color-sundo-ink-70);
+    font-variant-numeric: tabular-nums;
+  }
 }
 
 /* design/index.html 원문 그대로 — 수정 금지 */
@@ -4181,6 +4641,11 @@
    검증 실패는 shake 진동만 제거하고 색·아이콘·에러 문구는 그대로 둔다.
    스피너는 진행 중을 알리는 필수 피드백이라 정지 대상이 아니다. */
 @media (prefers-reduced-motion: reduce) {
+  /* 🔴 W-21C — `19d` 담당자 팝오버의 등장. 시트·모달의 다른 등장 모션과 같은 취급이다. */
+  .ap {
+    animation: none;
+  }
+
   .shine {
     animation: none;
   }

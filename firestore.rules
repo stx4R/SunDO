@@ -123,6 +123,30 @@ service cloud.firestore {
         && (resource.data.createdBy == request.auth.uid || isVice());
     }
 
+    // 🔴 **W-21C 결정 2 — 순찰 일정 편성은 부장만이다.**
+    //
+    // ⚠ **PRD §8.9.2 #3은 「차장 이상 노출」이고 규칙도 `isVice()`였다.** 결정 2가
+    //   그것을 좁혔다. §8.9.5 EM-06의 `지금 등록하기`와 §8.10.5 하단 문구도 함께
+    //   개정 대상이다(보고서 §9 ①).
+    //
+    // 🔬 **좁히기 전에 소비자를 셌다**(규약 4-2 · W-21B §7 ③이 규약이 됐다).
+    //    앱 소스에서 `dutySchedules`를 만지는 곳은 `src/lib/duty.ts`의 `getDoc`
+    //    **하나뿐이고 쓰기 경로가 0건**이다 — 좁혀도 깨질 화면이 없다.
+    //
+    // 🔴 **바꿀 수 있는 필드를 `hasOnly`로 못 박는다.** `weekId`·`startDate`·
+    //    `endDate`·`createdBy`가 목록에 **없으므로** 한 글자도 바뀔 수 없다(D-6~D-8).
+    //
+    // 🔴 **옛 필드 4개(`assignments`·`assigneeNames`·`patrolTime`·`patrolPlace`)도
+    //    목록에 없다**(D-10). 마이그레이션이 남긴 되돌리기용 사본이고 앱은 읽지도
+    //    쓰지도 않는다 — 새 앱이 그것을 건드리면 되돌릴 근거가 사라진다.
+    function editsDutyOnly() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['assignmentsByMeal', 'assigneeNamesByMeal',
+                         'patrolTimeByMeal', 'patrolPlaceByMeal',
+                         'updatedBy', 'updatedAt'])
+        && request.resource.data.updatedBy == request.auth.uid;
+    }
+
     // ========================================================================
     //  users
     // ========================================================================
@@ -398,8 +422,20 @@ service cloud.firestore {
     match /dutySchedules/{weekId} {
       allow get: if isActive();
       allow list: if isActive();
-      allow create: if isVice();
-      allow update: if isVice();
+
+      // §8.9.5 EM-06 `지금 등록하기` — 문서가 없는 주차를 부장이 처음 만든다.
+      // 🔴 `weekId`를 문서 ID와 강제로 맞춘다(D-13). 어긋나면 화면이 주차를 잘못 읽는다
+      //    — `inviteCodes`의 `data.code == codeId`와 같은 형태의 방어다.
+      allow create: if isHead()
+        && request.resource.data.weekId == weekId
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.updatedBy == request.auth.uid;
+
+      // 🔴 **결정 2 — `isVice()` → `isHead()`.** 근거와 소비자 실측은 `editsDutyOnly()` 주석에.
+      // ⚠ §8.9.3의 「이번 주 또는 다음 주만」은 규칙이 표현할 수 없다 —
+      //   `request.time`으로 ISO 주차를 계산하는 수단이 Rules에 없다. **화면이 막는다.**
+      allow update: if isHead() && editsDutyOnly();
+
       allow delete: if isHead();
     }
 

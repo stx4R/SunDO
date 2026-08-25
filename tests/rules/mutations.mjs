@@ -312,4 +312,53 @@ export const MUTATIONS = [
     to: '      allow update: if isHead();',
     breaks: ['P-5', 'P-6', 'P-7', 'P-8'],
   },
+
+  /* ==========================================================================
+     🔴 W-21C 신규 조건 역검증 — 기능 3(순찰 일정 편성)
+
+     🔴 **`breaks`를 먼저 적고 실측으로 고쳤다**(규약 4-3). 아래 주석의 🔬 표시가
+        예측이 빗나가 고친 자리다.
+     ========================================================================*/
+  {
+    name: 'duty-edit-vice',
+    why: '🔴 결정 2를 되돌린다 — 차장이 다시 순찰 일정을 편성한다',
+    from: 'allow update: if isHead() && editsDutyOnly();',
+    to: 'allow update: if isVice() && editsDutyOnly();',
+    breaks: ['D-3', 'B-33'],
+  },
+  {
+    name: 'duty-create-vice',
+    why: '🔴 새 주차 생성을 차장에게 연다 (§8.9.5 EM-06 경로)',
+    from: '      allow create: if isHead()\n        && request.resource.data.weekId == weekId',
+    to: '      allow create: if isVice()\n        && request.resource.data.weekId == weekId',
+    breaks: ['D-12'],
+  },
+  {
+    name: 'duty-keys-open',
+    why: '🔴 편성 허용 키를 넓힌다 — 주차 키·기간·최초 편성자·**옛 필드**가 함께 바뀐다',
+    from: "               .hasOnly(['assignmentsByMeal', 'assigneeNamesByMeal',\n                         'patrolTimeByMeal', 'patrolPlaceByMeal',\n                         'updatedBy', 'updatedAt'])",
+    to: "               .hasOnly(['assignmentsByMeal', 'assigneeNamesByMeal',\n                         'patrolTimeByMeal', 'patrolPlaceByMeal',\n                         'updatedBy', 'updatedAt',\n                         'weekId', 'startDate', 'endDate', 'createdBy', 'patrolTime'])",
+    breaks: ['D-6', 'D-7', 'D-8', 'D-10', 'B-35'],
+  },
+  {
+    name: 'duty-updatedby-free',
+    why: '편성자(`updatedBy`)가 본인이어야 한다는 조건을 뺀다',
+    from: '        && request.resource.data.updatedBy == request.auth.uid;\n    }\n\n    // ========================================================================\n    //  users',
+    to: '        && true;\n    }\n\n    // ========================================================================\n    //  users',
+    breaks: ['D-9'],
+  },
+  {
+    name: 'duty-create-weekid-free',
+    why: '🔴 `weekId`가 문서 ID와 같아야 한다는 강제를 뺀다 — 화면이 주차를 잘못 읽는다',
+    from: '        && request.resource.data.weekId == weekId\n        && request.resource.data.createdBy == request.auth.uid',
+    to: '        && request.resource.data.createdBy == request.auth.uid',
+    breaks: ['D-13'],
+  },
+  {
+    name: 'duty-create-createdby-free',
+    why: '🔴 `createdBy` 위조 방어를 뺀다',
+    from: '        && request.resource.data.createdBy == request.auth.uid\n        && request.resource.data.updatedBy == request.auth.uid;',
+    to: '        && request.resource.data.updatedBy == request.auth.uid;',
+    breaks: ['D-14'],
+  },
 ]

@@ -1,18 +1,28 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CenterNotice } from '../components/CenterNotice'
+import { DutyEditSheet } from '../components/DutyEditSheet'
 import { DutyEmptyIcon, LoadErrorIcon } from '../components/icons'
 import { NeuButton } from '../components/NeuButton'
+import { useToast } from '../components/Toast'
+import { useAuth } from '../contexts/AuthProvider'
 import { formatWeekLabel, toDayKey, toWeekdayKo, toWeekKey } from '../lib/dateKeys'
 import {
   clearDutyCache,
+  countDays,
   fetchDutySchedule,
   fetchPatrolDefaults,
   isWeekend,
+  MEALS,
+  saveDutySchedule,
   WEEKDAYS,
+  type DutyActor,
+  type DutyDraft,
   type DutyResult,
   type DutySchedule,
+  type MealKey,
   type PatrolDefaults,
 } from '../lib/duty'
+import { useOnline } from '../lib/useOnline'
 import { usePullToRefresh } from '../lib/usePullToRefresh'
 
 /**
@@ -40,9 +50,21 @@ const EM_06 = '이번 주 순찰 일정이 아직 등록되지 않았습니다'
 /** §8.10.3 ER-05. */
 const ER_05 = '일정을 불러오지 못했습니다'
 const RETRY = '다시 시도'
-/** §8.10.5 S9 하단 — 상시 안내 문구. */
-const HINT = '다음 주 일정은 부장·차장이 등록합니다'
+/**
+ * §8.10.5 S9 하단 — 상시 안내 문구.
+ *
+ * 🔴 **W-21C 결정 2로 교체됐다.** 원문은 `다음 주 일정은 부장·차장이 등록합니다`인데
+ * 편집이 **부장 전용**이 되면서 사실이 아니게 됐다. §8.10.5 개정 대상이다(보고서 §9 ①).
+ */
+const HINT = '다음 주 일정은 부장이 등록합니다'
 const TODAY_CHIP = '오늘'
+/** §8.9.2 #3 · §8.9.5 EM-06 보조 버튼 — PRD 확정 문안. */
+const BTN_EDIT = '일정 편집'
+const BTN_CREATE = '지금 등록하기'
+/** §8.10.1 TS-11. */
+const TS_11 = '순찰 일정을 저장했습니다'
+/** §8.10.3에 편성 실패 코드가 없다. ER-07(저장 실패)을 그대로 쓴다 — 보고서 §9. */
+const ER_07 = '저장에 실패했습니다. 다시 시도해 주세요'
 
 /** §12.3 「앱 30분 이상 백그라운드 후 복귀」 — N-06이 T-07과 같은 경로를 탄다. */
 const STALE_MS = 30 * 60 * 1000
@@ -54,10 +76,22 @@ function joinNames(names: readonly string[] | undefined): string {
   return (names ?? []).join(' · ')
 }
 
-/** `{순찰 시간} · {장소}`. 둘 중 하나라도 없으면 줄 자체를 그리지 않는다(추측하지 않는다). */
-function patrolLine(schedule: DutySchedule | null, defaults: PatrolDefaults | null): string | null {
-  const time = schedule?.patrolTime ?? defaults?.patrolTime ?? null
-  const place = schedule?.patrolPlace ?? defaults?.patrolPlace ?? null
+/**
+ * `{순찰 시간} · {장소}`. 둘 중 하나라도 없으면 줄 자체를 그리지 않는다(추측하지 않는다).
+ *
+ * 🔴 **W-21C — 끼니별이다.** 부서 기본값(`departments.patrolTime`)은 여전히 단일 문자열이라
+ * **중식 자리에만** 떨어뜨린다. 석식 기본값이라는 것이 §9.3.2에 없고, 없는 값을 지어내
+ * 「석식 07:50」을 그리면 그것이 곧 거짓말이다.
+ */
+function patrolLine(
+  schedule: DutySchedule | null,
+  defaults: PatrolDefaults | null,
+  meal: MealKey,
+): string | null {
+  const fallbackTime = meal === 'lunch' ? (defaults?.patrolTime ?? null) : null
+  const fallbackPlace = meal === 'lunch' ? (defaults?.patrolPlace ?? null) : null
+  const time = schedule?.patrolTime[meal] ?? fallbackTime
+  const place = schedule?.patrolPlace[meal] ?? fallbackPlace
   if (!time || !place) return null
   return `${time} · ${place}`
 }
@@ -70,10 +104,39 @@ export default function Duty() {
   const [duty, setDuty] = useState<DutyResult | null>(null)
   const [nextDuty, setNextDuty] = useState<DutyResult | null>(null)
   const [defaults, setDefaults] = useState<PatrolDefaults | null>(null)
+  /**
+   * 재조회 열쇠. 🔴 **편성 저장이 `now`를 건드리지 않고 다시 읽게 하는 유일한 통로다** —
+   * `now`를 갈면 주 경계가 다시 계산되고(T-05) 부서 기본값·다음 주 문서까지 버려진다.
+   */
+  const [reloadKey, setReloadKey] = useState(0)
 
   const titleRef = useRef<HTMLHeadingElement>(null)
   /* N-06 판정용. 마지막으로 조회한 시각이다. */
   const lastFetchedRef = useRef(0)
+
+  /* ── W-21C 기능 3 — 편집(부장만) ──────────────────────────────────────── */
+  const { profile } = useAuth()
+  const toast = useToast()
+  const online = useOnline()
+  const [editOpen, setEditOpen] = useState(false)
+  /** 열 때마다 올려 시트를 새로 마운트한다 — 초기화가 한 곳(마운트)에 모인다. */
+  const [editKey, setEditKey] = useState(0)
+  const [saving, setSaving] = useState(false)
+  /* 🔴 상태가 아니라 ref다. `saving`은 같은 태스크의 연타를 막지 못한다(W-06 §5-4). */
+  const savingRef = useRef(false)
+
+  /**
+   * 🔴 **결정 2 — 부장(과 Dev)만이다.** `firestore.rules`의 `dutySchedules` update가
+   * `isHead()`이고 그 함수는 `role in ['head','dev']`다 — **같은 문장이어야 한다.**
+   * ⚠ §8.9.2 #3의 「차장 이상」은 이 결정으로 무효가 됐다(보고서 §9 ①).
+   */
+  const canEdit =
+    profile?.status === 'active' && (profile.role === 'head' || profile.role === 'dev')
+
+  const actor = useMemo<DutyActor | null>(
+    () => (profile ? { uid: profile.uid, name: profile.name, role: profile.role } : null),
+    [profile],
+  )
 
   /* §15.3 — 화면 전환 시 제목으로 포커스를 옮긴다. */
   useEffect(() => {
@@ -103,8 +166,9 @@ export default function Duty() {
       alive = false
     }
     /* 🔴 `now`가 의존성에 있는 이유: T-07이 같은 주 안에서 새로고침하면 `weekId`가 그대로라
-       이 효과가 다시 돌지 않는다. `clearDutyCache()`만으로는 재조회가 일어나지 않는다. */
-  }, [weekId, now])
+       이 효과가 다시 돌지 않는다. `clearDutyCache()`만으로는 재조회가 일어나지 않는다.
+       `reloadKey`는 편성 저장 뒤 **`now`를 건드리지 않고** 다시 읽게 한다(T-03). */
+  }, [weekId, now, reloadKey])
 
   useEffect(() => {
     /* 평일에는 아무 것도 하지 않는다 — 여기서 `setNextDuty(null)`을 부르면 평일 렌더마다
@@ -146,7 +210,6 @@ export default function Duty() {
 
   const failed = duty?.kind === 'failed'
   const schedule = duty?.kind === 'ok' ? duty.schedule : null
-  const line = patrolLine(schedule, defaults)
 
   /* 🔴 EM-06은 **서버가 확인한 부재**일 때만이다. 실측(보고서 §1-3 P1)상 캐시에 없는 문서를
      오프라인에서 `getDoc`하면 `exists() === false`가 아니라 `unavailable`로 **throw**한다 —
@@ -157,7 +220,46 @@ export default function Duty() {
   /* 다음 주 미리보기는 **문서가 있을 때만** 그린다. 없을 때 쓸 문구가 §8.10.2에 없어
      블록 자체를 그리지 않는다(지시서 §3.7 · 보고서 §7 신규 항목). */
   const preview = nextDuty?.kind === 'ok' ? nextDuty.schedule : null
-  const previewLine = preview ? patrolLine(preview, defaults) : null
+
+  /* T-02 — 편집 시트 오픈. `key`를 올려 **마운트에서** 초기값을 잡는다(§3.5 계약). */
+  const openEdit = () => {
+    if (!online || saving) return
+    setEditKey((n) => n + 1)
+    setEditOpen(true)
+  }
+
+  /**
+   * T-03 — 저장 → 토스트 TS-11 → 재조회.
+   *
+   * 🔴 **저장 성공 뒤에 `refresh()`를 부르지 않는다.** 그것은 `now`를 갈아 주 경계를
+   * 다시 계산하고 부서 기본값·다음 주 문서까지 버린다. `saveDutySchedule`이 그 주차
+   * 캐시만 지웠으므로 **재조회 열쇠만** 올린다.
+   */
+  const handleSave = (draft: DutyDraft) => {
+    if (!actor || savingRef.current) return
+    savingRef.current = true
+    setSaving(true)
+    void (async () => {
+      const before = schedule
+        ? {
+            lunchDays: countDays(schedule.assigneeUids, 'lunch'),
+            dinnerDays: countDays(schedule.assigneeUids, 'dinner'),
+          }
+        : { lunchDays: 0, dinnerDays: 0 }
+      const result = await saveDutySchedule(actor, draft, schedule !== null, before)
+      savingRef.current = false
+      setSaving(false)
+      if (!result.ok) {
+        toast(ER_07)
+        return
+      }
+      setEditOpen(false)
+      setDuty(null)
+      setNextDuty(null)
+      setReloadKey((n) => n + 1)
+      toast(TS_11)
+    })()
+  }
 
   return (
     <main data-screen="S9" aria-labelledby="scr-s9" className="flex min-h-full flex-col">
@@ -170,6 +272,20 @@ export default function Duty() {
           <span className="skel" aria-hidden="true" />
         ) : (
           <p className="d-week">{formatWeekLabel(now)}</p>
+        )}
+        {/* §8.9.2 #3 — 🔴 **부장에게만 렌더한다.** 차장·부원·교사에게는 `disabled`가
+            아니라 **부재**다(W-15A §4-4 · W-21B §6.3과 같은 판단).
+            ⚠ §8.9.5 오프라인 행은 「`일정 편집` 비활성」을 규정하므로 그쪽은 `disabled`다 —
+            오프라인은 「지금은 안 되지만 곧 된다」이고 역할은 「영영 안 된다」다. */}
+        {canEdit && duty !== null && !failed && !empty && (
+          <button
+            type="button"
+            className="pill d-edit"
+            disabled={!online || saving}
+            onClick={openEdit}
+          >
+            {BTN_EDIT}
+          </button>
         )}
       </div>
 
@@ -188,9 +304,26 @@ export default function Duty() {
       ) : duty === null ? (
         <DutySkeleton />
       ) : empty ? (
-        /* EM-06 — design `6h`. 🔴 `지금 등록하기` 버튼은 **없다**(§17.1 MVP 제외). */
+        /* EM-06 — design `6h`. 🔴 **W-21C가 `지금 등록하기`를 만들었다**(§8.9.5).
+           §17.1의 「S9 편집 제외」가 결정 1로 무효가 됐고, 이 버튼이 없으면 문서가 없는
+           주차는 **영영 편성할 수 없다.** 🔴 부장에게만 렌더한다. */
         <>
-          <CenterNotice icon={<DutyEmptyIcon />} title={EM_06} />
+          <CenterNotice
+            icon={<DutyEmptyIcon />}
+            title={EM_06}
+            action={
+              canEdit ? (
+                <NeuButton
+                  radius={15}
+                  className="cnote-retry"
+                  disabled={!online || saving}
+                  onClick={openEdit}
+                >
+                  {BTN_CREATE}
+                </NeuButton>
+              ) : undefined
+            }
+          />
           <p className="d-hint">{HINT}</p>
         </>
       ) : (
@@ -204,40 +337,68 @@ export default function Duty() {
                   <div className="dcard-chips">
                     <span className="dchip">{formatWeekLabel(new Date(now.getTime() + WEEK_MS))}</span>
                   </div>
-                  {previewLine && <p className="dcard-foot">{previewLine}</p>}
+                  {MEALS.map((meal) => {
+                    const l = patrolLine(preview, defaults, meal.key)
+                    return l && <p key={meal.key} className="dcard-foot">{`${meal.label} ${l}`}</p>
+                  })}
                 </>
               )}
             </section>
           ) : (
-            /* §8.9.2 #4 — 오늘 순찰 카드. */
+            /* §8.9.2 #4 — 오늘 순찰 카드.
+               🔴 **W-21C — 끼니 블록 2개.** 담당자가 없는 끼니는 **블록 자체를 그리지 않는다**
+               (§8.10에 「석식 없음」 문구가 없고, 빈 라벨만 남기면 고장으로 보인다). */
             <section className="dcard">
               <p className="dcard-top">{TODAY_PREFIX + toWeekdayKo(now) + '요일'}</p>
-              {(schedule?.assigneeNames[todayKey] ?? []).length > 0 && (
-                <ul className="dcard-chips">
-                  {schedule?.assigneeNames[todayKey]?.map((name, i) => (
-                    <li key={`${name}-${i}`} className="dchip">
-                      {name}
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {line && <p className="dcard-foot">{line}</p>}
+              {MEALS.map((meal) => {
+                const names = schedule?.assigneeNames[todayKey]?.[meal.key] ?? []
+                const l = patrolLine(schedule, defaults, meal.key)
+                if (names.length === 0 && !l) return null
+                return (
+                  <div key={meal.key} className="dcard-meal">
+                    <p className="dcard-meal-label">{meal.label}</p>
+                    {names.length > 0 && (
+                      <ul className="dcard-chips">
+                        {names.map((name, i) => (
+                          <li key={`${name}-${i}`} className="dchip">
+                            {name}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    {l && <p className="dcard-foot">{l}</p>}
+                  </div>
+                )
+              })}
             </section>
           )}
 
-          {/* §8.9.2 #5 — 요일 행 5개(월~금 고정). */}
+          {/* §8.9.2 #5 — 요일 행 5개(월~금 고정).
+              🔴 **W-21C 결정 3 — 요일 행 안에 중식·석식 두 줄.** 탭이 아니다.
+              담당자가 없는 끼니는 줄을 그리지 않는다 — 「중식」 라벨만 덩그러니 남는 것보다
+              아무것도 없는 편이 사실에 가깝다(design `19`에 이 상태의 시안이 없다 · 보고서 §9 ③). */}
           <ul className="glass rounded-22 dlist">
             {WEEKDAYS.map((day) => {
               /* 🔴 주말에는 강조 행이 0개다 — `todayKey`가 `sat`·`sun`이면 어느 행과도 같지 않다. */
               const today = day.key === todayKey
+              const cell = schedule?.assigneeNames[day.key]
               return (
                 <li key={day.key} className={today ? 'drow drow-today' : 'drow'}>
                   <span className="dbadge" aria-hidden="true">
                     {day.label}
                   </span>
-                  <span className="drow-name">
+                  <span className="drow-meals">
                     <span className="sr-only">{day.label}요일 </span>
-                    {joinNames(schedule?.assigneeNames[day.key])}
+                    {MEALS.map((meal) => {
+                      const names = cell?.[meal.key] ?? []
+                      if (names.length === 0) return null
+                      return (
+                        <span key={meal.key} className="drow-meal">
+                          <span className="dmeal">{meal.label}</span>
+                          <span className="drow-name">{joinNames(names)}</span>
+                        </span>
+                      )
+                    })}
                   </span>
                   {/* AC-03 — 오늘을 색만으로 전달하지 않는다. 이 칩의 **텍스트**가 그 역할이다. */}
                   {today && <span className="dtoday">{TODAY_CHIP}</span>}
@@ -248,6 +409,21 @@ export default function Duty() {
 
           <p className="d-hint">{HINT}</p>
         </>
+      )}
+
+      {/* 🔴 `key`가 마운트를 가른다 — 초기값(현재 편성)이 한 곳에서 잡힌다(§3.5). */}
+      {canEdit && (
+        <DutyEditSheet
+          key={editKey}
+          open={editOpen}
+          onClose={() => setEditOpen(false)}
+          weekId={weekId}
+          weekLabel={formatWeekLabel(now)}
+          schedule={schedule}
+          defaults={defaults}
+          saving={saving}
+          onSave={handleSave}
+        />
       )}
     </main>
   )

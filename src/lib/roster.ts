@@ -1,4 +1,12 @@
-import { collection, getCountFromServer, getDocs, orderBy, query, where } from 'firebase/firestore'
+import {
+  collection,
+  getCountFromServer,
+  getDocs,
+  limit,
+  orderBy,
+  query,
+  where,
+} from 'firebase/firestore'
 import { db } from './firebase'
 import { toStudentNo } from './studentNo'
 
@@ -55,6 +63,44 @@ function errorCode(error: unknown, fallback: string): string {
   return (error as { code?: string })?.code ?? fallback
 }
 
+/* ============================================================================
+   🔴 W-21C 결함 3 — 오프라인에서 집계 질의가 전부 죽는다 (W-21 §6.1 · 원인 확정)
+
+   `getCountFromServer`는 **로컬 캐시 경로가 아예 없다** — SDK 원문이
+   `invokeRunAggregationQueryRpc`로 직행하고 `TODO(b/277628384): check canUseNetwork()`가
+   남아 있다. ⇒ 오프라인에서 **항상 throw**한다.
+
+   🔴 **W-21은 이것을 「설계 회차 규모」로 판정했다**(집계를 `getDocs`로 바꾸면 S3 진입마다
+      학생 1,033건). 🔬 **소비자를 세어 보니 그 전제가 틀렸다** —
+      S3의 학년 버튼도 S4의 반 버튼도 **인원 수치를 그리지 않는다.**
+      `isEmptyGrade`·`isEmptyClass`가 `> 0`만 보므로 필요한 것은 **존재 여부**뿐이고,
+      `limit(1)`이면 학년당 **1건**이다(보고서 §6).
+
+   그래서 두 단계로 센다.
+     ① `getCountFromServer` — 온라인 비용은 **그대로 1읽기**다
+     ② 실패하면 `getDocs` — 🔴 **오프라인에서도 resolve한다**(캐시에서 읽는다)
+
+   🔴 **`fromCache && 비어 있음`을 「0건」으로 읽지 마라.** 그것은 「캐시가 아무것도 모른다」
+      이지 「없다」가 아니다 — W-10 §5-3이 막으려던 거짓말과 같은 종류다. `null`을 돌려주고
+      호출부가 실패로 떨어뜨린다.
+   ==========================================================================*/
+
+/**
+ * 존재 여부만 필요한 자리의 카운트. **정확한 수가 필요 없다.**
+ *
+ * @returns 건수 · 🔴 판정 불가면 `null`(오프라인 + 캐시 미스)
+ */
+export async function countOrProbe(q: ReturnType<typeof query>): Promise<number | null> {
+  try {
+    return (await getCountFromServer(q)).data().count
+  } catch {
+    /* 오프라인. 🔴 `limit(1)`이라 캐시가 있어도 1건만 읽는다 — 존재 여부에는 그것으로 족하다. */
+    const snapshot = await getDocs(query(q, limit(1)))
+    if (snapshot.empty && snapshot.metadata.fromCache) return null
+    return snapshot.size
+  }
+}
+
 /**
  * §8.4.2 #4 — 반별 **활성** 학생 수. 0인 반이 `opacity 0.5` + TS-15가 된다.
  *
@@ -79,7 +125,7 @@ export async function fetchClassCounts(
     const classNos = Array.from({ length: classCount }, (_, i) => i + 1)
     const counts = await Promise.all(
       classNos.map((classNo) =>
-        getCountFromServer(
+        countOrProbe(
           query(
             students,
             where('academicYear', '==', academicYear),
@@ -90,9 +136,14 @@ export async function fetchClassCounts(
         ),
       ),
     )
+    /* 🔴 **한 반이라도 오프라인 폴백조차 실패하면 전체를 실패로 본다.** 일부만 0으로
+       채우면 그 반들이 `opacity 0.5` + TS-15가 되어 「명부가 비었다」는 거짓말이 된다. */
+    if (counts.some((c) => c === null)) {
+      return { kind: 'failed', code: 'firestore/class-counts-offline' }
+    }
     const byClass: Record<number, number> = {}
     classNos.forEach((classNo, i) => {
-      byClass[classNo] = counts[i].data().count
+      byClass[classNo] = counts[i] as number
     })
     const result: ClassCountsResult = { kind: 'ok', byClass }
     countsCache.set(key, result)
@@ -159,10 +210,121 @@ export async function fetchStudents(
       .filter((student) => student.isActive)
       .map(({ id, studentNo, name, number }) => ({ id, studentNo, name, number }))
 
+    /**
+     * 🔴 **W-21C 결함 4의 곁가지 — 이 파일의 문서 주석이 경고하던 것을 이제 막는다.**
+     *
+     * `getDocs`는 오프라인에서 **reject하지 않고 빈 결과를 조용히 돌려준다**(SDK 원문 —
+     * `r.fromCache && "server" === i.source ? reject : resolve`). 캐시에 없는 반을 열면
+     * **EM-01 「이 반에 등록된 학생이 없습니다」라는 거짓말**이 떴다.
+     * ⇒ `fromCache && 비어 있음`은 **모른다**이지 **없다**가 아니다. ER-03으로 떨어뜨린다.
+     *
+     * ⚠ **관측된 ER-03(결함 4 본체)의 원인은 아직 미확정이다** — 기기에 디버거를 붙여
+     *   `errorCode`의 실제 값을 봐야 갈린다. 여기서 고친 것은 **코드에서 보이는 거짓말**
+     *   하나뿐이고, 그 사실을 보고서 §6에 그대로 적었다.
+     */
+    if (students.length === 0 && snapshot.empty && snapshot.metadata.fromCache) {
+      return { kind: 'failed', code: 'firestore/students-offline' }
+    }
+
     const result: StudentsResult = { kind: 'ok', students }
     studentsCache.set(key, result)
     return result
   } catch (error: unknown) {
     return { kind: 'failed', code: errorCode(error, 'firestore/students-failed') }
   }
+}
+
+/* ============================================================================
+   🔴 W-21C 기능 4 — 학생 검색 (§2.4 · 결정 3)
+
+   **방식: 전량 로드 + 클라이언트 필터.** 근거 넷(보고서 §6):
+     ① 🔬 **새 질의도 새 인덱스도 없다** — `fetchStudents`를 반마다 부를 뿐이고 그것은
+        IX-08을 그대로 쓴다. 검색을 위해 만든 질의가 **0개**다
+     ② 🔴 **캐시를 공유한다** — S4→S5로 들어간 반은 이미 `studentsCache`에 있어
+        검색이 그만큼 싸진다. 반대로 검색이 채운 캐시는 S5 진입을 공짜로 만든다
+     ③ 🔴 **이름 중간 일치가 된다**(「준」으로 「김준서」). prefix 질의로는 불가능하고
+        사용자가 원한 동작이다
+     ④ §14.1 — **실질 차이가 없다.** 부원은 이미 S4→S5로 **전 학년·전 반을 열람할 수 있고**
+        PR-01의 4필드(학년·반·번호·이름)를 그대로 본다. 검색은 **접근 범위를 넓히지 않고**
+        도달 경로만 줄인다. ⚠ 다만 오프라인 캐시에 명부가 더 오래 남는다 — 그 사실은
+        보고서 §6에 적었다(PR-04와 같은 층의 잔여 위험이다)
+
+   🔴 **한 번에 전부 받지 않는다.** 학년×반을 순차로 채우며 **첫 결과부터 흘린다** —
+      1,033건을 다 받을 때까지 사용자가 빈 화면을 보지 않아야 한다.
+   ==========================================================================*/
+
+export interface StudentHit extends Student {
+  grade: number
+  classNo: number
+}
+
+/** 🔴 입력 판정 — **숫자면 학번, 아니면 이름**(§2.4). 공백은 무시한다. */
+export function isStudentNoQuery(q: string): boolean {
+  const t = q.trim()
+  return t.length > 0 && /^[0-9]+$/.test(t)
+}
+
+/**
+ * §2.4 — 학번은 **포함**, 이름도 **포함**이다.
+ *
+ * 🔴 학번을 prefix가 아니라 포함으로 두는 이유: 부원이 기억하는 조각이 앞자리라는 보장이
+ * 없다(「23번」으로 `20323`을 찾는다). 클라이언트 필터라 비용 차이가 0이다.
+ */
+export function matchStudent(student: Student, q: string): boolean {
+  const t = q.trim()
+  if (t === '') return false
+  return isStudentNoQuery(t) ? student.studentNo.includes(t) : student.name.includes(t)
+}
+
+/** 검색이 훑을 (학년, 반) 목록. `classCountByGrade`의 **문자열 키**를 그대로 읽는다. */
+export function searchScope(
+  classCountByGrade: Readonly<Record<string, number>>,
+): readonly { grade: number; classNo: number }[] {
+  const out: { grade: number; classNo: number }[] = []
+  for (const grade of [1, 2, 3]) {
+    const count = classCountByGrade[String(grade)] ?? 0
+    for (let classNo = 1; classNo <= count; classNo += 1) out.push({ grade, classNo })
+  }
+  return out
+}
+
+/**
+ * 한 반씩 받아 **부분 결과를 즉시 흘린다.**
+ *
+ * 🔴 **이미 캐시에 있는 반은 질의 0회다** — `fetchStudents`의 `studentsCache`가 그대로 산다.
+ * 🔴 **취소 가능해야 한다** — 사용자가 입력을 바꾸면 남은 반을 더 받을 이유가 없다.
+ *   `signal.aborted`를 매 반마다 본다.
+ *
+ * @param onPartial 지금까지 모인 결과. 반이 끝날 때마다 부른다
+ * @returns 한 반이라도 실패했는가(부분 실패는 화면이 「일부만 찾았다」로 알린다)
+ */
+export async function searchStudents(
+  academicYear: number,
+  scope: readonly { grade: number; classNo: number }[],
+  query_: string,
+  onPartial: (hits: readonly StudentHit[], done: number) => void,
+  signal: { aborted: boolean },
+): Promise<{ failed: number }> {
+  const hits: StudentHit[] = []
+  let failed = 0
+  let done = 0
+
+  for (const { grade, classNo } of scope) {
+    if (signal.aborted) break
+    const result = await fetchStudents(academicYear, grade, classNo)
+    if (signal.aborted) break
+    done += 1
+    if (result.kind === 'failed') {
+      failed += 1
+      continue
+    }
+    for (const student of result.students) {
+      if (matchStudent(student, query_)) hits.push({ ...student, grade, classNo })
+    }
+    /* 학번 오름차순 — S5와 같은 순서다(DR-01상 학년·반·번호 순과 항등). */
+    hits.sort((a, b) => a.studentNo.localeCompare(b.studentNo))
+    onPartial([...hits], done)
+  }
+
+  return { failed }
 }

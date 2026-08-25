@@ -616,22 +616,41 @@ export async function fetchRecordCounts(now: Date, force = false): Promise<Recor
   const records = collection(db, 'records')
   const active = where('status', '==', 'active')
   try {
+    /* 🔴 **W-21C 결함 3.** `getCountFromServer`는 오프라인에서 항상 throw한다(캐시 경로가
+       SDK에 없다). 실패하면 `getDocs`로 캐시에서 센다 — 근거는 `lib/roster.ts`의
+       `countOrProbe` 위 블록에 있다. 💰 온라인 비용은 그대로 3읽기다. */
     const [today, week, month] = await Promise.all([
-      getCountFromServer(query(records, active, where('dateKey', '==', toDateKey(now)))),
-      getCountFromServer(query(records, active, where('weekKey', '==', toWeekKey(now)))),
-      getCountFromServer(query(records, active, where('monthKey', '==', toMonthKey(now)))),
+      countWithCacheFallback(query(records, active, where('dateKey', '==', toDateKey(now)))),
+      countWithCacheFallback(query(records, active, where('weekKey', '==', toWeekKey(now)))),
+      countWithCacheFallback(query(records, active, where('monthKey', '==', toMonthKey(now)))),
     ])
-    countsCache = {
-      kind: 'ok',
-      today: today.data().count,
-      week: week.data().count,
-      month: month.data().count,
+    /* 🔴 하나라도 모르면 셋 다 `-`다(§8.7.5 에러 행). 반쪽을 0으로 그리지 않는다. */
+    if (today === null || week === null || month === null) {
+      return { kind: 'failed', code: 'firestore/record-counts-offline' }
     }
+    countsCache = { kind: 'ok', today, week, month }
   } catch (error: unknown) {
     /* 실패는 캐시하지 않는다. 다음 진입에서 다시 시도해야 한다. */
     return { kind: 'failed', code: errorCode(error, 'firestore/record-counts-failed') }
   }
   return countsCache
+}
+
+/**
+ * `stats.ts`의 같은 이름 함수와 **같은 문장**이다.
+ *
+ * 🔴 **한 곳으로 합치지 않았다.** `records.ts`가 `stats.ts`를 import하면 S3의 부서·명부
+ * 캐시가 S6·S7 청크로 끌려 들어오고, 반대로도 같다 — 세 `lib`을 가른 이유가 정확히
+ * 그 캐시 수명이다(W-11 §4-5 · W-13 §4-3). **11줄을 복제하는 편이 싸다.**
+ */
+async function countWithCacheFallback(q: ReturnType<typeof query>): Promise<number | null> {
+  try {
+    return (await getCountFromServer(q)).data().count
+  } catch {
+    const snapshot = await getDocs(q)
+    if (snapshot.empty && snapshot.metadata.fromCache) return null
+    return snapshot.size
+  }
 }
 
 /* --- 작성자 탈퇴 상태 (BR-58 · §8.7.2 #8-2) ------------------------------- */

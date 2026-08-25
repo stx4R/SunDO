@@ -386,4 +386,50 @@ export async function run() {
     b.update(doc(db, 'users', UIDS.member), { recordCount: increment(-1), updatedAt: now })
     return b.commit()
   })
+
+  /* ==========================================================================
+     🔴 W-21C 기능 3 — S9 순찰 일정 편성 **2연산**(§8.9.4 T-03 · 결정 2)
+
+     🔴 `src/lib/duty.ts`의 `saveDutySchedule`과 **같은 필드 집합**이다.
+     🔴 **`before`/`after`에 담당자 이름을 담지 않는다** — `DUTY_UPDATE`의 대상은
+        「그 주차의 편성」이지 사람이 아니다. 누가 편성했는지는 `actorUid`에 있다.
+     ========================================================================*/
+  describe('🔴 배치 조합 — S9 일정 편성 2연산 (W-21C · DUTY_UPDATE)')
+
+  function dutySaveBatch(db, actor, actorRole, { over = {}, logOver = {} } = {}) {
+    const b = writeBatch(db)
+    const now = serverTimestamp()
+    b.update(doc(db, 'dutySchedules', '2026-W35'), {
+      assignmentsByMeal: { mon: { lunch: [UIDS.member], dinner: [UIDS.vice] } },
+      assigneeNamesByMeal: { mon: { lunch: ['부원1'], dinner: ['차장1'] } },
+      patrolTimeByMeal: { lunch: '12:30', dinner: '18:30' },
+      patrolPlaceByMeal: { lunch: '중앙 현관', dinner: '급식실' },
+      updatedBy: actor,
+      updatedAt: now,
+      ...over,
+    })
+    b.set(doc(db, 'auditLogs', 'log-duty'), {
+      actorUid: actor, actorName: '행위자', actorRole, action: 'DUTY_UPDATE',
+      targetType: 'dutySchedules', targetId: '2026-W35',
+      before: { lunchDays: 1, dinnerDays: 0 }, after: { lunchDays: 1, dinnerDays: 1 },
+      createdAt: now, ...logOver,
+    })
+    return b.commit()
+  }
+
+  await seed()
+  await check('B-32', 'pass', '🔴 **`head`의 편성 2연산 통째로**', () =>
+    dutySaveBatch(as(UIDS.head), UIDS.head, 'head'))
+  await seed()
+  await check('B-33', 'deny', '🔴 **`vice`의 편성 2연산** — `dutySchedules` 연산이 걸려 전체 거부(결정 2)', () =>
+    dutySaveBatch(as(UIDS.vice), UIDS.vice, 'vice'))
+  await seed()
+  await check('B-34', 'deny', '🔴 정상 편성 + **위조된 감사 로그** — 로그가 걸려 전체 거부', () =>
+    dutySaveBatch(as(UIDS.head), UIDS.head, 'head', { logOver: { actorUid: UIDS.vice } }))
+  await seed()
+  await check('B-35', 'deny', '🔴 편성하면서 `weekId`를 함께 바꾼다 (허용 키 밖 — 전체 거부)', () =>
+    dutySaveBatch(as(UIDS.head), UIDS.head, 'head', { over: { weekId: '2026-W36' } }))
+  await seed()
+  await check('B-36', 'pass', '`dev`의 편성 2연산', () =>
+    dutySaveBatch(as(UIDS.dev), UIDS.dev, 'dev'))
 }
