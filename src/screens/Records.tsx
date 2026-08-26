@@ -711,6 +711,26 @@ export default function Records() {
             className={filter === item.value ? 'fchip fchip-on' : 'fchip'}
             onClick={() => {
               if (filter === item.value) return
+              /* 🔴 **W-24 A-3 — 목록을 갈아 끼우기 전에 스크롤을 맨 위로 되돌린다.**
+
+                 🔬 원인 실측(402×874) — 아래로 스크롤한 상태에서 칩을 누르면 목록이
+                 **5행 스켈레톤**으로 줄어 스크롤 범위가 사라지고, 브라우저가 `scrollTop`을
+                 **강제로 잘라낸다**(최하단이면 **953px**). 화면 전체가 그만큼 튀는 것이
+                 PM이 본 「위젯이 올라오기 전의 흔들림」이다. 🔴 **A-2로는 닫히지 않는다** —
+                 빈 상태를 가운데로 옮겨도 스켈레톤 단계의 축소는 그대로다(전/후 되감김 동일).
+
+                 🔴 **여기서 먼저 0으로 만들면 「내용이 발밑에서 빠지는」 종류의 튐이 사라진다.**
+                 레이아웃이 바뀌는 순간의 `scrollTop`이 이미 0이라 잘라낼 것이 없다.
+                 남는 이동은 **사용자가 누른 결과로서의 맨 위 복귀** 1회뿐이다.
+
+                 🔬 선례 그대로다 — W-23이 라우트 변경에 같은 처방을 `ScreenTransition`에
+                 넣었고(`router.tsx`), 필터 전환은 §8.7.4 T-02가 「목록만 갈아 끼운다」로
+                 규정하는 **같은 종류의 사건**이다.
+                 ⚠ `scrollTop = 0` 대입이 아니라 `scrollTo(0, 0)`이다 — oxlint
+                 `react(immutability)`가 `useContext()` 반환값 대입을 경고한다(W-23과 같은 이유).
+                 ⚠ **`AppShell`에 prop을 만들지 않는다.** 이 화면은 이미 무한 스크롤의
+                 `root`로 같은 노드를 쓰고 있어 새 통로가 필요 없다. */
+              scrollRoot?.scrollTo(0, 0)
               /* 목록만 갈아 끼운다. 카운터와 `delta`는 건드리지 않는다(ST-03). */
               setFilter(item.value)
               setRows(new Map())
