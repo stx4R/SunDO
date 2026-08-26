@@ -1,12 +1,22 @@
-# SunDO. v0.18.0
+# SunDO. v0.19.0 (Beta)
 
-안녕하십니까?  **SunDO**의 개발자 유이준입니다.  
-해당 마크다운 문서에서는 업데이트 로그, 사용법, F&Q, 오픈소스 라이선스를 서술하고 있습니다.
+ 안녕하십니까?  **SunDO** 프로젝트의 개발자 유이준입니다.  
+위 마크다운 문서에서는 자율생활부 선도 전자기록 PWA(총칭 : SunDO)에 관한 모든 정보들을 제공하고 있습니다.  
+또한 모든 개발과 피드백의 근간은 위 문서에서 이루어지니, 참고해주시면 감사할 것 같습니다.  
+추가로, 저작권은 <code>MIT LICENSE</code>를 따르고 있으니 라이선스를 준수해주십시오.
 
-참조1) 해당 프로그램은 PWA 방식으로 작동되며, iOS (26.6.1) 모바일 기기를 기준으로 제작되었습니다.  
-(Status Bar, Dynamic Island, Home Indicator, etc...)  
+## 목차
 
-## 업데이트 로그
+1. [Development - 업데이트 진행 사항](###-Release-Notes.)  
+2. [Development - 업데이트 예정 사항](###-Upcoming-Changes.)  
+3. [Development - 업데이트 논의 사항](###-Backlog.)  
+4. [GuideLines - 지원 기기](###-Target-Device.)  
+5. [GuideLines - PWA 설치](###-Installation.)  
+6. [GuideLines - 회원가입](###-Sign-Up.)  
+7. [GuideLines - 로그인](###-Sign-In.)  
+
+## < Development >  
+### Release Notes.  
 <pre><code>( 진행 완료 ) v0.0.1 Project Scaffolding   
 ( 진행 완료 ) v0.0.2 Design Token Track   
 ( 진행 완료 ) v0.0.3 Layer, Appshell, Field, Switch     
@@ -37,9 +47,9 @@
 ( 진행 완료 ) v0.16.1 Database fixed.  
 ( 진행 완료 ) v0.17.0 LOTS OF BUGS FIXED.  
 ( 진행 완료 ) v0.18.0 Deploy Settings.  
-( 진행 대기 ) **v1.0.0 DEPLOY**   </code></pre>
-
-## 남은 작업
+( 진행 완료 ) v0.18.0 LOTS OF BUGS FIXED.  
+( 진행 대기 ) **v1.0.0 DEPLOY**   </code></pre>    
+### Upcoming Changes.
 <pre><code>1. 온라인 / 오프라인 멤버 확인 기능  
 2. 오프라인 상태에서 토스트 알림 마진 설정    
 3. 검색 로직 수정.
@@ -49,30 +59,26 @@
 (C) 7. 차장 role 생성    
 (C) 8. 화면 모바일 기기 최적화 및 스크롤 범위 제한  
 (C) 9. PWA 편의성 패치 (복사 불가, 확대 불가, 자동 전체 화면(ui 숨기기))  
-(C) 10. 미기록 상태일때의 위젯 마진 설정</code></pre>
+(C) 10. 미기록 상태일때의 위젯 마진 설정</code></pre>  
+### Backlog.  
+<code>업데이트 대기중입니다.</code>  
 
-## 미결정 사항들
-<code>업데이트 대기중입니다.</code>
+## < GuideLines >
+### Target Device.
 
-## 사용법
+### Installation.
 
-### 회원가입 및 로그인 방식
-
-#### 회원가입
-
+### Sign Up.  
 아래 기술된 회원가입 절차를 따라 진행하는 것을 권장함.  
-각각의 절차에 부적격 처리를 받은 과정 진행 시, 거부될 수 있음.
-
+각각의 절차에 부적격 처리시, 거부될 수 있음.  
 1. 학교 도메인 구글 계정으로 OAuth 인증을 진행합니다.
 2. 부장에게 발급받은 코드를 올바르게 입력합니다.
-3. 부장이 승인할 때까지 대기합니다.
-4. 승인이 완료되면 회원가입이 완료됩니다.
-
-#### 로그인
-
+3. 정책 동의 체크박스를 표시합니다.
+4. 부장이 승인할 때까지 대기합니다.
+5. 승인이 완료되면 회원가입이 완료됩니다.
+### Sign In.  
 아래 기술된 로그인 절차를 따라 진행하는 것을 권장함.  
-각각의 절차에 부적격 처리를 받은 과정 진행 시, 거부될 수 있음.  
-
+각각의 절차에 부적격 처리시, 거부될 수 있음.  
 1. 학교 도메인 구글 계정으로 OAuth 인증을 진행합니다.
 2. 올바르게 인증이 완료되었다면, 로그인이 완료됩니다.
   
