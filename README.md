@@ -66,7 +66,9 @@
 ---
 ### Backlog.
 업데이트 대기중입니다.  
+
 ---
+
 ## < GuideLines >
 ### Target Device.
 [ Android ]  
@@ -74,6 +76,7 @@ Galaxy S~ 기종 이상 및 Android v.10 이상
   
 [ IOS ]  
 iPhone SE 3세대 이상 및 IOS v.17 이상
+
 ---
 ### Installation.
 [ Android ]  
