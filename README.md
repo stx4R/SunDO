@@ -6,17 +6,18 @@
 추가로, 저작권은 <code>MIT LICENSE</code>를 따르고 있으니 라이선스를 준수해주십시오.
 
 ## 목차
+1. [Development - 업데이트 진행 사항](#release-notes)  
+2. [Development - 업데이트 예정 사항](#upcoming-changes)  
+3. [Development - 업데이트 논의 사항](#backlog)  
+4. [GuideLines - 지원 기기](#target-device)  
+5. [GuideLines - 설치](#installation)  
+6. [GuideLines - 회원가입](#sign-up)  
+7. [GuideLines - 로그인](#sign-in)  
+8. [GuideLines - 사용법](#user-guide)  
+9. [LICENSE](#-license-)
 
-1. [Development - 업데이트 진행 사항](###-Release-Notes.)  
-2. [Development - 업데이트 예정 사항](###-Upcoming-Changes.)  
-3. [Development - 업데이트 논의 사항](###-Backlog.)  
-4. [GuideLines - 지원 기기](###-Target-Device.)  
-5. [GuideLines - PWA 설치](###-Installation.)  
-6. [GuideLines - 회원가입](###-Sign-Up.)  
-7. [GuideLines - 로그인](###-Sign-In.)  
-
-## < Development >  
-### Release Notes.  
+## < Development >
+### Release Notes.
 <pre><code>( 진행 완료 ) v0.0.1 Project Scaffolding   
 ( 진행 완료 ) v0.0.2 Design Token Track   
 ( 진행 완료 ) v0.0.3 Layer, Appshell, Field, Switch     
@@ -56,18 +57,30 @@
 4. 선도 일정 범위화  
 5. 선도 인원 부장 확인  
 6. AI 챗봇  
+  
 (C) 7. 차장 role 생성    
 (C) 8. 화면 모바일 기기 최적화 및 스크롤 범위 제한  
 (C) 9. PWA 편의성 패치 (복사 불가, 확대 불가, 자동 전체 화면(ui 숨기기))  
 (C) 10. 미기록 상태일때의 위젯 마진 설정</code></pre>  
-### Backlog.  
+### Backlog.
 <code>업데이트 대기중입니다.</code>  
 
 ## < GuideLines >
 ### Target Device.
+<code><pre>[ Android ]  
+Galaxy S~ 기종 이상 및 Android v.10 이상  
+[ IOS ]  
+iPhone SE 3세대 이상 및 IOS v.17 이상</code></pre>
 
 ### Installation.
-
+[ Android ]  
+1. Chrome 웹 브라우저로 접속
+2. 공유 버튼 클릭
+3. 홈 화면에 추가 버튼 클릭 (웹 앱으로 사용하기 옵션 토글)  
+[ IOS ]  
+1. Safari 웹 브라우저로 접속
+2. 공유 버튼 클릭
+3. 3. 홈 화면에 추가 버튼 클릭 (웹 앱으로 사용하기 옵션 토글)  
 ### Sign Up.  
 아래 기술된 회원가입 절차를 따라 진행하는 것을 권장함.  
 각각의 절차에 부적격 처리시, 거부될 수 있음.  
@@ -81,32 +94,24 @@
 각각의 절차에 부적격 처리시, 거부될 수 있음.  
 1. 학교 도메인 구글 계정으로 OAuth 인증을 진행합니다.
 2. 올바르게 인증이 완료되었다면, 로그인이 완료됩니다.
-  
-### 하단 Dock 바  
 
-#### 하단 Dock 바 - 홈  
-
+### User Guide.
+#### DockBar - 홈
 해당 페이지에서는 SunDO PWA의 전반적인 기능을 한번에 볼 수 있는 페이지입니다.  
 
-#### 하단 Dock 바 - 기록  
-
+#### DockBar - 기록  
 해당 페이지에서는 선도 조건에 부적합한 학생들을 선택형으로 기록하는 페이지입니다.  
 
-#### 하단 Dock 바 - 일정  
-
+#### DockBar - 일정  
 해당 페이지에서는 최근 1주일 간의 선도 일정을 확인할 수 있습니다.  
 
-#### 하단 Dock 바 - 관리  
-
+#### DockBar - 관리  
 해당 페이지는 부장만 접근이 가능하며, 기능은 공개하지 않습니다.  
 
-#### 하단 Dock 바 - 설정  
-
+#### DockBar - 설정  
 해당 페이지에서는 부원 여러분들이 각자의 계정에 대한 정보나 SunDO PWA에 관한 설정들을 조작할 수 있습니다.  
 
-## F&Q
-
-## 오픈소스 라이선스
+## < LICENSE >
 <pre><code>MIT License
 
 Copyright (c) 2026 Yijun Yoo
