@@ -175,20 +175,73 @@ export type MemberListState = { kind: 'ok'; members: Member[] } | { kind: 'faile
  * §4.4 R-01~R-04 · BR-24의 권한 순서. **알파벳 순이 아니다.**
  *
  * 🔴 IX-10의 `role ASC`는 `dev`·`head`·`member`·`teacher`·`vice` 순이라
- * 조직도와 아무 관계가 없다. 사람이 목록에서 찾는 순서(부장 → 차장 → 부원 → 교사 → Dev)로
- * **클라이언트에서** 정렬한다 — §7 신규 항목으로 올렸다.
+ * 조직도와 아무 관계가 없다. 사람이 목록에서 찾는 순서로 **클라이언트에서** 정렬한다.
+ *
+ * 🔴 **W-24 B-4 — 순서가 `부장 → 차장 → Dev → 부원 → 교사`로 바뀌었다(사용자 확정).**
+ * W-15B가 확정했던 `부장 → 차장 → 부원 → 교사 → Dev`를 **바꾸는 결정**이다.
+ * PM 지정은 `부장 → 차장 → Dev → 부원` 4종뿐이고 교사가 없어 **맨 뒤**로 두었다 —
+ * 교사는 양도·임명 대상이 아니라(BR-20) 목록에서 찾을 일이 가장 적다.
+ * ⚠ **여전히 클라이언트 정렬이다.** `orderBy`를 서버로 보내지 않는다 — IX-10은 미생성이고
+ * `role ASC`는 알파벳 순이라 의미가 없다. **S8은 인덱스를 0건 요구한다**(W-15B §2).
  */
 const ROLE_RANK: Readonly<Record<string, number>> = {
   head: 0,
   vice: 1,
-  member: 2,
-  teacher: 3,
-  dev: 4,
+  dev: 2,
+  member: 3,
+  teacher: 4,
 }
 
 /** BR-20 · R-08 · BR-59 · US-H-03 AC-4 — 양도 대상 자격. 본인 제외는 호출부가 판단한다. */
 export function isTransferTarget(member: Pick<Member, 'role'>): boolean {
   return member.role === 'member' || member.role === 'vice'
+}
+
+/**
+ * 🔴 **W-24 §B — 차장 임명·해제의 대상 자격.** BR-20(양도)과 **다르다.**
+ *
+ * 이미 차장인 사람에게 「차장 임명」은 뜻이 없고, 부원에게 「차장 해제」도 뜻이 없다.
+ * 🔬 둘의 합집합이 `isTransferTarget`과 **정확히 같다**(`member` ∪ `vice`) —
+ * 그래서 pill이 뜨는 조건은 W-15B와 한 글자도 달라지지 않았고 EM-05의 판정도 그대로다.
+ */
+export function isViceAppointTarget(member: Pick<Member, 'role'>): boolean {
+  return member.role === 'member'
+}
+
+export function isViceReleaseTarget(member: Pick<Member, 'role'>): boolean {
+  return member.role === 'vice'
+}
+
+/** S8 ② pill 하나가 여는 세 연산. */
+export type RoleAction = 'head' | 'viceOn' | 'viceOff'
+
+/**
+ * 🔴 **한 대상에게 가능한 권한 변경 옵션. 판정자는 이 함수 하나다.**
+ *
+ * `canEditRecord()`와 같은 규율이다(W-21B) — 화면에 역할 분기를 또 쓰면 두 곳이 갈리고,
+ * 「눌렀는데 실패」나 「할 수 있는데 안 보임」이 된다(W-17F 결함 1의 형태).
+ *
+ * **실행자** — `head`·`dev`뿐이다. BR-24가 「부원↔차장 역할 변경은 **부장이 수행**」이고
+ * §4.1이 Dev에게 전 기능 접근을 준다(결정 2). 🔴 **차장은 실행자가 아니다.**
+ * 이것이 `firestore.rules`의 `(request.auth.uid != uid && isHead())`와 **같은 문장**이다.
+ *
+ * **본인** — 어떤 옵션도 없다. BR-21이고, 규칙의 `request.auth.uid != uid`와 같은 판정이다.
+ *
+ * 🔴 **옵션이 0개면 화면은 pill을 렌더하지 않는다** — `disabled`가 아니라 부재다(W-15A §4-4).
+ */
+export function roleActionsFor(
+  actor: Pick<Member, 'uid' | 'role'>,
+  member: Pick<Member, 'uid' | 'role'>,
+): RoleAction[] {
+  if (actor.role !== 'head' && actor.role !== 'dev') return []
+  if (!member.uid || member.uid === actor.uid) return []
+  const list: RoleAction[] = []
+  /* BR-20 그대로 — `member ∪ vice`. */
+  if (isTransferTarget(member)) list.push('head')
+  /* 이미 차장이면 임명이, 부원이 아니면 해제가 각각 뜻이 없다. */
+  if (isViceAppointTarget(member)) list.push('viceOn')
+  if (isViceReleaseTarget(member)) list.push('viceOff')
+  return list
 }
 
 /**
@@ -310,10 +363,12 @@ export type WriteResult = { ok: true } | { ok: false; code: string }
 
 /**
  * §9.3.8의 `action` 목록에서 **이번 회차에 쓰는 값만** 늘린다.
- * 🔴 `ROLE_CHANGE`를 넣지 않았다 — 부장의 부원↔차장 역할 변경(§4.2 BR-24)은
- * §8.8.3 요소 표에 UI가 없고 ⑥ Dev 도구(v1.2) 소유다. 쓰지 않는 값을 미리 열지 않는다.
+ *
+ * 🔴 **W-24 §B — `ROLE_CHANGE`가 여기 들어왔다.** W-15A는 「§8.8.3 요소 표에 UI가 없고
+ * ⑥ Dev 도구(v1.2) 소유」라는 이유로 빼 두었는데, 이번 회차가 **그 UI를 만들었다.**
+ * 🔴 **새로 지은 값이 아니다** — §9.3.8의 `action` 목록에 처음부터 있는 값이다(PRD:1649).
  */
-type AuditAction = 'USER_APPROVE' | 'USER_REJECT' | 'CODE_ISSUE' | 'HEAD_TRANSFER'
+type AuditAction = 'USER_APPROVE' | 'USER_REJECT' | 'CODE_ISSUE' | 'HEAD_TRANSFER' | 'ROLE_CHANGE'
 
 /**
  * §9.3.8 전 필드. **배치에 넣기만 하고 커밋은 호출부가 한다** — 감사 로그만 따로
@@ -604,6 +659,71 @@ export async function transferHead(actor: Actor, target: Member): Promise<WriteR
     return { ok: false, code: errorCode(error, 'firestore/transfer-failed') }
   }
   /* 두 계정의 역할이 바뀌었으므로 목록 캐시가 곧 거짓이다(`reissueInviteCode` 선례). */
+  clearAdminCache()
+  return { ok: true }
+}
+
+/**
+ * 🔴 **W-24 §B — 차장 임명·해제. 배치 2연산.**
+ *
+ * **BR-24(PRD:1814)가 이 연산의 정본이다** — 「부원↔차장 역할 변경은 **부장이 수행**하고,
+ * 부장·교사·Dev 역할 부여는 Dev만 수행한다」. 🔴 **차장은 실행자가 아니다.**
+ * 지시서는 「차장도 차장을 임명한다」를 요구했지만 **PRD가 이긴다**(규약 4-8 · 사용자 확정).
+ * 실행자 = `head`·`dev`이고 그것이 `firestore.rules`의
+ * `allow update: (request.auth.uid != uid && isHead())`와 **같은 문장**이다 —
+ * 🔴 **그래서 이번 회차는 규칙을 한 줄도 고치지 않았다.**
+ *
+ * **양도(`transferHead`)와 세 가지가 다르다.**
+ * ① `departments`를 건드리지 않는다 — 차장에는 `headUid` 같은 단일 진실 필드가 **없고**
+ *    필요하지도 않다(§4.1이 차장을 **1~3명**으로 규정한다 · D-21 기본 2명).
+ * ② 실행자의 역할이 바뀌지 않는다 — 화면 이동도 `refresh()`도 없다.
+ * ③ 🔴 **되돌릴 수 있다.** `next`를 뒤집으면 그대로 원복이다 — 그것이 「해제」를 함께
+ *    만든 이유이고(사용자 확정 · 지시서 §4-4의 멈춤 조건), 임명만 만들면 앱 안에
+ *    실수를 고칠 방법이 사라진다.
+ *
+ * **커밋 전 확인**(W-15A §4-2 — `batch.update`는 대상 문서가 없으면 배치 전체를 실패시킨다)
+ * 1. 대상이 본인이면 거부 — 규칙의 `request.auth.uid != uid`와 같은 판정을 화면 쪽에서도 한다.
+ * 2. 대상 문서: 존재 · `status === 'active'` · **현재 역할이 기대한 값**
+ *    (임명이면 `member`, 해제면 `vice`). 🔴 목록을 그린 뒤 대상이 이미 바뀌었을 수 있다.
+ *
+ * ⚠ **오프라인에서 `commit()`은 resolve되지 않는다**(`transferHead`와 같은 성질).
+ *   화면이 `useOnline()`으로 먼저 막는다.
+ */
+export async function changeVice(
+  actor: Actor,
+  target: Member,
+  next: 'vice' | 'member',
+): Promise<WriteResult> {
+  const expected = next === 'vice' ? 'member' : 'vice'
+  if (!target.uid || target.uid === actor.uid) {
+    return { ok: false, code: CODE_INELIGIBLE_TARGET }
+  }
+
+  try {
+    const snapshot = await getDoc(doc(db, 'users', target.uid))
+    const data = snapshot.data() as { role?: string; status?: string } | undefined
+    if (!snapshot.exists() || data?.status !== 'active' || data?.role !== expected) {
+      return { ok: false, code: CODE_INELIGIBLE_TARGET }
+    }
+  } catch (error: unknown) {
+    /* 🔴 읽기 실패를 「자격 있음」으로 읽지 마라. `unavailable`이면 어차피 커밋도
+       resolve되지 않는다(W-15A §4-7). */
+    return { ok: false, code: errorCode(error, 'firestore/role-precheck-failed') }
+  }
+
+  const batch = writeBatch(db)
+  const now = serverTimestamp()
+
+  batch.update(doc(db, 'users', target.uid), { role: next, updatedAt: now })
+  /* 🔴 `before`/`after`에 이름·이메일을 담지 않는다(W-15A §4-9의 규율).
+     누가 누구를 바꿨는지는 `actorUid`와 `targetId`(uid)로 역추적한다. */
+  appendAudit(batch, actor, 'ROLE_CHANGE', 'users', target.uid, { role: expected }, { role: next })
+
+  try {
+    await batch.commit()
+  } catch (error: unknown) {
+    return { ok: false, code: errorCode(error, 'firestore/role-change-failed') }
+  }
   clearAdminCache()
   return { ok: true }
 }

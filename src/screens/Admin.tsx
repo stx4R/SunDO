@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { useNavigate } from 'react-router'
+import { BottomSheet } from '../components/BottomSheet'
 import { Chip } from '../components/Chip'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { NeuButton } from '../components/NeuButton'
@@ -8,6 +9,7 @@ import { useToast } from '../components/Toast'
 import { useAuth } from '../contexts/AuthProvider'
 import {
   approveRequest,
+  changeVice,
   clearAdminCache,
   CODE_INELIGIBLE_TARGET,
   countRecentIssues,
@@ -17,6 +19,7 @@ import {
   reissueInviteCode,
   rejectRequest,
   REISSUE_LIMIT_PER_HOUR,
+  roleActionsFor,
   subscribePendingRequests,
   transferHead,
   type Actor,
@@ -24,6 +27,7 @@ import {
   type Member,
   type MemberListState,
   type PendingRequest,
+  type RoleAction,
 } from '../lib/admin'
 import { useOnline } from '../lib/useOnline'
 import { usePullToRefresh } from '../lib/usePullToRefresh'
@@ -75,12 +79,16 @@ const HINT_CODE_NO_ISSUE = '코드 재발급은 개발자에게 문의하세요'
  * 🔴 그렇다고 새 문구를 지어내지 않는다(§4-4). §7 신규 항목으로 올렸다.
  */
 const HINT_TRANSFER = '부장 권한을 양도하면 내 계정은 일반 부원으로 전환됩니다'
-/**
- * 🔴 **W-21B 결정 4로 교체됐다.** 원문은 `기록 수정·삭제는 부장·차장만 가능합니다`인데
- * 작성자 본인이 권한자로 들어오면서 **사실이 아니게 됐다.**
- * §8.10.5 개정이 필요하다 — 보고서 §8 ①. 「차장 이상」은 §8.9.2·EM-06이 이미 쓰는 어법이다.
+/*
+ * 🔴 **W-24 B-5 — `기록 수정·삭제는 작성자 본인과 차장 이상만 가능합니다`를 지웠다(사용자 확정).**
+ *
+ * 지시서 Q-5는 「이 문구가 부원에게 무반응의 유일한 설명이면 지우는 순간 이유를 알 방법이
+ * 없어진다」고 걱정했는데 🔬 **전제가 거짓이었다 — 부원은 이 문구를 볼 수 없다.**
+ * `/admin`은 `router.tsx`의 `ADMIN_ROLES=['vice','head','teacher','dev']` 가드 뒤에 있고
+ * 독의 `관리` 탭은 `memberVisible: false`다. 문구를 보던 대상(차장·부장·교사·Dev)은
+ * **전원 실제로 수정·삭제가 되는 계정**이라 「왜 안 되는지」를 설명받을 필요가 없다.
+ * ⚠ §8.10.5 · PRD:1364의 개정 대상이다 — 보고서 §7.
  */
-const HINT_BOTTOM = '기록 수정·삭제는 작성자 본인과 차장 이상만 가능합니다'
 /**
  * 🔴 결정 1(W-15B) — design `9b`·`9c`의 읽기 전용 안내 3종. **§8.10에 없던 문구이고
  * 사용자가 확정 문안으로 채택했다.** `열람 전용 계정입니다`는 S5(§8.5.2 #5)가 이미 쓴다.
@@ -121,6 +129,28 @@ function md02Body(name: string, demotesSelf: boolean): string {
 }
 const MD_03_TITLE = '가입 거절'
 const MD_03_CONFIRM = '거절'
+/**
+ * 🔴 **W-24 §B 신규 문안 6종 — §8.10 사전에 자리가 없어 「지어낸 것」이다.**
+ * 규약 4-6이 「사전에 없으면 만들지 말고 §7 신규 항목으로」라고 하고, 지시서 §2가
+ * **차장 문안만은 예외적으로 짓되 지었다는 사실을 명시하라**고 했다. 보고서 §7이 전량 목록이다.
+ *
+ * 어법은 사전에서 빌렸다 — `임명`은 PRD §4.1의 「부장이 **임명**」, `일반 부원으로 전환됩니다`는
+ * §8.10.5 `HINT_TRANSFER`의 「내 계정은 **일반 부원으로 전환**됩니다」에서 그대로 왔다.
+ * 마침표는 §8.10 사전 스타일(모달 본문은 있고 토스트는 없다)을 따랐다.
+ *
+ * 🔴 **옵션 시트의 `부장 권한 양도`는 지은 문구가 아니다** — MD-02의 제목 원문이다.
+ */
+const SHEET_ROLE_TITLE = '권한 변경'
+const OPT_HEAD = MD_02_TITLE
+const OPT_VICE_ON = '차장 임명'
+const OPT_VICE_OFF = '차장 해제'
+const MD_VICE_ON_CONFIRM = '임명'
+const MD_VICE_OFF_CONFIRM = '해제'
+const md_vice_on_body = (name: string) => `${name}님을 차장으로 임명합니다.`
+const md_vice_off_body = (name: string) =>
+  `${name}님의 차장 권한을 해제합니다. 일반 부원으로 전환됩니다.`
+const TS_VICE_ON = '차장으로 임명했습니다'
+const TS_VICE_OFF = '차장 권한을 해제했습니다'
 /** §8.8.6 오프라인 행. */
 const OFFLINE_NOTICE = '오프라인 상태에서는 관리 기능을 사용할 수 없습니다'
 /** §8.8.6 로딩 — 코드 자리표시. */
@@ -236,7 +266,6 @@ export default function Admin() {
         />
       </div>
 
-      <p className="adm-hint">{HINT_BOTTOM}</p>
     </main>
   )
 }
@@ -419,12 +448,30 @@ function CodeSection({
 /* --- ② 부원 · 권한 양도 ------------------------------------------------- */
 
 /**
+ * 🔴 **W-24 §B — pill 하나가 세 연산의 입구가 됐다.**
+ *
+ * `head` = 부장 양도(4연산) · `viceOn` = 차장 임명(2연산) · `viceOff` = 차장 해제(2연산).
+ * 🔴 **실행자는 셋 다 `head`·`dev`다** — BR-24가 「부원↔차장 역할 변경은 **부장이 수행**」으로
+ * 규정하고 §4.1이 차장을 「부장이 임명」으로 규정한다. **차장은 실행자가 아니다**(규약 4-8).
+ */
+/* 🔴 `RoleAction`과 옵션 판정은 `admin.ts`가 갖는다 — 화면은 라벨만 붙인다. */
+const OPTION_LABEL: Readonly<Record<RoleAction, string>> = {
+  head: OPT_HEAD,
+  viceOn: OPT_VICE_ON,
+  viceOff: OPT_VICE_OFF,
+}
+
+/**
  * §8.8.3 #6·#7·#8 — design `9a` 두 번째 카드 · `9c`(교사 읽기) · `9d`(Dev).
  *
- * 🔴 **`양도` pill이 렌더되는 조건 = 실행자 조건 ∧ 대상 조건이다.**
- * 실행자는 `head`·`dev`(결정 2), 대상은 `active` 且 `role ∈ {member, vice}`(BR-20) 且 본인 아님(BR-21).
+ * 🔴 **pill이 렌더되는 조건 = 실행자 조건 ∧ 「가능한 옵션 ≥ 1」이다.**
+ * 실행자는 `head`·`dev`(결정 2), 옵션 조건은 아래 `optionsFor`가 갖는다.
  * 탈퇴(R-08·BR-59)와 승인 대기(US-H-03 AC-4)는 `status == 'active'` 질의에 이미 걸러진다.
- * 🔴 **`disabled`가 아니라 부재다**(W-15A §4-4).
+ * 🔴 **`disabled`가 아니라 부재다**(W-15A §4-4) — 옵션이 0개면 pill 자체가 없다.
+ *
+ * 🔬 **옵션 합집합이 BR-20과 같다** — `head`는 `member ∪ vice`, `viceOn`은 `member`,
+ * `viceOff`는 `vice`다. 그래서 **pill이 뜨는 대상 집합은 W-15B와 한 명도 다르지 않고**
+ * EM-05(`양도할 수 있는 부원이 없습니다`)의 판정도 그대로다.
  */
 function MemberSection({
   canTransfer,
@@ -444,16 +491,33 @@ function MemberSection({
   style: CSSProperties
 }) {
   const [state, setState] = useState<MemberListState | null>(null)
-  const [target, setTarget] = useState<Member | null>(null)
+  /** 옵션 시트. 닫힘 모션 0.38s 동안 내용이 남아 있어야 해 `open`과 내용물을 따로 든다(W-12 §3.5). */
+  const [sheet, setSheet] = useState<{ member: Member; options: RoleAction[] } | null>(null)
+  const [sheetOpen, setSheetOpen] = useState(false)
+  /**
+   * 확인 모달의 대상 + 무엇을 하려는가.
+   * 🔴 **닫을 때 내용을 비우지 않는다** — `ConfirmModal`은 `useOverlayTransition`으로
+   * **닫힌 뒤에도 잠시 그려지고**, 이제 제목·본문·버튼 라벨이 조작마다 갈리므로 비우면
+   * 닫히는 0.2초 동안 다른 조작의 문안이 스친다(W-12 §3.5와 같은 규율).
+   * 열림 여부는 `confirmOpen`이 따로 든다.
+   */
+  const [confirm, setConfirm] = useState<{ member: Member; action: RoleAction } | null>(null)
+  const [confirmOpen, setConfirmOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
   const navigate = useNavigate()
+
+  /**
+   * 🔴 **시트를 겹쳐 띄우지 않는다.** `BottomSheet`가 N-02 히스토리 엔트리를 쌓으므로
+   * 옵션 시트를 **먼저 닫고 `onClosed`에서** 확인 모달을 연다(W-21B가 남긴 규율 그대로).
+   */
+  const nextRef = useRef<{ member: Member; action: RoleAction } | null>(null)
 
   /* 🔴 연속 탭 차단은 상태가 아니라 ref다. **양도는 되돌릴 수 없어 더 중요하다** —
      `disabled`와 `busy`는 같은 태스크 안의 5연타를 못 막는다(W-06 §5-4). */
   const lockRef = useRef(false)
 
-  /* 🔴 head 경로의 `refresh()`는 **이 화면이 사라진 뒤에** 돈다. 이유는 `doTransfer` 주석. */
+  /* 🔴 head 경로의 `refresh()`는 **이 화면이 사라진 뒤에** 돈다. 이유는 `doAction` 주석. */
   const refreshOnUnmountRef = useRef(false)
   useEffect(
     () => () => {
@@ -477,6 +541,9 @@ function MemberSection({
   }, [reloadKey])
 
   const meUid = profile?.uid ?? ''
+  /* 🔴 `canTransfer`(섹션 라벨·EM-05용)와 **같은 값을 두 번 계산하지 않는다** —
+     실행자 판정은 `roleActionsFor()`가 갖고, 여기서는 그 입력만 만든다. */
+  const actorRole = profile?.role ?? ''
   const members = state?.kind === 'ok' ? state.members : []
 
   /* §2.3-C — EM-05의 조건은 「부원 1명」이 아니라 **BR-20 통과 대상 0명**이다.
@@ -489,19 +556,93 @@ function MemberSection({
     [state, meUid],
   )
 
-  const doTransfer = async () => {
-    const member = target
-    if (!member || lockRef.current || !online || !canTransfer) return
+  /**
+   * 🔴 **판정을 화면에 다시 쓰지 않는다.** 옵션 판정자는 `admin.ts`의 `roleActionsFor()`
+   * **하나**다 — `canEditRecord()`가 남긴 규율 그대로다(W-21B).
+   * 여기서 하는 일은 실행자 정보를 넘기는 것뿐이다.
+   */
+  const optionsFor = (member: Member): RoleAction[] =>
+    roleActionsFor({ uid: meUid, role: actorRole }, member)
+
+  /**
+   * 🔴 **옵션이 하나뿐이면 시트를 띄우지 않고 바로 확인 모달로 간다**(지시서 §B-3).
+   * 선택지가 하나뿐인 UI를 만들지 않는다 — 부장 양도만 가능한 대상이 그 경우다.
+   */
+  const askConfirm = (next: { member: Member; action: RoleAction }) => {
+    setConfirm(next)
+    setConfirmOpen(true)
+  }
+
+  const openPill = (member: Member) => {
+    if (busy || !online) return
+    const options = optionsFor(member)
+    if (options.length === 0) return
+    if (options.length === 1) {
+      askConfirm({ member, action: options[0] })
+      return
+    }
+    setSheet({ member, options })
+    setSheetOpen(true)
+  }
+
+  const chooseOption = (action: RoleAction) => {
+    if (!sheet) return
+    nextRef.current = { member: sheet.member, action }
+    setSheetOpen(false)
+  }
+
+  /* 닫힘 모션 0.38s까지 끝난 뒤. 여기서만 다음 표면을 연다. */
+  const handleSheetClosed = () => {
+    setSheet(null)
+    const next = nextRef.current
+    nextRef.current = null
+    if (next) askConfirm(next)
+  }
+
+  /**
+   * 확인 모달 문안 3종. 🔴 **세 문안 모두 제목과 본문에 역할 이름이 들어간다.**
+   * MD-02만 §8.10 사전 원문이고 나머지 둘은 **지어낸 것이다**(선언은 상수 블록 주석).
+   */
+  const view = confirm
+  const viewName = view?.member.name ?? ''
+  const confirmCopy =
+    view?.action === 'viceOn'
+      ? { title: OPT_VICE_ON, body: md_vice_on_body(viewName), confirm: MD_VICE_ON_CONFIRM }
+      : view?.action === 'viceOff'
+        ? { title: OPT_VICE_OFF, body: md_vice_off_body(viewName), confirm: MD_VICE_OFF_CONFIRM }
+        : {
+            title: MD_02_TITLE,
+            /* 🔴 Dev 경로에서는 「내 계정은 부원으로 전환됩니다」를 그리지 않는다(W-15B 그대로). */
+            body: md02Body(viewName, isHead),
+            confirm: MD_02_CONFIRM,
+          }
+
+  const doAction = async () => {
+    const pending = confirm
+    if (!pending || !confirmOpen || lockRef.current || !online || !canTransfer) return
+    const { member, action } = pending
     lockRef.current = true
     setBusy(true)
-    const result = await transferHead(toActor(profile), member)
+    const result =
+      action === 'head'
+        ? await transferHead(toActor(profile), member)
+        : await changeVice(toActor(profile), member, action === 'viceOn' ? 'vice' : 'member')
     lockRef.current = false
     setBusy(false)
-    setTarget(null)
+    setConfirmOpen(false)
 
     if (!result.ok) {
       /* OP-11 E-3003과 통신 실패는 사용자가 할 수 있는 일이 다르다. */
       toast(result.code === CODE_INELIGIBLE_TARGET ? E_3003 : SECTION_ERROR)
+      return
+    }
+
+    /* 🔴 **차장 임명·해제는 실행자의 역할을 바꾸지 않는다.** 화면 이동도 `refresh()`도 없다 —
+       `transferHead`의 Dev 경로와 같은 형태다. 목록만 다시 읽는다. */
+    if (action !== 'head') {
+      toast(action === 'viceOn' ? TS_VICE_ON : TS_VICE_OFF)
+      clearAdminCache()
+      setReloadKey((n) => n + 1)
       return
     }
 
@@ -594,12 +735,16 @@ function MemberSection({
                   {/* 🔴 이메일을 그리지 않는다(§8.8.3 #6 · §4.2 단서 1). */}
                   <span className="mrow-sub">{ROLE_LABEL[member.role] ?? member.role}</span>
                 </span>
-                {canTransfer && member.uid !== meUid && isTransferTarget(member) && (
+                {/* 🔴 **옵션이 0개면 pill 자체가 없다** — `disabled`가 아니라 부재다(W-15A §4-4).
+                    ⚠ `ariaLabel`이 「부장 권한 양도」에서 「권한 변경」으로 바뀌었다. pill 하나가
+                    세 연산의 입구가 됐으므로 옛 라벨은 **AT 사용자에게 거짓말**이 된다.
+                    🔴 §8.10 사전 항목이 아니라 W-15B가 지은 접근성 문자열이고, 같은 자리에서 고쳤다. */}
+                {optionsFor(member).length > 0 && (
                   <Pill
                     variant="soft"
                     disabled={!online || busy}
-                    ariaLabel={`${member.name}에게 부장 권한 양도`}
-                    onClick={() => setTarget(member)}
+                    ariaLabel={`${member.name} 권한 변경`}
+                    onClick={() => openPill(member)}
                   >
                     {BTN_TRANSFER}
                   </Pill>
@@ -617,15 +762,42 @@ function MemberSection({
       {/* §8.8.3 #8. 🔴 Dev가 볼 때도 그대로다 — §8.10.5 확정 문안이다. */}
       {canTransfer && <p className="adm-note">{HINT_TRANSFER}</p>}
 
-      {/* §8.10.4 MD-02. 🔴 `destructive`를 켜지 않는다 — §8.10.4가 위험색을 MD-07에만 준다. */}
+      {/* 🔴 **옵션 선택은 시트다.** `ConfirmModal`은 좌 `취소` + 우 1개가 계약이라
+          버튼을 3개로 늘릴 수 없다(W-03C). **새 표면을 만들지 않았다** — 기존
+          `BottomSheet`이고, 안의 메뉴는 `RecordActionSheet`의 모양을 S8 접두사로 옮겨 왔다. */}
+      <BottomSheet
+        open={sheetOpen}
+        title={SHEET_ROLE_TITLE}
+        onClose={() => setSheetOpen(false)}
+        onClosed={handleSheetClosed}
+      >
+        <div className="adm-menu">
+          {sheet?.options.map((action) => (
+            <button
+              key={action}
+              type="button"
+              className="adm-item"
+              onClick={() => chooseOption(action)}
+            >
+              <span className="adm-item-label">{OPTION_LABEL[action]}</span>
+            </button>
+          ))}
+        </div>
+      </BottomSheet>
+
+      {/* §8.10.4 MD-02(부장 양도) + W-24 신규 2종(차장 임명·해제).
+          🔴 **문안에 「어떤 역할인지」가 반드시 들어간다** — 제목과 본문 둘 다에 있다.
+          🔴 `destructive`를 켜지 않는다 — §8.10.4가 위험색을 MD-07에만 준다.
+          ⚠ **차장 해제도 위험색이 아니다.** 되돌릴 수 있는 조작이라 양도와 급이 다르고,
+             §8.10.4의 위험색 배정을 이 회차가 바꾸지 않는다. */}
       <ConfirmModal
-        open={target !== null}
-        title={MD_02_TITLE}
-        body={md02Body(target?.name ?? '', isHead)}
-        confirmLabel={MD_02_CONFIRM}
+        open={confirmOpen}
+        title={confirmCopy.title}
+        body={confirmCopy.body}
+        confirmLabel={confirmCopy.confirm}
         loading={busy}
-        onConfirm={() => void doTransfer()}
-        onCancel={() => setTarget(null)}
+        onConfirm={() => void doAction()}
+        onCancel={() => setConfirmOpen(false)}
       />
     </section>
   )

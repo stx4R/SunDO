@@ -35,15 +35,18 @@ export const MUTATIONS = [
     from: 'allow update: if (request.auth.uid != uid && isHead())',
     to: 'allow update: if (isHead())',
     /* 🔬 SEC-9a가 함께 빨개진다 — `isHead()`를 본인에게도 열면 부장이 자기 문서를
-       마음대로 고칠 수 있어 `selfWithdraw`의 부장 차단(BR-56)까지 우회된다. */
-    breaks: ['T-7', 'T-7c', 'SEC-9a', 'B-9'],
+       마음대로 고칠 수 있어 `selfWithdraw`의 부장 차단(BR-56)까지 우회된다.
+       🔴 **W-24 — 선언에 `B-15`가 빠져 있었다.** SEC-9a의 배치판(부장의 탈퇴 배치)이고
+       같은 이유로 함께 빨개진다. 실측으로 채웠다(W-21C가 B-15를 더하면서 갱신하지 않았다). */
+    breaks: ['T-7', 'T-7c', 'SEC-9a', 'B-9', 'B-15'],
   },
   {
     name: 'demote-any-role',
     why: '자기 강등의 목적지 제한(`member`)을 뺀다 — 아무 역할로나 자기 강등',
     from: "&& request.resource.data.role == 'member'\n        && request.resource.data.diff(resource.data).affectedKeys()\n             .hasOnly(['role', 'updatedAt']);",
     to: "&& request.resource.data.diff(resource.data).affectedKeys()\n             .hasOnly(['role', 'updatedAt']);",
-    breaks: ['T-7'],
+    /* 🔴 **W-24 — 선언에 `B-9`가 빠져 있었다.** T-7의 배치판이고 같은 조건에서 함께 빨개진다. */
+    breaks: ['T-7', 'B-9'],
   },
   {
     name: 'invitecodes-read-merged',
@@ -92,7 +95,30 @@ export const MUTATIONS = [
     why: '`actorUid == auth.uid`를 뺀다 (§9.6 필수 조건 6)',
     from: 'allow create: if isSignedIn() && request.resource.data.actorUid == request.auth.uid;',
     to: 'allow create: if isSignedIn();',
-    breaks: ['L-2'],
+    /* 🔴 **W-24 — 선언이 낡아 있었다.** `L-2` 하나만 적혀 있었지만 실제로는 **6건**이 빨개진다.
+       W-21B가 `B-24`를, W-21C가 `B-34`를, W-15A가 `B-19`를 더하면서 이 목록을 갱신하지 않았다.
+       🔬 이번 회차가 `B-42`·`B-43`을 더하면서 전량을 다시 재어 채웠다.
+       ⚠ `B-43`은 **통과기대인데 빨개진다** — 그것이 이 변형의 가장 좋은 증거다.
+       감사 로그 관문이 사라지면 배치가 통째로 성공해 **대상의 `role`이 실제로 바뀐다.** */
+    breaks: ['L-2', 'B-19', 'B-24', 'B-34', 'B-42', 'B-43'],
+  },
+  {
+    /* 🔴 **W-24 §B 신설.** 이번 회차는 규칙을 한 줄도 고치지 않았다 — BR-24가 정한 실행자
+       (`head`·`dev`)가 이미 `isHead()`로 열려 있었기 때문이다. 그렇다면 **「차장을 막고 있는
+       것이 정말 그 `isHead()`인가」**를 재야 한다. 그것이 이 변형이다.
+       🔴 `isVice()`는 `['vice','head','dev']`라 이 변형은 **차장에게 남의 `role` 변경을 연다** —
+       BR-24를 정면으로 위반하는 형태이고, 그때 무엇이 빨개지는지가 조건이 일한다는 증거다. */
+    name: 'users-update-vice',
+    why: '🔴 W-24 — `users` update의 `isHead()`를 `isVice()`로 넓힌다 (BR-24 위반 — 차장이 남의 역할을 바꾼다)',
+    from: 'allow update: if (request.auth.uid != uid && isHead())',
+    to: 'allow update: if (request.auth.uid != uid && isVice())',
+    /* 🔬 **선언을 한 번 틀렸고 실측이 고쳤다.** 처음에는 `T-4`·`T-11`·`B-40`(= `role` 관련)만
+       적었는데 `U-2`(차장이 남의 `status`를 바꾼다)와 `B-30`(차장이 남의 `recordCount`를 −1)도
+       함께 빨개졌다. 🔴 **이 절은 `role`만이 아니라 그 문서의 「모든 필드」를 가른다** —
+       `users` update의 `isHead()` 분기에는 필드 제한이 **없기 때문**이다(§1-9 실측).
+       ⚠ `B-7`(차장의 양도 4연산)은 **빨개지지 않는다** — `departments` update가 따로
+       `isHead()`를 요구해 그쪽에서 여전히 걸린다. 관문이 둘이라는 증거다. */
+    breaks: ['U-2', 'T-4', 'T-11', 'B-30', 'B-40'],
   },
   {
     name: 'users-list-open',

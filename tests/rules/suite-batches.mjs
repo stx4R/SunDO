@@ -8,7 +8,7 @@
  * 🔴 앱 코드(`src/lib/signup.ts` · `admin.ts` · `records.ts`)의 **실제 필드 집합**을
  *    그대로 옮겼다. 한 글자라도 다르면 이 테스트가 규칙을 검증하지 못한다.
  */
-import { doc, increment, serverTimestamp, writeBatch } from 'firebase/firestore'
+import { doc, getDoc, increment, serverTimestamp, writeBatch } from 'firebase/firestore'
 import { as, check, DEPT, describe, put, recordPayload, seed, UIDS } from './harness.mjs'
 
 const codeRef = (db, id) => doc(db, 'departments', DEPT, 'inviteCodes', id)
@@ -67,6 +67,22 @@ function transferBatch(db, actor, actorRole, target, demote) {
     actorUid: actor, actorName: '행위자', actorRole, action: 'HEAD_TRANSFER',
     targetType: 'users', targetId: target,
     before: { headUid: demote }, after: { headUid: target }, createdAt: now,
+  })
+  return b.commit()
+}
+
+/**
+ * 🔴 W-24 §B — 차장 임명·해제. **2연산**(`users` + `auditLogs`)이고 `departments`가 없다.
+ * `src/lib/admin.ts`의 `changeVice()`와 **같은 필드 집합**이다.
+ */
+function viceBatch(db, actor, actorRole, target, from, to) {
+  const b = writeBatch(db)
+  const now = serverTimestamp()
+  b.update(doc(db, 'users', target), { role: to, updatedAt: now })
+  b.set(doc(db, 'auditLogs', `log-vice-${to}`), {
+    actorUid: actor, actorName: '행위자', actorRole, action: 'ROLE_CHANGE',
+    targetType: 'users', targetId: target,
+    before: { role: from }, after: { role: to }, createdAt: now,
   })
   return b.commit()
 }
@@ -140,6 +156,48 @@ export async function run() {
     b.update(doc(db, 'users', UIDS.head), { role: 'vice', updatedAt: now })
     b.update(doc(db, 'departments', DEPT), { headUid: UIDS.member, updatedAt: now })
     return b.commit()
+  })
+
+  /* 🔴 **W-24 §B — 차장 임명·해제 2연산.** `src/lib/admin.ts`의 `changeVice()`가 만드는
+     배치를 **필드까지 그대로** 옮겼다(§6 규율 — 한 글자라도 다르면 규칙을 검증하지 못한다).
+     🔴 **`departments`를 건드리지 않는다** — 차장에는 `headUid` 같은 단일 진실이 없고
+     §4.1이 차장을 1~3명으로 규정하므로 필요하지도 않다. */
+  describe('🔴 배치 조합 — W-24 차장 임명·해제 2연산')
+  await seed()
+  await check('B-37', 'pass', '🔴 **`head`의 차장 임명 2연산** (`member → vice` + ROLE_CHANGE)', () =>
+    viceBatch(as(UIDS.head), UIDS.head, 'head', UIDS.member, 'member', 'vice'))
+  await seed()
+  await check('B-38', 'pass', '🔴 **`dev`의 차장 임명 2연산** (§4.1 전 기능 접근)', () =>
+    viceBatch(as(UIDS.dev), UIDS.dev, 'dev', UIDS.member, 'member', 'vice'))
+  await seed()
+  await check('B-39', 'pass', '🔴 **`head`의 차장 해제 2연산** (`vice → member`) — 되돌리는 경로', () =>
+    viceBatch(as(UIDS.head), UIDS.head, 'head', UIDS.vice, 'vice', 'member'))
+  await seed()
+  await check('B-40', 'deny', '🔴 `vice`의 임명 배치 — T-11이 걸려 **전체 거부**(BR-24)', () =>
+    viceBatch(as(UIDS.vice), UIDS.vice, 'vice', UIDS.member, 'member', 'vice'))
+  await seed()
+  await check('B-41', 'deny', '`teacher`의 임명 배치 (T-14)', () =>
+    viceBatch(as(UIDS.teacher), UIDS.teacher, 'teacher', UIDS.member, 'member', 'vice'))
+
+  /* 🔴 **부분 성공이 없다** — 두 연산 중 **감사 로그만** 규칙에 걸리게 만든다(남의 uid).
+     `users` 연산 자체는 T-8로 통과하는 형태인데도 **배치 전체가 거부되고 쓰기가 0건**이어야 한다.
+     🔬 그 확인은 `check`의 deny 판정 + 뒤이은 문서 재확인(B-18)이 함께 한다. */
+  await seed()
+  await check('B-42', 'deny', '🔴 **감사 로그 한 연산만 위조** — 배치 전체 거부 (§9.6 필수 조건 6)', () => {
+    const db = as(UIDS.head)
+    const b = writeBatch(db)
+    const now = serverTimestamp()
+    b.update(doc(db, 'users', UIDS.member), { role: 'vice', updatedAt: now })
+    b.set(doc(db, 'auditLogs', 'log-vice-forge'), {
+      actorUid: UIDS.dev, actorName: '위조', actorRole: 'head', action: 'ROLE_CHANGE',
+      targetType: 'users', targetId: UIDS.member,
+      before: { role: 'member' }, after: { role: 'vice' }, createdAt: now,
+    })
+    return b.commit()
+  })
+  await check('B-43', 'pass', '🔴 **B-42 뒤 대상 문서가 그대로다** — `role`이 아직 `member`', async () => {
+    const snap = await getDoc(doc(as(UIDS.head), 'users', UIDS.member))
+    if (snap.data().role !== 'member') throw new Error(`부분 성공 — role=${snap.data().role}`)
   })
 
   describe('🔴 배치 조합 — S2 가입 2연산 (OP-01)')

@@ -116,6 +116,33 @@ export async function run() {
       role: 'member', status: 'withdrawn', updatedAt: serverTimestamp(),
     }))
 
+  /* 🔴 **W-24 §B — 차장 임명·해제. 규칙은 한 줄도 바뀌지 않았다.**
+     BR-24(PRD:1814)가 「부원↔차장 역할 변경은 **부장이 수행**」으로 규정하고,
+     `allow update: (request.auth.uid != uid && isHead())`가 **이미 그 경로를 열고 있었다.**
+     아래 7건은 「PRD가 정한 실행자만 실제로 할 수 있는가」를 재는 신규 케이스다 —
+     새 권한을 여는 것이 아니라 **이번 회차가 쓰기 시작한 전이를 관문 아래 두는 것**이다. */
+  await seed()
+  await check('T-8', 'pass', '🔴 **W-24** `head`가 남의 `role`을 `member → vice` (차장 임명 · BR-24)', () =>
+    updateDoc(doc(as(UIDS.head), 'users', UIDS.member), { role: 'vice', updatedAt: serverTimestamp() }))
+  await seed()
+  await check('T-9', 'pass', '🔴 **W-24** `dev`가 같은 임명 (§4.1 전 기능 접근 · 결정 2)', () =>
+    updateDoc(doc(as(UIDS.dev), 'users', UIDS.member), { role: 'vice', updatedAt: serverTimestamp() }))
+  await seed()
+  await check('T-10', 'pass', '🔴 **W-24** `head`가 `vice → member` (차장 해제 — 되돌리는 경로)', () =>
+    updateDoc(doc(as(UIDS.head), 'users', UIDS.vice), { role: 'member', updatedAt: serverTimestamp() }))
+  await seed()
+  await check('T-11', 'deny', '🔴 **W-24** `vice`가 남을 차장으로 임명 (BR-24 — 차장은 실행자가 아니다)', () =>
+    updateDoc(doc(as(UIDS.vice), 'users', UIDS.member), { role: 'vice', updatedAt: serverTimestamp() }))
+  await seed()
+  await check('T-12', 'deny', '🔴 **W-24** `vice`가 **본인**의 차장 권한을 스스로 해제한다 (자기 역할 직접 변경 경로 0)', () =>
+    updateDoc(doc(as(UIDS.vice), 'users', UIDS.vice), { role: 'member', updatedAt: serverTimestamp() }))
+  await seed()
+  await check('T-13', 'deny', '🔴 **W-24** `member`가 **본인**을 `member → vice` (자기 승격 경로 0)', () =>
+    updateDoc(doc(as(UIDS.member), 'users', UIDS.member), { role: 'vice', updatedAt: serverTimestamp() }))
+  await seed()
+  await check('T-14', 'deny', '🔴 **W-24** `teacher`가 남을 차장으로 임명', () =>
+    updateDoc(doc(as(UIDS.teacher), 'users', UIDS.member), { role: 'vice', updatedAt: serverTimestamp() }))
+
   describe('departments update — W-15B §3.3')
   await seed()
   await check('P-1', 'pass', '`head`가 `headUid` 갱신', () =>
