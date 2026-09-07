@@ -3,7 +3,7 @@
  안녕하십니까?  **SunDO** 프로젝트의 개발자 유이준입니다.  
 위 마크다운 문서에서는 자율생활부 선도 전자기록 PWA(총칭 : SunDO)에 관한 모든 정보들을 제공하고 있습니다.  
 또한 모든 개발과 피드백의 근간은 위 문서에서 이루어지니, 참고해주시면 감사할 것 같습니다.  
-추가로, 저작권은 <code>MIT LICENSE</code>를 따르고 있으니 라이선스를 준수해주십시오.
+추가로, 저작권은 <code>MPL 2.0 LICENSE</code>를 따르고 있으니 라이선스를 준수해주십시오.
 
 ## 목차
 1. [Development - 업데이트 진행 사항](#release-notes)  
@@ -49,6 +49,7 @@
 ( 진행 완료 ) v0.17.0 LOTS OF BUGS FIXED.  
 ( 진행 완료 ) v0.18.0 Deploy Settings.  
 ( 진행 완료 ) v0.18.0 LOTS OF BUGS FIXED.  
+( 진행 완료 ) v0.19.1 LICENSE fixed.  
 ( 진행 대기 ) **v1.0.0 DEPLOY**   </code></pre>  
 ---    
 ### Upcoming Changes.
@@ -130,25 +131,13 @@ iPhone SE 3세대 이상 및 iOS v.17 이상
 * 로그아웃 및 계정탈퇴 버튼으로 계정을 전환할 수 있습니다.  
 ---
 ## < LICENSE >
-<pre><code>MIT License
+<pre><code>Mozilla Public License Version 2.0
 
 Copyright (c) 2026 Yijun Yoo
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this
+file, You can obtain one at https://mozilla.org/MPL/2.0/.
+</code></pre>  
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-</code></pre>
+전문은 저장소 루트의 [LICENSE](./LICENSE) 파일 또는 <https://mozilla.org/MPL/2.0/> 에서 확인하실 수 있습니다.
