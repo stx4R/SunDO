@@ -2,8 +2,13 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
+import { startAppHeightSync } from './lib/appHeight'
 import { captureInstallPrompt, registerServiceWorker } from './lib/pwa'
 import { blockPinchZoom } from './lib/zoom'
+
+/* W-28 A-1 — 앱 높이를 **실측해서** `--app-h`에 심는다(`lib/appHeight.ts`).
+   🔴 렌더보다 먼저다. 첫 프레임이 이미 옳은 높이로 그려져야 띠가 한 번도 보이지 않는다. */
+startAppHeightSync()
 
 /* W-19 — PRD §18.2. 🔴 등록 실패는 삼킨다(`lib/pwa.ts`) — 앱은 서비스 워커에
    의존하지 않는다. 렌더보다 먼저 부르되 실제 등록은 `load` 이후로 미뤄진다. */

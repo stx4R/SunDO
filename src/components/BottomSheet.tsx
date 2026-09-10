@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router'
 import { cn } from '../lib/cn'
 import { useFocusTrap } from '../lib/useFocusTrap'
+import { useKeyboardInset } from '../lib/useKeyboardInset'
 import { useOverlayTransition } from '../lib/useOverlayTransition'
 import { OverlayRootContext } from './AppShell'
 
@@ -127,6 +128,15 @@ export function BottomSheet({ open, onClose, title, onClosed, children }: Bottom
   const [dragging, setDragging] = useState(false)
   const dragStartRef = useRef<{ pointerId: number; y: number } | null>(null)
 
+  /**
+   * 🔴 **W-28 A-2 — 키보드가 덮은 높이. 여기가 모든 바텀시트의 단독 소유자다**(사용자 확정).
+   * 학생 검색만 고치면 기록 작성(`기타` 사유)·일정 편집·사유 편집·출석 표시가 같은 채로
+   * 남고, 다음에 같은 요구가 오면 **코드가 두 벌**이 된다.
+   * ⚠ 마운트된 동안에만 구독한다. `open`이 아니라 `mounted`인 이유는 닫힘 모션이
+   * 도는 380ms 동안에도 시트가 화면에 남아 있기 때문이다.
+   */
+  const keyboard = useKeyboardInset(mounted)
+
   /* 닫힘이 시작되면 인라인 transform을 걷어 CSS의 `translateY(110%)`가 이긴다.
      손을 뗀 위치에서 이어져 내려간다. */
   useEffect(() => {
@@ -165,6 +175,15 @@ export function BottomSheet({ open, onClose, title, onClosed, children }: Bottom
 
   if (!mounted || !overlayRoot) return null
 
+  /* `--kb`를 읽는 세 자리는 전부 `index.css`의 `.sheet`에 있다 — 여기서는 수만 넘긴다.
+     🔴 인라인 `transform`은 **끌고 있을 때만** 얹는다. 언제나 얹으면 열림·닫힘 모션의
+     `translateY(110%)`를 눌러 이겨 시트가 순간이동한다(W-12 §4-2 계약 그대로다). */
+  const sheetStyle = { '--kb': `${keyboard}px` } as React.CSSProperties
+  if (dragY > 0) {
+    sheetStyle.transform = `translateY(${dragY}px)`
+    if (dragging) sheetStyle.transition = 'none'
+  }
+
   return createPortal(
     <>
       <div
@@ -180,11 +199,7 @@ export function BottomSheet({ open, onClose, title, onClosed, children }: Bottom
         aria-labelledby={title ? titleId : undefined}
         /* 포커스 가능한 자식이 없는 시트도 있다. 그때는 컨테이너가 받는다. */
         tabIndex={-1}
-        style={
-          dragY > 0
-            ? { transform: `translateY(${dragY}px)`, transition: dragging ? 'none' : undefined }
-            : undefined
-        }
+        style={sheetStyle}
       >
         <div
           className="sheet-handle"

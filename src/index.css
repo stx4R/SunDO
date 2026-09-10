@@ -250,7 +250,13 @@
        스크롤 주인은 `AppShell`의 스크롤 영역 **하나뿐**이다(W-10 `ScrollRootContext`).
        ⚠ 아래 `overscroll-behavior: none`을 대체하지 않는다 — 그쪽은 iOS의 시각적
        바운스를, 이쪽은 문서 스크롤 자체를 막는다. */
-    height: 100%;
+    /* 🔴 **W-28 A-1 — 위 W-26 수리로는 부족했다. 띠가 살아 돌아왔다(사용자 첨부1).**
+       `dvh`도 `100%`도 결국 **같은 하나**(레이아웃 뷰포트)를 참조한다. 단위를 바꿔도
+       증상이 남았다는 사실이 **단위가 아니라 그 뷰포트가 짧다**는 것을 증명한다.
+       ⇒ `lib/appHeight.ts`가 실제 높이를 **재서** `--app-h`에 심고 여기가 그것을 쓴다.
+       ⚠ **`100%` 폴백을 지우지 마라.** 스크립트가 죽거나 아직 돌지 않은 프레임에서는
+       W-26 이후의 동작이 그대로 남는다 — 이 줄이 실패하는 방향을 안전한 쪽으로 고정한다. */
+    height: var(--app-h, 100%);
     overflow: hidden;
 
     /* 🔴 **W-23 B-11 — 화면 밖으로 튕기는 것을 여기서 막는다.**
@@ -266,9 +272,11 @@
   }
 
   /* 🔴 **W-26 A-1 — 사슬의 가운데 고리.** `index.html`의 `<div id="root">`다.
-     여기가 빠지면 `AppShell`의 `h-full`이 참조할 높이가 없어 통째로 무너진다. */
+     여기가 빠지면 `AppShell`의 `h-full`이 참조할 높이가 없어 통째로 무너진다.
+     ⚠ W-28 — 위 `html, body`와 **같은 값을 써야 한다.** 한쪽만 `100%`로 남으면
+     그 고리에서 사슬이 짧아져 실측이 무의미해진다. */
   #root {
-    height: 100%;
+    height: var(--app-h, 100%);
   }
 
   /* 🔴 **W-23 B-9(a)(B-09) — 길게 눌러도 복사되지 않는다.**
@@ -2242,11 +2250,15 @@
   }
 
   /* 바텀시트 (§6.4 z 50). 껍데기만 — 내용물은 W-09다. */
+  /* 🔴 **W-28 A-2 — `--kb`는 「키보드가 덮은 높이」다.** `BottomSheet`가 실측해서 심고
+     (`lib/useKeyboardInset.ts`) 이 규칙의 **세 자리**가 그것을 읽는다. 셋 다 필요하다 —
+     `bottom`만 올리면 내용이 화면 위로 자라 잘리고, `max-height`만 줄이면 시트가
+     키보드 뒤에 그대로 남는다. 키보드가 없으면 `0px`이라 **옛 좌표와 한 픽셀도 다르지 않다.** */
   .sheet {
     position: absolute;
     left: 0;
     right: 0;
-    bottom: 0;
+    bottom: var(--kb, 0px);
     z-index: 50;
     box-sizing: border-box;
     border-radius: var(--radius-26) var(--radius-26) 0 0;
@@ -2258,9 +2270,18 @@
     box-shadow:
       0 -14px 44px rgba(20, 53, 38, 0.2),
       inset 0 1px 0 rgba(255, 255, 255, 0.9);
-    padding: 12px 22px calc(env(safe-area-inset-bottom) + 26px);
+    /* 🔴 **W-28 A-2 — 키보드 위로 올라간 만큼 안전영역 몫을 돌려준다.**
+       `env(safe-area-inset-bottom)`은 **홈 인디케이터 자리**를 비우려는 값인데, 키보드가
+       올라오면 그 자리는 이미 키보드가 덮고 있다. 그대로 두면 시트 바닥에 34px짜리
+       빈 칸이 하나 더 생긴다. 🔴 `max(…, 0px)`이라 **`26px` 아래로는 내려가지 않는다** —
+       design 원문의 간격이 그 26px이다. 키보드가 없으면 옛 값 그대로다. */
+    padding: 12px 22px calc(max(env(safe-area-inset-bottom) - var(--kb, 0px), 0px) + 26px);
     transform: translateY(110%);
-    transition: transform 0.38s var(--ease-sundo);
+    /* ⚠ `bottom`이 함께 전이한다 — 키보드가 한 번에 튀어 오르는 기기에서 시트가
+       순간이동하지 않게 한다. iOS처럼 여러 번 나눠 오는 기기에서는 그 값들을 따라간다. */
+    transition:
+      transform 0.38s var(--ease-sundo),
+      bottom 0.24s var(--ease-sundo);
     pointer-events: auto;
     /* 🔴 **W-23 A-5(e)(B-05) — 여기가 「S9 일정 편집 화면의 위가 잘린다」의 원인이다(가설 ⓐ).**
        시트는 `bottom: 0` 고정이고 **높이 상한이 없었다.** 내용이 스테이지보다 길어지면
@@ -2274,8 +2295,12 @@
 
        🔴 **「시트 안에 `overflow-y: auto`를 만들지 않는다」(S6 블록 주석)와 충돌하지 않는다.**
        그 규율은 **본문 화면**의 스크롤 소유자를 하나로 묶는 것이고(W-11 DoD 16),
-       시트는 오버레이다(W-03C). 시트 본문이 스스로 스크롤하는 것이 정상이다. */
-    max-height: calc(100% - 34px);
+       시트는 오버레이다(W-03C). 시트 본문이 스스로 스크롤하는 것이 정상이다.
+
+       🔴 **W-28 A-2 — 키보드가 덮은 만큼도 함께 뺀다.** 안 그러면 시트가 올라간 만큼
+       위로 자라 스테이지 밖으로 나가고, `overflow: hidden`이 **머리부터 잘라 낸다**
+       (A-5(e)가 잡았던 바로 그 사고다). 상한이 줄면 본문(`.sheet-body`)만 스크롤한다. */
+    max-height: calc(100% - 34px - var(--kb, 0px));
     display: flex;
     flex-direction: column;
   }
