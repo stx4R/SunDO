@@ -15,6 +15,7 @@ import { run as users } from './suite-users.mjs'
 import { run as admin } from './suite-admin.mjs'
 import { run as batches } from './suite-batches.mjs'
 import { run as recordcount } from './suite-recordcount.mjs'
+import { run as attendance } from './suite-attendance.mjs'
 
 const RULES = 'firestore.rules'
 const BACKUP = 'firestore.rules.mutbak'
@@ -61,6 +62,7 @@ try {
   await admin()
   await batches()
   await recordcount()
+  await attendance()
   code = report() === 0 ? 0 : 1
 } finally {
   await stopEnv()

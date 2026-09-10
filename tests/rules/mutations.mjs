@@ -401,4 +401,41 @@ export const MUTATIONS = [
     to: '        && request.resource.data.updatedBy == request.auth.uid;',
     breaks: ['D-14'],
   },
+
+  /* ── 🔴 W-25 — `dutyAttendance`(출석 체크) 신설 블록의 역검증 5종. ────────── */
+  {
+    name: 'attendance-create-open',
+    why: '🔴 출석 create를 활성 부원 전원에게 연다 — 「차장 이상」이 실제로 일하는가',
+    from: "allow create: if isVice()\n        && request.resource.data.weekId == weekId",
+    to: "allow create: if isActive()\n        && request.resource.data.weekId == weekId",
+    breaks: ['AT-3', 'AT-7'],
+  },
+  {
+    name: 'attendance-update-open',
+    why: '🔴 출석 update를 활성 부원 전원에게 연다',
+    from: "allow update: if isVice()\n        && request.resource.data.diff(resource.data).affectedKeys()",
+    to: "allow update: if isActive()\n        && request.resource.data.diff(resource.data).affectedKeys()",
+    breaks: ['AT-11', 'AT-12'],
+  },
+  {
+    name: 'attendance-weekid-free',
+    why: '🔴 `weekId == 문서 ID` 방어를 뺀다 (D-13과 같은 형태)',
+    from: "        && request.resource.data.weekId == weekId\n        && request.resource.data.updatedBy == request.auth.uid;\n\n      allow update: if isVice()",
+    to: "        && request.resource.data.updatedBy == request.auth.uid;\n\n      allow update: if isVice()",
+    breaks: ['AT-8'],
+  },
+  {
+    name: 'attendance-hasonly-open',
+    why: '🔴 update의 허용 키 `hasOnly`를 뺀다 — `weekId`가 열리는지 본다',
+    from: "        && request.resource.data.diff(resource.data).affectedKeys()\n             .hasOnly(['marks', 'updatedBy', 'updatedAt'])\n",
+    to: '',
+    breaks: ['AT-13', 'AT-15'],
+  },
+  {
+    name: 'attendance-delete-open',
+    why: '🔴 출석 문서 삭제를 부장에게 연다 — 「아무도 못 지운다」가 실제로 일하는가',
+    from: 'allow delete: if false;\n    }\n\n    // ========================================================================\n    //  approvalRequests',
+    to: 'allow delete: if isHead();\n    }\n\n    // ========================================================================\n    //  approvalRequests',
+    breaks: ['AT-16'],
+  },
 ]

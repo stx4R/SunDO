@@ -260,3 +260,45 @@ export function ChevronRightIcon({ className }: IconProps) {
     </svg>
   )
 }
+
+/**
+ * 🔴 **W-25 — `ChevronRightIcon`의 거울상.** 순찰 일정 편집 시트의 주차 이동(←)이
+ * 유일한 소비자다. 새 규격이 아니라 위 path의 `d`를 좌우로 뒤집은 것뿐이라
+ * 두 화살표의 굵기·캡·크기가 저절로 같다.
+ */
+export function ChevronLeftIcon({ className }: IconProps) {
+  return (
+    <svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true" className={className}>
+      <path d="M8.8 3.2l-4 3.8 4 3.8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+/**
+ * 🔴 **W-25 — S9 우상단 `출석 체크` 버튼의 아이콘.** 사용자 요구는 「서류 관련
+ * 아이콘」이고, Tailwind가 공식으로 함께 쓰는 아이콘 세트는 Heroicons다 —
+ * 그 `clipboard-document-check`의 형태를 이 파일의 규격(`stroke-width 1.9` ·
+ * 라운드 캡 · `currentColor`)으로 옮겨 그렸다. **아이콘 라이브러리를 새로 붙이지
+ * 않았다**(의존성 추가 0 · 지시서 §7.6).
+ */
+export function ClipboardCheckIcon({ className }: IconProps) {
+  return (
+    <svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
+      <path
+        d="M7.4 3.6H5.8A1.4 1.4 0 004.4 5v10.4a1.4 1.4 0 001.4 1.4h8.4a1.4 1.4 0 001.4-1.4V5a1.4 1.4 0 00-1.4-1.4h-1.6"
+        stroke="currentColor"
+        strokeWidth="1.9"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <rect x="7.4" y="2.2" width="5.2" height="2.9" rx="1.1" stroke="currentColor" strokeWidth="1.9" />
+      <path
+        d="M7.6 11.2l1.8 1.8 3.2-3.6"
+        stroke="currentColor"
+        strokeWidth="1.9"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}

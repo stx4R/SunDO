@@ -31,6 +31,9 @@ import { DEPARTMENT_ID } from './stats'
  *
  * ── 🔴 W-21C — 중식/석식 (결정 1·3) ──────────────────────────────────────
  *
+ * ⚠ **W-25 B-2가 아래 네 쌍 중 `patrol*` 두 쌍의 소비자를 없앴다.** 문단은 그대로
+ * 남긴다 — 문서에는 여전히 그 필드들이 있고 「왜 병기했나」가 사라지면 안 된다.
+ *
  * §9.3.6의 `assignments`·`assigneeNames`·`patrolTime`·`patrolPlace` **넷 다 타입이 바뀐다.**
  * 같은 이름으로 타입을 바꾸면 옛 앱이 `[object Object]`를 그리거나 요일 행을 조용히 비우므로
  * (🔬 실측), **새 이름 4개를 병기**한다(사용자 확정 · `scripts/migrate-duty-meals.mjs`).
@@ -53,14 +56,26 @@ export const WEEKDAYS: readonly { key: DayKey; label: string }[] = [
 ]
 
 /**
- * 🔴 **W-21C 결정 1 — 하루 2회.** 표시 순서도 이 배열이 정한다(중식 먼저).
+ * 🔴 **W-21C 결정 1 — 하루 2회.** 표시 순서도 이 배열이 정한다.
  *
- * ⚠ **§8.9·§9.3.6에도 design `19`에도 이 개념이 없다.** 결정 1·3이 신설했고 라벨
- * `중식`·`석식`은 사용자 원문이다 — 보고서 §9 ③의 규격 공백 목록에 올렸다.
+ * 🔴 **W-25 B-1 — `석식` → `아침 선도`이고 순서가 뒤집혔다(아침 선도 먼저).**
+ * 화면 순서를 정하는 곳은 여기 하나이므로 이 배열만 뒤집으면 S9 카드·요일 행·
+ * 편집 시트·출석 체크가 **전부 같이** 뒤집힌다.
+ *
+ * 🔴 **저장 키 `dinner`는 그대로 둔다 — 라벨만 바꿨다.**
+ * 바꾸면 이미 편성된 모든 주차의 `assignmentsByMeal.*.dinner`가 화면에서 사라지고
+ * 마이그레이션이 한 벌 더 필요해진다. 사용자 요구는 **「석식을 아침 선도로 바꿔라」**
+ * 즉 그 칸의 이름을 갈아 끼우는 것이지 칸을 새로 파는 것이 아니다 —
+ * 기존 편성이 그대로 아침 선도 편성이 되는 것이 옳은 결과다.
+ * ⚠ 그래서 **키 이름과 라벨이 어긋나 있다.** 여기 말고 다른 곳에서 `dinner`를
+ * 「저녁」으로 읽지 마라. 감사 로그의 `dinnerDays`도 같은 이유로 이름이 그대로다.
+ *
+ * ⚠ **§8.9·§9.3.6에도 design `19`에도 이 개념이 없다.** 결정 1·3이 신설했다 —
+ * 라벨 `중식`·`아침 선도`는 사용자 원문이다.
  */
 export const MEALS: readonly { key: MealKey; label: string }[] = [
+  { key: 'dinner', label: '아침 선도' },
   { key: 'lunch', label: '중식' },
-  { key: 'dinner', label: '석식' },
 ]
 
 export type MealKey = 'lunch' | 'dinner'
@@ -93,11 +108,13 @@ export interface DutySchedule {
   endDate: string | null
   /** 요일 → 끼니 → 담당자 표시 이름. 🔴 다섯 요일 키가 **항상** 있다. */
   assigneeNames: Readonly<Record<DayKey, ByMeal<readonly string[]>>>
-  /** 같은 모양의 uid. 편집 시트 전용이다. */
+  /**
+   * 같은 모양의 uid. 편집 시트가 「누가 이미 선택돼 있나」를 판정하고,
+   * 🔴 **W-25 C-3 — 출석 색이 어느 담당자의 것인지도 이 배열의 인덱스로 맞춘다.**
+   * `assigneeNames[day][meal][i]`와 `assigneeUids[day][meal][i]`는 **같은 사람**이다
+   * (`toStored`가 두 배열을 같은 순서로 만든다).
+   */
   assigneeUids: Readonly<Record<DayKey, ByMeal<readonly string[]>>>
-  /** 끼니별. 문서에 없으면 `null`이고 그때는 시간·장소 줄을 그리지 않는다. */
-  patrolTime: ByMeal<string | null>
-  patrolPlace: ByMeal<string | null>
   /** 🔴 마이그레이션 전 문서를 옛 형태에서 승격해 읽었는가. 보고용이다. */
   legacy: boolean
 }
@@ -115,11 +132,6 @@ export type DutyResult =
   | { kind: 'empty'; fromCache: boolean }
   | { kind: 'failed'; code: string }
 
-export interface PatrolDefaults {
-  patrolTime: string | null
-  patrolPlace: string | null
-}
-
 /**
  * 🔴 **캐시 키는 `weekId`다.** 주 경계를 넘으면 키가 저절로 갈려 T-05가 별도 코드 없이 성립한다.
  *
@@ -127,12 +139,10 @@ export interface PatrolDefaults {
  * 파일도 다르다(W-11 §4-5 · W-13 §4-3). **실패는 캐시하지 않는다.**
  */
 const scheduleCache = new Map<string, DutyResult>()
-let defaultsCache: PatrolDefaults | null = null
 
 /** T-07 당겨서 새로고침 전용. */
 export function clearDutyCache(): void {
   scheduleCache.clear()
-  defaultsCache = null
 }
 
 function errorCode(error: unknown, fallback: string): string {
@@ -187,18 +197,6 @@ function promote(byMeal: unknown, legacy: unknown): {
   return { map: out, usedLegacy: false }
 }
 
-/** `{ lunch, dinner }` 문자열 맵. 옛 단일 문자열은 중식으로 승격한다. */
-function promoteText(byMeal: unknown, legacy: unknown): ByMeal<string | null> {
-  if (byMeal && typeof byMeal === 'object') {
-    const c = byMeal as Record<string, unknown>
-    return {
-      lunch: typeof c.lunch === 'string' ? c.lunch : null,
-      dinner: typeof c.dinner === 'string' ? c.dinner : null,
-    }
-  }
-  return { lunch: typeof legacy === 'string' ? legacy : null, dinner: null }
-}
-
 interface StoredDuty {
   weekId?: string
   startDate?: string
@@ -206,13 +204,10 @@ interface StoredDuty {
   /* 옛 형태 — 🔴 앱은 **읽기 폴백에만** 쓴다. 쓰지 않는다. */
   assignments?: unknown
   assigneeNames?: unknown
-  patrolTime?: unknown
-  patrolPlace?: unknown
-  /* W-21C 신설. */
+  /* W-21C 신설. 🔴 **W-25 B-2 — `patrol*ByMeal` 2종은 여기서도 빠졌다.**
+     문서에는 남아 있지만 앱이 읽는 자리가 없다. */
   assignmentsByMeal?: unknown
   assigneeNamesByMeal?: unknown
-  patrolTimeByMeal?: unknown
-  patrolPlaceByMeal?: unknown
 }
 
 /**
@@ -244,8 +239,6 @@ export async function fetchDutySchedule(weekId: string, force = false): Promise<
           endDate: typeof data.endDate === 'string' ? data.endDate : null,
           assigneeNames: names.map,
           assigneeUids: uids.map,
-          patrolTime: promoteText(data.patrolTimeByMeal, data.patrolTime),
-          patrolPlace: promoteText(data.patrolPlaceByMeal, data.patrolPlace),
           legacy: names.usedLegacy || uids.usedLegacy,
         },
       }
@@ -258,34 +251,11 @@ export async function fetchDutySchedule(weekId: string, force = false): Promise<
   return result
 }
 
-/**
- * §9.3.6 — `patrolTime`·`patrolPlace`가 문서에 없을 때의 **부서 기본값**.
- *
- * 🔴 **`stats.ts`를 넓히지 않았다.** `fetchDepartment()`는 `academicYear`·`classCountByGrade`만
- * 돌려주고 그 캐시는 `clearHomeCache()`에 묶여 있다 — 거기에 두 필드를 얹으면 S9의 당겨서
- * 새로고침이 홈 통계·명부 캐시까지 버리거나, 반대로 S3의 새로고침이 S9 값을 갈아 치운다
- * (W-11 §4-5 · W-13 §4-3과 같은 판단). 문서 ID 상수만 가져다 쓴다.
- *
- * 결정 3의 규율대로 **화면이 쓰는 두 필드만** 반환한다. 조회 실패는 `null`이고, 그때는
- * 시간·장소 줄을 그리지 않는다(추측한 값을 그리지 않는다).
- */
-export async function fetchPatrolDefaults(force = false): Promise<PatrolDefaults | null> {
-  if (!force && defaultsCache) return defaultsCache
-
-  try {
-    const snapshot = await getDoc(doc(db, 'departments', DEPARTMENT_ID))
-    if (!snapshot.exists()) return null
-    const data = snapshot.data() as { patrolTime?: string; patrolPlace?: string }
-    defaultsCache = {
-      patrolTime: data.patrolTime ?? null,
-      patrolPlace: data.patrolPlace ?? null,
-    }
-  } catch {
-    /* 기본값을 못 읽은 것은 일정 조회 실패가 아니다. 시간·장소 줄만 비운다. */
-    return null
-  }
-  return defaultsCache
-}
+/* 🔴 **W-25 B-2 — `fetchPatrolDefaults()`가 여기 있었고 통째로 지웠다.**
+   순찰 시간·장소를 화면에서 전부 걷어내라는 사용자 요구(보고서 §2 결정 2)로
+   **소비자가 0이 됐다.** `departments`의 `patrolTime`·`patrolPlace` 필드는 문서에
+   그대로 남아 있다 — 지우지 않았다(되돌릴 근거를 없애지 않는다). 되살릴 일이 생기면
+   이 함수는 `git show` 한 번이면 돌아온다. */
 
 /* ============================================================================
    S9 순찰 일정 편성 (W-21C 기능 3) — §8.9.3 · §8.9.4 T-02·T-03 · design `19a`~`19e`
@@ -366,8 +336,6 @@ export interface DutyDraft {
   endDate: string
   /** 요일 → 끼니 → 담당자 uid. 이름은 저장 시점에 `members`로 스냅샷한다. */
   byDay: Record<DayKey, ByMeal<readonly string[]>>
-  patrolTime: ByMeal<string | null>
-  patrolPlace: ByMeal<string | null>
 }
 
 export interface DutyActor {
@@ -437,11 +405,14 @@ export async function saveDutySchedule(
   const ref = doc(db, 'dutySchedules', draft.weekId)
 
   /* 🔴 **규칙의 허용 키와 정확히 같다**(`editsDutyOnly`). 하나라도 더 쓰면 배치가 통째로 죽는다. */
+  /* 🔴 **W-25 B-2 — `patrolTimeByMeal`·`patrolPlaceByMeal`을 더 이상 쓰지 않는다.**
+     ⚠ **규칙은 손대지 않아도 된다.** `editsDutyOnly()`의 `hasOnly`는 「값이 바뀐 키」를
+     보고(규약 4-6 · B-20), 안 쓰는 키는 애초에 `affectedKeys()`에 나타나지 않는다.
+     🔴 **기존 문서의 두 필드를 지우지도 않는다.** `deleteField()`를 쓰면 되돌릴 값이
+     사라진다 — 화면에서 안 그리면 요구는 이미 충족된다. */
   const payload = {
     assignmentsByMeal: toStored(draft.byDay),
     assigneeNamesByMeal: toStored(names),
-    patrolTimeByMeal: { lunch: draft.patrolTime.lunch, dinner: draft.patrolTime.dinner },
-    patrolPlaceByMeal: { lunch: draft.patrolPlace.lunch, dinner: draft.patrolPlace.dinner },
     updatedBy: actor.uid,
     updatedAt: now,
   }

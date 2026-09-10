@@ -144,6 +144,32 @@ export function formatWeekLabel(d: Date): string {
 }
 
 /**
+ * §9.3.6 `startDate`/`endDate` — 그 주의 **월요일**과 **금요일**을 `YYYY-MM-DD`로.
+ *
+ * 🔴 **W-25에서 필요해졌다.** 그전까지 편집은 「이번 주」 하나뿐이었고 문서가 이미
+ * 있으면 값을 그대로 되썼다 — 그래서 새 주차를 만들 때 `''`를 쓰고도 아무도 몰랐다.
+ * 주차 이동이 붙으면서 **문서가 없는 주차를 만드는 일이 흔해지고**, 그때 두 필드가
+ * §9.3.6의 「필수 · `YYYY-MM-DD`」를 지켜야 한다.
+ *
+ * 🔴 **`toWeekKey`와 같은 `toKst()`를 통과한다.** 주 경계를 여기서 다시 정의하지 마라 —
+ * 두 함수가 서로 다른 경로로 월요일을 구하면 연말·연초에 `weekId`와 `startDate`가
+ * 서로 다른 주를 가리킨다. 아래 산술은 KST 벽시계에서 뽑은 연·월·일로 만든
+ * `Date.UTC` 위에서만 돌아 시간대 변환이 다시 일어나지 않는다(`formatWeekLabel`과 같은 기법).
+ */
+export function toWeekRange(d: Date): { startDate: string; endDate: string } {
+  const k = toKst(d)
+  /* 월=0 … 일=6. `getUTCDay()`는 일=0이라 그대로 쓰면 주가 일요일에 시작한다(BR-46 위반). */
+  const dayIndex = (k.getUTCDay() + 6) % 7
+  const monday = Date.UTC(k.getUTCFullYear(), k.getUTCMonth(), k.getUTCDate() - dayIndex)
+  const fmt = (ms: number) => {
+    const x = new Date(ms)
+    return `${x.getUTCFullYear()}-${pad2(x.getUTCMonth() + 1)}-${pad2(x.getUTCDate())}`
+  }
+  /* §9.3.6은 `endDate`를 **금요일**로 규정한다 — 일요일이 아니다(순찰은 월~금이다). */
+  return { startDate: fmt(monday), endDate: fmt(monday + 4 * DAY_MS) }
+}
+
+/**
  * KST ISO-8601 주차 `YYYY-Www` (DR-06 · BR-46 — **월요일 시작**).
  *
  * ISO 주차의 정의는 「그 주의 **목요일**이 속한 해가 주차연도」다. 그래서 연말·연초에

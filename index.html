@@ -29,7 +29,22 @@
          §18.2가 적은 옛 이름을 지우지 않고 표준 이름을 **함께** 둔다(보고서 §4). -->
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <!-- 🔴 **W-25 A-1 — `default` → `black-translucent`.**
+         `default`은 웹뷰를 상태 표시줄 **아래**에서 시작시키므로 그 띠는 `body`의
+         배경**색** 한 겹으로만 칠해진다. 스테이지 그라디언트도 좌상단 aura 블롭의
+         초록 틴트도 그 띠에는 닿지 않아 **이음매**가 남았다(첨부1).
+         `black-translucent`는 웹뷰를 화면 맨 위에서 시작시켜 **배경 자체가 그 자리를
+         칠한다** — 사용자가 요구한 「배경만 연장」이 정확히 이 값이다.
+
+         🔴 **UI는 따라 올라가지 않는다.** `viewport-fit=cover`가 이미 있고
+         `AppShell`이 상단 패딩에 `env(safe-area-inset-top)`을 더한다(그 계약은
+         W-10 이후 diff 0줄이다). 토스트·오프라인 배너도 같은 함수를 쓴다.
+
+         ⚠ **대가 — 상태 표시줄 글자가 흰색으로 고정된다.** 밝은 배경(#F7FBF8) 위에서
+         시계·배터리가 거의 안 보인다. 🔴 **이것은 W-23 A-1의 결정을 뒤집는 것이고,
+         사용자가 그 대가를 알고 확정했다**(보고서 §2 결정 1). 되돌리기는 이 한 줄을
+         `default`로 되돌리면 끝난다. -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <!-- §18.3 3단계가 「홈 화면의 `자율생활부` 아이콘으로 실행합니다」라고 적는다.
          이 줄이 없으면 iOS가 `<title>`(= `SunDO`)를 아이콘 이름으로 쓴다 —
          값은 §18.2의 `short_name`에서 그대로 가져왔고 새로 지은 문자열이 아니다. -->

@@ -119,6 +119,18 @@
      PRD 본문·Claude Design 산출물에서 반복 사용 중인 리터럴을 승격한 것. */
   --color-sundo-danger: #c0392b;
   --color-sundo-danger-active: #a93226;
+  /* 🔴 **W-25 신설 — 이 저장소에서 처음 만드는 색이다.** §7.1에도 design 산출물에도
+     노랑 계열이 **없다**(전수 확인 — `#FBBC05`는 Google 로고 전용이라 UI 토큰이 아니다).
+     출석 체크의 `지각`이 사용자 요구로 **노랑**이라 새로 정했다(보고서 §9 ③).
+
+     🔴 **값을 밝은 노랑으로 두지 않은 이유는 대비다.** 이 토큰은 두 자리에 동시에 쓰인다 —
+     ① 세그먼트 인디케이터의 **바탕**(그 위에 흰 13px/700이 온다)
+     ② S9 요일 행 담당자 이름의 **글자색**(밝은 스테이지 위)
+     🔬 `#9C6500` 실측 — 흰 글자 대비 **4.91:1**, `#F7FBF8` 배경 위 글자 대비 **4.70:1**.
+     둘 다 AC-01(4.5:1)을 넘는다. 밝은 노랑(`#FBBC05` 등)은 ①에서 2:1대로 떨어져
+     흰 글자가 사라진다. `--color-sundo-danger`(#C0392B)가 순빨강이 아닌 것과 같은 성격의
+     선택이다 — 팔레트가 채도보다 가독을 택한다. */
+  --color-sundo-warn: #9c6500;
   --color-sundo-control: rgba(255, 255, 255, 0.6);
   --color-sundo-line-surface: rgba(255, 255, 255, 0.72);
   --color-sundo-line-border: rgba(46, 107, 76, 0.3);
@@ -216,9 +228,15 @@
    `#F7FBF8`이다 — 새로 지은 값이 아니다. 상단 띠가 스테이지 맨 위와 맞닿으므로
    그 자리에서 이음매가 사라진다.
 
-   🔴 **`status-bar-style`을 `black-translucent`로 바꾸지 않았다.** 그 값은 iOS에서
-   상태 표시줄 **글자를 흰색으로 고정**한다 — 밝은 배경 위에서 시각을 잃는 거래다
-   (지시서 A-1). 전체화면은 얻지 않고 배경만 채운다.
+   🔴 **W-25 A-1 — 위 문단의 결정이 뒤집혔다.** `index.html`이 이제
+   `black-translucent`를 쓴다. 그 값은 상태 표시줄 **글자를 흰색으로 고정**하지만,
+   `default`이 칠하는 것은 `body`의 배경**색 한 겹**뿐이라 스테이지 그라디언트도
+   좌상단 aura 틴트도 그 띠에 닿지 못했다 — 색만으로는 이음매가 사라지지 않았다.
+   사용자가 대가를 알고 「배경 연장」을 택했다(보고서 §2 결정 1).
+
+   🔴 **그래도 이 `background-color`를 지우지 마라.** 역할이 둘 더 있다 —
+   ② 오버스크롤로 드러나는 캔버스(첨부7·8)와 ③ PWA 실행 스플래시의 바탕이다.
+   `black-translucent`는 상태 표시줄만 바꿀 뿐 그 둘을 대신하지 않는다.
 
    ⚠ **여백 계약은 한 칸도 건드리지 않는다.** 상단 `26px`/`34px` + `env(safe-area-inset-top)`은
    `AppShell` 단독 소유다(W-10 이후 diff 0줄).
@@ -4519,26 +4537,172 @@
     color: var(--color-sundo-danger);
   }
 
-  /* 🔴 규격 공백 ② — `19a`의 시간·장소 한 줄을 **끼니마다 한 줄씩** 쌓았다. */
-  .de-patrol {
-    margin-top: 18px;
-  }
+  /* 🔴 **W-25 B-2 — `.de-patrol`·`.de-patrol-row`(+ 자식 규칙)가 여기 있었고 지웠다.**
+     순찰 시간·장소 4필드가 화면에서 통째로 빠지면서 소비자가 0이 됐다(보고서 §2 결정 2).
+     `19a` 원문의 「`display:flex;gap:10px` 한 줄」은 이제 이 저장소 어디에도 없다. */
 
-  /* `19a` 원문 `display:flex;gap:10px` — 두 필드가 반씩 나눈다. */
-  .de-patrol-row {
+  /* 🔴 **W-25 B-3 — 주차 이동.** `19a`의 주차 칩(`.de-week`)은 **한 글자도 바뀌지 않았고**
+     좌우에 형제 둘이 생겼다. `19a`에 이 요소가 없어 규격을 새로 정한다(보고서 §9 ③):
+     크기 28×28은 `.de-badge`(34)보다 한 단 작고 `.de-chip` 높이(33)와 나란히 서며,
+     배경·색은 `.de-week`가 이미 쓰는 `tint-10` · `--color-sundo-700` 그대로다. */
+  .de-nav {
     display: flex;
-    gap: 10px;
+    flex: none;
+    align-items: center;
+    gap: 8px;
   }
 
-  /* `Field`가 자기 폭을 갖지 않으므로 여기서 나눈다. 🔴 `min-width:0`이 없으면
-     긴 장소 이름이 필드를 밀어 시트가 가로로 넘친다. */
-  .de-patrol-row > * {
-    flex: 1 1 0;
-    min-width: 0;
+  .de-navbtn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    flex: none;
+    border-radius: var(--radius-pill);
+    background: var(--color-sundo-tint-10);
+    color: var(--color-sundo-700);
+  }
+
+  /* ⚠ `PrimaryButton`과 같은 값이다(§7.3 `btnp:disabled`). 리터럴을 새로 짓지 않았다. */
+  .de-navbtn:disabled {
+    opacity: 0.45;
+  }
+
+  /* 주차를 옮기는 동안. 🔴 빈 편성표 대신 이 한 줄을 그린다 — 빈 표는
+     「담당자가 전부 지워졌다」로 읽힌다. `.d-hint`와 같은 규격이다. */
+  .de-loading {
+    margin: 18px 0;
+    font-size: var(--text-micro);
+    color: var(--color-sundo-ink-70);
+    text-align: center;
   }
 
   .de-save {
     margin-top: 20px;
+  }
+
+  /* ====================================================================
+     🔴 W-25 기능 4 — 출석 체크. **design 산출물에 시안이 0건이다**(전수 확인).
+     새 표면을 짓지 않고 `19a`(편집 시트)와 S8 부원 행의 배치를 그대로 빌렸다.
+     아래에서 **새로 정한 값은 색 토큰 1개(`--color-sundo-warn`)뿐**이고
+     나머지는 전부 기존 토큰이다. 보고서 §9 ③에 올렸다.
+     ==================================================================== */
+
+  /* S9 우상단 버튼. 🔴 **사용자 요구가 「전체적인 색감은 검은색」**이라
+     §7.1 팔레트 밖이다 — 이 저장소에서 검은 표면은 이것이 처음이다(보고서 §2 결정 4).
+     🔴 값은 발명이 아니라 **`--color-sundo-900`(#14352A)의 잉크색**이다:
+     팔레트 안에서 가장 어두운 값이라 검게 보이면서 초록 계열을 벗어나지 않는다.
+     🔬 대비: `#fff` on `#14352A` = **14.6:1** — AC-01(4.5:1)을 크게 넘긴다. */
+  .d-attbtn {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 12px;
+    border-radius: var(--radius-pill);
+    background: var(--color-sundo-900);
+    box-shadow: 0 6px 14px rgba(20, 53, 38, 0.28);
+    font-size: var(--text-label);
+    font-weight: 700;
+    color: #fff;
+  }
+
+  .d-attbtn:disabled {
+    opacity: 0.45;
+  }
+
+  /* 담당자 행 묶음 — `.de-chips`의 자리에 온다(같은 `flex:1;min-width:0`). */
+  .at-rows {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  /* 한 담당자. S8 부원 행(`.mrow`)의 「이름 + 우측 상태」 구조를 그대로 쓴다. */
+  .at-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    width: 100%;
+    padding: 8px 12px;
+    border-radius: var(--radius-12);
+    background: var(--color-sundo-tint-06);
+    text-align: left;
+  }
+
+  .at-row-name {
+    min-width: 0;
+    font-size: var(--text-rowsm);
+    font-weight: 600;
+    color: var(--color-sundo-900);
+  }
+
+  .at-row-state {
+    flex: none;
+    font-size: var(--text-label);
+    font-weight: 700;
+    color: var(--color-sundo-ink-70);
+  }
+
+  /* 🔴 **AC-03 — 색만으로 전달하지 않는다.** 오른쪽 `.at-row-state`의 **텍스트**가
+     `정상`·`지각`·`불참`을 그대로 말하고, 색은 그 위에 얹히는 보조다. */
+  .at-row-present .at-row-state {
+    color: var(--color-sundo-700);
+  }
+
+  .at-row-late .at-row-state {
+    color: var(--color-sundo-warn);
+  }
+
+  .at-row-absent .at-row-state {
+    color: var(--color-sundo-danger);
+  }
+
+  /* 잠긴 요일. `disabled`가 이미 탭을 막으므로 여기는 **보이는 상태**만 만든다. */
+  .at-day-locked {
+    opacity: 0.4;
+  }
+
+  /* 🔴 사용자 요구 — 하단 **초록** 텍스트. `.d-hint`의 자리·크기에 색만 초록이다. */
+  .at-unlock {
+    display: block;
+    width: 100%;
+    margin-top: 14px;
+    font-size: var(--text-label);
+    font-weight: 700;
+    color: var(--color-sundo-700);
+    text-align: center;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  .at-unlocked {
+    margin-top: 14px;
+    font-size: var(--text-micro);
+    color: var(--color-sundo-ink-70);
+    text-align: center;
+  }
+
+  /* 🔴 **S9 요일 행의 담당자 이름 색**(사용자 요구 — 「이름 색이 검은색에서
+     출석 여부의 색으로 변경되고 모든 부원이 시각적으로 확인할 수 있다」).
+     ⚠ **`.drow-name`을 건드리지 않았다** — 기본(미기록)은 여전히 `--color-sundo-900`이고
+     아래 셋은 그 위에 얹히는 변형이다. 미기록 이름은 한 픽셀도 달라지지 않는다.
+     🔴 **AC-03의 예외가 아니다.** 같은 정보를 `출석 체크` 시트가 **텍스트로** 그대로
+     들고 있고(`.at-row-state`), 이 색은 일람에서의 **보조 신호**다. */
+  .dname-present {
+    color: var(--color-sundo-700);
+  }
+
+  .dname-late {
+    color: var(--color-sundo-warn);
+  }
+
+  .dname-absent {
+    color: var(--color-sundo-danger);
   }
 
   /* --- 담당자 팝오버 (design `19d`·`19e`) --- */

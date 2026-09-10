@@ -19,6 +19,14 @@ interface SegmentedProps<T extends string> {
   expanded?: boolean
   /** 저장 중 잠금(§8.6.5 로딩). 항목이 `disabled`가 되고 인디케이터는 그대로 남는다. */
   disabled?: boolean
+  /**
+   * 🔴 **W-25 — 인디케이터 배경 덮어쓰기.** 기본값은 CSS의 `--gradient-primary`(초록)이고
+   * S6·S7은 그대로 쓴다. 출석 체크만 **선택한 값에 따라** 초록·노랑·빨강으로 갈린다
+   * (사용자 요구 — 정상/지각/불참). 세 색을 CSS 클래스 3개로 두지 않은 이유는
+   * 「무슨 색인가」를 아는 주체가 이 컴포넌트가 아니라 **호출부**이기 때문이다 —
+   * 이 파일이 `present`·`late`·`absent`를 알게 되면 「사유를 모른다」는 계약이 깨진다.
+   */
+  indicatorColor?: string
 }
 
 interface IndicatorBox {
@@ -52,6 +60,7 @@ export function Segmented<T extends string>({
   labelledBy,
   expanded,
   disabled = false,
+  indicatorColor,
 }: SegmentedProps<T>) {
   const listRef = useRef<HTMLDivElement>(null)
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([])
@@ -108,6 +117,8 @@ export function Segmented<T extends string>({
             transform: `translate(${box.left}px, ${box.top}px)`,
             width: box.width,
             height: box.height,
+            /* `undefined`면 선언 자체가 나가지 않아 CSS의 기본 배경이 그대로 이긴다. */
+            background: indicatorColor,
           }}
         />
       )}

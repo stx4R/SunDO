@@ -440,6 +440,55 @@ service cloud.firestore {
     }
 
     // ========================================================================
+    //  dutyAttendance  — 🔴 **W-25 신설.** 순찰 담당자 출석 체크.
+    // ========================================================================
+    //
+    // 🔴 **PRD §9.3에 이 컬렉션이 없다.** 사용자 요구로 이 회차가 신설했다
+    //    (`src/lib/attendance.ts` 문서 주석에 스키마와 근거가 있다).
+    //
+    // 🔴 **왜 `dutySchedules`에 얹지 않았나 — 쓰기 권한이 다르기 때문이다.**
+    //    편성은 `isHead()`(W-21C 결정 2)이고 출석은 **차장 이상**이다. 같은 문서에 두면
+    //    `dutySchedules` update를 차장에게 열고 「차장은 출석 키만, 부장은 전부」를
+    //    `affectedKeys()` 조합으로 표현해야 한다 — 조건 하나가 어긋나는 순간
+    //    **차장이 편성을 통째로 덮어쓴다.** 문서를 가르면 그 위험이 구조적으로 사라진다.
+    //
+    // 🔴 **읽기는 활성 부원 전원이다.** 요일 행의 담당자 이름 색이 출석을 그대로
+    //    드러내고(사용자 요구 「모든 부원이 시각적으로 확인」), 읽지 못하면 그 색이
+    //    영영 검은색으로 남는다. `dutySchedules`의 읽기와 같은 폭이다.
+    //
+    // 🔴 **`weekId`를 문서 ID와 강제로 맞춘다** — `dutySchedules`의 D-13과 같은 형태의
+    //    방어다. 어긋나면 화면이 주차를 잘못 읽는다.
+    //
+    // ⚠ **`marks`의 값은 검사하지 않는다.** Rules에는 맵 값을 순회하는 수단이 없다
+    //    (`editsDutyOnly`가 `assignmentsByMeal`의 내용을 검사하지 않는 것과 같은 한계다).
+    //    막을 수 있는 것은 **누가 · 어느 키를** 쓰는가이고 그 둘은 아래가 막는다.
+    //    ⇒ 차장 이상이 자기 부서 안에서 엉뚱한 상태 문자열을 넣는 것은 규칙이 아니라
+    //      화면(`ATTENDANCE_STATUSES`)과 읽기 계층(`toMark`가 모르는 값을 버린다)이 막는다.
+    //
+    // ⚠ **`hasOnly`가 `weekId`를 포함하지 않는다.** `markAttendance`는 매번 같은 값을
+    //   함께 쓰지만 값이 바뀌지 않으므로 `affectedKeys()`에 잡히지 않는다(규약 4-6 · B-20).
+    //   포함시키면 「`weekId`를 남의 주차 값으로 바꾸는」 update가 열린다.
+    match /dutyAttendance/{weekId} {
+      allow get: if isActive();
+      allow list: if isActive();
+
+      allow create: if isVice()
+        && request.resource.data.weekId == weekId
+        && request.resource.data.updatedBy == request.auth.uid;
+
+      allow update: if isVice()
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['marks', 'updatedBy', 'updatedAt'])
+        && request.resource.data.updatedBy == request.auth.uid;
+
+      // 🔴 **지울 수 없다.** 출석은 되돌릴 일이 있으면 **다시 찍는 것**이 옳고
+      //    (사용자 요구 — 「이미 기록된 출석 여부를 수정할 수 있다」), 문서를 통째로
+      //    지우는 UI가 어디에도 없다. `dutySchedules`가 `isHead()` delete를 여는 것은
+      //    편성 자체를 취소하는 경로가 있기 때문이고 여기에는 그런 경로가 없다.
+      allow delete: if false;
+    }
+
+    // ========================================================================
     //  approvalRequests
     // ========================================================================
     match /approvalRequests/{reqId} {
