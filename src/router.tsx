@@ -8,9 +8,11 @@ import {
   useParams,
 } from 'react-router'
 import { AppShell, ScrollRootContext } from './components/AppShell'
+import { PwaBanners } from './components/PwaBanners'
 import { Splash } from './components/Splash'
 import { ToastProvider, useToast } from './components/Toast'
 import { AuthProvider, useAuth } from './contexts/AuthProvider'
+import { useServiceWorkerUpdate } from './lib/pwa'
 import { useLastActiveAt } from './lib/useLastActiveAt'
 import { DockLayout } from './routes/DockLayout'
 import { RequireAuth, RequireRole, type RouteHandle } from './routes/RequireAuth'
@@ -93,16 +95,45 @@ function RootLayout() {
   const matches = useMatches()
   const hasDock = matches.some((m) => (m.handle as RouteHandle | undefined)?.hasDock)
 
+  /**
+   * 🔴 **W-30 — 업데이트 감지가 `DockLayout`에서 여기로 올라왔다.**
+   *
+   * 🔬 W-29가 잡은 구조적 덫이다. `sw.js`는 `skipWaiting()`을 부르지 않으므로(§18.2)
+   * 대기 중인 새 워커를 푸는 경로는 **배너 탭**뿐인데, 그 배너가 독 화면에만 있었다.
+   * 독 화면 = **로그인한 계정만 보는 화면**이라, **로그인을 막는 버그의 수리가
+   * 로그인을 못 해서 영영 적용되지 않는다.** W-29의 무한 로그인 루프가 정확히 그랬다.
+   *
+   * ⇒ 감지를 `RootLayout`으로 올려 **로그인·가입·승인 대기·정책·스플래시까지** 덮는다.
+   * 🔴 **§18.2 계약은 그대로다** — 「배너 → 탭 → `skipWaiting` → 리로드」의 네 단계 중
+   * 어느 것도 바뀌지 않았다. 바뀐 것은 **배너를 볼 수 있는 화면의 범위**뿐이다.
+   * (W-29 §5의 안 ② `install`에서 `skipWaiting()`은 채택하지 않았다 — 열려 있는 탭이
+   * 예고 없이 새 워커로 넘어가면 옛 청크 요청이 404가 난다. precache는 「한 벌」이다(W-27 §7-1).)
+   *
+   * ⚠ 훅은 **여기 한 곳에서만** 부른다. 두 곳에서 부르면 `controllerchange` 구독이
+   * 두 벌이 되고 배너도 둘이 될 수 있다.
+   */
+  const { updateReady, applyUpdate } = useServiceWorkerUpdate()
+
   return (
     <AuthProvider key={attempt}>
-      <AppShell hasDock={hasDock}>
+      {/* 🔴 W-30 — 독이 없는 화면에서 배너가 뜨면 그만큼 스크롤 바닥을 비운다.
+          독 화면의 `120`과 같은 성격의 값이다(배너 바닥 16 + 높이 52 + 숨 16 = 84).
+          배너가 없으면 `undefined`라 **기존 화면들의 computed 값이 한 칸도 바뀌지 않는다.** */}
+      <AppShell
+        hasDock={hasDock}
+        bottomGap={!hasDock && updateReady ? NODOCK_BANNER_GAP : undefined}
+      >
         <ToastProvider>
+          <PwaBanners hasDock={hasDock} updateReady={updateReady} applyUpdate={applyUpdate} />
           <AuthGate onRetry={() => setAttempt((n) => n + 1)} />
         </ToastProvider>
       </AppShell>
     </AuthProvider>
   )
 }
+
+/** 독이 없는 화면에서 업데이트 배너가 차지하는 세로. 위 주석의 `16 + 52 + 16`이다. */
+const NODOCK_BANNER_GAP = 84
 
 /**
  * N-05 — 판정 전에는 스플래시만 남기고 **어떤 화면도 렌더하지 않는다.**

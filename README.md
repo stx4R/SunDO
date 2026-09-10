@@ -1,4 +1,4 @@
-# SunDO. v1.0.0
+# SunDO. v1.0.2
 
  안녕하십니까?  **SunDO** 프로젝트의 개발자 유이준입니다.  
 위 마크다운 문서에서는 자율생활부 선도 전자기록 PWA(총칭 : SunDO)에 관한 모든 정보들을 제공하고 있습니다.  
@@ -53,7 +53,9 @@
 ( 진행 완료 ) v0.20.0 Attendance Check, Schedule Rework.  
 ( 진행 완료 ) v0.21.0 Layout, Search Logic Fixed.  
 ( 진행 완료 ) v0.22.0 PWA Performance, Repository Cleanup.  
-( 진행 완료 ) **v1.0.0 DEPLOY**   </code></pre>  
+( 진행 완료 ) **v1.0.0 DEPLOY**   
+( 진행 완료 ) v1.0.1 Login Loop Hotfix.  
+( 진행 완료 ) v1.0.2 UpdateBanner Reach, Bottom Blank Fixed.   </code></pre>  
 ---    
 ### Upcoming Changes.
 <pre><code>1. 온라인 / 오프라인 멤버 확인 기능  

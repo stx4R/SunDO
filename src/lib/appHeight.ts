@@ -57,16 +57,23 @@ function readInsets(): { top: number; bottom: number } {
  * ① **브라우저에서는 `innerHeight` 하나뿐이다.** 그것이 정의상 「지금 보이는 높이」다.
  *    Safari의 도구 막대가 덮는 자리를 앱이 차지하지 않게 되는 것도 같은 이유로 옳다.
  *
- * ② **standalone에서만** 화면 전체(`screen.height`)까지 늘릴 수 있다. 단 세 관문을 전부
+ * ② **standalone에서만** 화면 전체까지 늘릴 수 있다. 단 세 관문을 전부
  *    통과해야 한다 — 하나라도 어긋나면 늘리지 않는다.
  *    - 세로 방향이어야 한다. 🔴 iOS의 `screen.height`는 **회전해도 세로 값 그대로**라
  *      가로에서 쓰면 화면 높이를 2배 넘게 잡는다.
- *    - `env(safe-area-inset-top)`·`bottom`이 **둘 다 0보다 커야 한다.** 이 둘이 0이 아니라는
- *      것은 **웹뷰가 상태 표시줄과 홈 인디케이터 자리까지 실제로 덮고 있다**는 증거다.
- *      웹뷰가 안전영역 안쪽에 놓인 경우(그때는 두 값이 0이다) 화면 끝까지 늘리면
- *      독이 보이지 않는 자리로 내려간다 — 그 사고를 이 관문이 막는다.
+ *    - 🔴 **W-30 — `top`·`bottom` 중 하나라도 0보다 크면 된다(옛 조건은 「둘 다」였다).**
+ *      안드로이드의 흔한 배치가 **상태 표시줄만 덮고 아래는 시스템이 갖는** 형태라
+ *      `bottom`이 0이다. 옛 `||` 관문은 그 기기를 통째로 배제해 **W-28의 수리가
+ *      실기기에서 한 번도 실행되지 않았다** — 사용자가 같은 띠를 다섯 번 신고한 이유다.
+ *      둘 **다** 0인 경우(= 웹뷰가 시스템 바 사이에 놓였다)에만 늘리지 않는다.
+ *      그때 늘리면 독이 보이지 않는 자리로 내려간다 — 그 사고는 그대로 막힌다.
  *    - 늘리는 양은 **`top + bottom`을 넘지 못한다.** 레이아웃 뷰포트가 빠뜨릴 수 있는
  *      자리는 그 둘뿐이므로, 다른 이유로 벌어진 차이는 여기서 잘린다.
+ *
+ * 🔴 **W-30 — 「화면이 얼마나 큰가」를 `screen.height` 한 곳에만 묻지 않는다.**
+ * 안드로이드 Chrome은 `screen.height`가 **레이아웃 뷰포트를 그대로 되받는** 경우가 있어
+ * `screen.height - innerHeight`가 0이 된다 = 늘릴 양이 0 = 아무 일도 일어나지 않는다.
+ * `window.outerHeight`를 함께 보고 **더 큰 쪽**을 쓴다. 둘 다 크지 않으면 늘리지 않는다.
  *
  * 🔴 **브라우저가 옳아지면 이 함수는 저절로 아무것도 하지 않는다** — 그 순간
  * `screen.height - innerHeight`가 0이라 늘릴 양이 0이 된다. 하드코딩한 보정값이 아니다.
@@ -78,10 +85,15 @@ function measure(): number {
   if (window.innerWidth > inner) return inner
 
   const { top, bottom } = readInsets()
-  if (top <= 0 || bottom <= 0) return inner
+  /* 🔴 W-30 — `||`가 아니라 `&&`다. 둘 **다** 0일 때만 손을 뗀다. */
+  if (top <= 0 && bottom <= 0) return inner
 
-  const missing = Math.round((window.screen?.height ?? 0) - inner)
-  return inner + Math.min(Math.max(missing, 0), top + bottom)
+  /* 🔴 W-30 — 두 곳에 묻고 더 큰 쪽을 쓴다. 한쪽이 뷰포트를 되받아도 다른 쪽이 남는다. */
+  const reported = Math.max(window.screen?.height ?? 0, window.outerHeight || 0)
+  const missing = Math.round(reported - inner)
+  /* 화면이 뷰포트보다 크지 않다 = 이미 화면 전체다. 늘릴 것이 없다. */
+  if (missing <= 0) return inner
+  return inner + Math.min(missing, top + bottom)
 }
 
 /**
