@@ -120,6 +120,26 @@ self.addEventListener('fetch', (event) => {
      오프라인 캐시를 갖는다(§2.1의 두 번째 층). 가로채면 두 캐시가 겹쳐 진단이 불가능해진다. */
   if (url.origin !== self.location.origin) return
 
+  /* 🔴 **W-29 — Firebase Hosting 예약 경로(`/__/**`)는 우리 것이 아니다. 절대 답하지 마라.**
+   *
+   * 🔬 이것이 「무한 로그인 루프」의 원인이었다. `authDomain`이 `sundo.today` —
+   * **앱과 같은 출처**라, Google 로그인이 여는 `/__/auth/handler`와 `/__/auth/iframe`이
+   * 둘 다 `mode: 'navigate'`로 들어와 아래 `navigateShellFirst`에 걸렸다.
+   * 그 함수는 **경로를 보지 않고** 캐시된 `/index.html`을 돌려주므로, 인증 핸들러 자리에
+   * **앱 셸이 대신 떴다.** 자격 증명이 부모 창으로 돌아올 길이 없어 계정은 영영
+   * 로그아웃 상태로 남고, 화면은 로그인으로 되돌아온다 — 팝업(브라우저)·리다이렉트(PWA)
+   * 양쪽 모두 같은 이유로 죽는다.
+   * 🔬 실측: 서버는 `curl https://sundo.today/__/auth/handler`에 진짜 핸들러를 준다.
+   * 같은 주소를 **브라우저**로 열면 `#root`가 있는 SunDO 화면이 떴다 — 가로챈 것은 이 워커다.
+   *
+   * 🔴 **W-20의 network-first에서는 증상이 없었다.** 그때는 네트워크가 진짜 핸들러를
+   * 가져왔고, 타임아웃 폴백일 때만 셸이 나갔다. W-27이 cache-first로 바꾸면서
+   * **가끔 실패하던 것이 항상 실패하는 것으로** 바뀌었다.
+   *
+   * ⚠ **오프라인 폴백을 붙이지 않는다.** 이 경로는 애초에 네트워크가 있어야 의미가 있고,
+   * 브라우저 기본 경로로 내려보내는 것이 유일하게 옳은 처리다. */
+  if (url.pathname.startsWith('/__/')) return
+
   if (request.mode === 'navigate') {
     event.respondWith(navigateShellFirst(request))
     return
