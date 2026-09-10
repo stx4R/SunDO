@@ -3,14 +3,22 @@
 /* ============================================================
    Spoqa Han Sans Neo — 로컬 `@font-face` (W-19 결정 2)
 
-   🔴 **왜 이 5개가 CDN CSS와 1:1인가.**
+   🔴 **W-27 — 5개에서 3개로 줄였다. W-19 결정 2의 근거 문장 하나를 일부러 폐기한다.**
+
    `index.html`이 받던 `cdn.jsdelivr.net/gh/spoqa/spoqa-han-sans@latest/css/SpoqaHanSansNeo.css`는
    TTF가 아니라 **`Subset/` woff2**를 가리켰다. `public/fonts/`의 파일은 그 배포처의
-   같은 파일이고 바이트 크기까지 일치한다(Bold 183,708 · Medium 179,960 · Regular 180,600 ·
-   Light 175,620 · Thin 160,912). 그래서 **글리프 커버리지·시각 변화가 정의상 0**이다.
-   굵기를 3개로 줄이지 않은 것도 같은 이유다 — 줄이면 그 문장이 거짓이 된다.
-   ⚠ 브라우저는 **실제로 쓰이는 face만 내려받는다.** 앱이 쓰는 굵기는 400·500·700뿐이라
-   전송량은 544 kB이고, Thin·Light 2개는 배포 산출물에만 있고 전송되지 않는다.
+   같은 파일이고 바이트 크기까지 일치한다(Bold 183,708 · Medium 179,960 · Regular 180,600).
+   W-19는 여기에 Light 175,620 · Thin 160,912를 더해 **「CDN CSS와 1:1」**이라 적었고,
+   굵기를 줄이지 않은 이유도 그 문장을 참으로 유지하기 위해서였다.
+
+   🔴 **그 문장은 이제 거짓이다. 대신 렌더 결과는 한 픽셀도 바뀌지 않는다.**
+   W-27이 이 파일의 `font-weight` 선언을 전수 조사한 결과 **100·300을 요구하는 규칙이
+   `@font-face` 자기 자신 말고는 0건**이었다. 브라우저는 **실제로 쓰이는 face만 내려받으므로**
+   Thin·Light 337 kB는 애초에 **한 번도 전송된 적이 없다** — 배포 산출물과 저장소에만
+   얹혀 있었다. ⇒ 지운 것은 「쓰이는 것」이 아니라 「전송되지 않는 사본」이다.
+   ⚠ **되살리려면 `font-weight: 100`이나 `300`을 쓰는 규칙을 먼저 만들어야 한다.**
+   그런 규칙 없이 face만 되돌리면 같은 337 kB가 다시 조용히 얹힌다.
+   ⚠ 600·800을 쓰는 규칙은 있지만 그 face는 **원래도 없었다** — 브라우저가 700에서 합성한다.
 
    `local()`을 남긴 것도 CDN CSS 원문 그대로다. 기기에 설치돼 있으면 요청이 0이 된다.
 
@@ -20,26 +28,6 @@
 
    ⚠ `@layer` 안에 넣지 마라. `@font-face`는 캐스케이드 레이어의 대상이 아니다.
    ============================================================ */
-
-@font-face {
-  font-family: "Spoqa Han Sans Neo";
-  font-weight: 100;
-  font-style: normal;
-  font-display: swap;
-  src:
-    local("Spoqa Han Sans Neo Thin"),
-    url("/fonts/SpoqaHanSansNeo-Thin.woff2") format("woff2");
-}
-
-@font-face {
-  font-family: "Spoqa Han Sans Neo";
-  font-weight: 300;
-  font-style: normal;
-  font-display: swap;
-  src:
-    local("Spoqa Han Sans Neo Light"),
-    url("/fonts/SpoqaHanSansNeo-Light.woff2") format("woff2");
-}
 
 @font-face {
   font-family: "Spoqa Han Sans Neo";
@@ -3171,15 +3159,6 @@
     backdrop-filter: blur(8px);
     font-size: var(--text-subtitle);
     font-weight: 700;
-  }
-
-  /* `1j` 원문 `font-size:11px;opacity:0.65;margin-top:12px`.
-     ⚠ 원문 텍스트는 `등교 지도 07:50 · 중앙 현관`인데 **`등교 지도 ` 접두사는 §8.10 사전에도
-     §8.9.2 #4에도 없다.** 규격이 `{순찰 시간} · {장소}`라 접두사를 빼고 그렸다(보고서 §3). */
-  .dcard-foot {
-    margin-top: 12px;
-    font-size: var(--text-micro);
-    opacity: 0.65;
   }
 
   /* 로딩 카드. 🔴 **S9 전용 스켈레톤 시안이 없다**(§20.7의 `6a`~`6d`는 다른 화면이다).

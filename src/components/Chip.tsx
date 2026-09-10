@@ -6,31 +6,13 @@ interface ChipProps {
   className?: string
 }
 
-interface FilterChipProps {
-  label: string
-  active: boolean
-  onClick: () => void
-}
-
 /** PRD §7.3 `chip` — 인원 수 · 상태 표시 · 역할 배지. 정적 표시 전용이다. */
 export function Chip({ children, className }: ChipProps) {
   return <span className={cn('chip', className)}>{children}</span>
 }
 
-/**
- * PRD §7.3 `fchip` — S7 기록 조회 필터. `Chip`과 역할이 달라 분리했다(지시서 §6.4).
- * AC-04: 활성은 배경 반전 + 굵기 700 이중 표시다. 굵기는 `.fchip-on`이 갖고 있다.
- * 단일 선택이지만 `radiogroup` 부모를 강제하지 않도록 `aria-pressed`를 쓴다.
- */
-export function FilterChip({ label, active, onClick }: FilterChipProps) {
-  return (
-    <button
-      type="button"
-      aria-pressed={active}
-      onClick={onClick}
-      className={cn('fchip', active && 'fchip-on')}
-    >
-      {label}
-    </button>
-  )
-}
+/* 🔴 **W-27 — `FilterChip`을 지웠다. `.fchip` CSS는 그대로다.**
+   호출부가 0이었다. S7의 필터 칩은 `screens/Records.tsx`가 같은 마크업을 **인라인으로**
+   직접 그리고 있어(§8.7.3 · W-24 A-3의 스크롤 되감기가 그 `onClick`에 붙어 있다)
+   이 컴포넌트는 한 번도 렌더된 적이 없다.
+   ⚠ **`.fchip`·`.fchip-on`을 CSS에서 지우지 마라** — 쓰는 쪽은 살아 있다. */

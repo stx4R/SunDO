@@ -17,7 +17,7 @@ import {
   signOut as firebaseSignOut,
   type User,
 } from 'firebase/auth'
-import { doc, getDoc, serverTimestamp, updateDoc } from 'firebase/firestore'
+import { doc, getDoc, getDocFromCache, serverTimestamp, updateDoc } from 'firebase/firestore'
 import { auth, db, googleProvider } from '../lib/firebase'
 import { parseDisplayName, type ParseResult } from '../lib/parseDisplayName'
 
@@ -148,7 +148,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       void (async () => {
         await redirectSettled
         if (cancelled || mine !== seqRef.current) return
-        await resolve(user, () => cancelled || mine !== seqRef.current)
+        const isStale = () => cancelled || mine !== seqRef.current
+
+        /* 🔴 **W-27 — 첫 판정만 「캐시로 먼저 그리고, 서버로 확인한다」**(사용자 확정).
+           `primeFromCache`가 참을 돌려주면 스플래시는 **서버 왕복을 기다리지 않고** 걷힌다.
+           그 뒤 아래 `resolve`가 그대로 이어 돌아 서버 값으로 판정을 확정한다. */
+        const primed = await primeFromCache(user, isStale)
+        if (isStale()) return
+
+        /* 🔴 **`silent`가 붙는 조건이 계약의 핵심이다.**
+           선판정이 성공했으면 화면에는 이미 확정된 상태가 그려져 있다 — 이때 서버 조회가
+           실패했다고 `loading`으로 되돌리면 **멀쩡히 보이던 화면 위로 스플래시가 덮인다.**
+           `silent`는 W-07 §3.2 규칙 3이 바로 그 상황을 위해 만든 것이라 그대로 쓴다.
+           반대로 선판정이 없었으면 이 조회가 **유일한 판정**이므로 실패는 그대로 드러나야 한다
+           (§8.1.5 스플래시 3초 타임아웃과 오류 화면이 그 경로다). */
+        await resolve(user, isStale, primed ? { silent: true } : undefined)
       })()
     })
 
@@ -157,6 +171,51 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       unsubscribe()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  /**
+   * 🔴 **W-27 — 영구 캐시에 이미 있는 프로필로 「먼저 그리는」 선판정**(사용자 확정).
+   *
+   * **왜 필요한가.** `lib/firebase.ts`가 `persistentLocalCache`를 켜 두었는데도
+   * `getDoc`은 **언제나 서버를 먼저 친다** — 캐시는 그 조회가 실패했을 때의 폴백이다.
+   * 그래서 재실행마다 스플래시가 서버 왕복 하나를 통째로 기다렸다. 이 함수는 그 왕복을
+   * **판정의 앞에서 빼내고 뒤로 옮긴다.** 화면은 캐시로 서고, 서버 값은 곧이어 도착해 덮는다.
+   *
+   * 🔴 **대가를 정확히 적는다 — 최대 1왕복 동안 옛 계정 상태가 보일 수 있다.**
+   * 정지·거절 처분이 방금 내려진 계정이 그 사이 활성 화면을 볼 수 있다. 사용자가 이 대가를
+   * 알고 확정했다. **다만 「보인다」와 「할 수 있다」는 다르다** — 읽기·쓰기는 전부
+   * `firestore.rules`가 서버에서 막으므로 데이터가 새지 않는다. 잠기는 것은 껍데기뿐이고
+   * 그것도 서버 판정이 도착하는 즉시 걷힌다.
+   * 되돌리려면 이 함수를 지우고 위 호출부에서 `primed`를 `false`로 고정하면 끝이다.
+   *
+   * 🔴 **참을 돌려주는 조건을 좁게 잡았다.**
+   * ① 로그인된 사용자가 있고 ② 도메인이 학교 도메인이고 ③ 캐시에 문서가 **존재**할 때뿐이다.
+   * ⚠ **캐시가 「없음」이라고 답하면 믿지 않는다.** SDK는 「이 문서는 없다」도 캐시하는데,
+   * 프로필이 만들어지기 **전에** 굳은 그 답을 그대로 쓰면 이미 승인된 부원에게
+   * S2 가입 신청 화면이 번쩍인다. 없음은 서버에게 다시 묻는다 — 그 경로가 원래 동작이다.
+   * ⚠ **이름 재파싱(DR-12)을 여기서 하지 않는다.** 그것은 `updateDoc` **쓰기**이고,
+   * 선판정은 읽기만 하는 자리다. 뒤이어 도는 `resolve`가 서버 값으로 그 일을 한다.
+   */
+  const primeFromCache = useCallback(async (user: User | null, stale: () => boolean) => {
+    if (!user) return false
+    const email = (user.email ?? '').toLowerCase()
+    /* 도메인 판정을 여기서 한 번 더 하는 것은 중복이 아니라 **가드**다.
+       거절 계정은 `resolve`가 계정 삭제·로그아웃까지 하는 경로라 선판정이 건드리면 안 된다. */
+    if (!SCHOOL_DOMAIN.test(email)) return false
+
+    let snapshot
+    try {
+      snapshot = await getDocFromCache(doc(db, 'users', user.uid))
+    } catch {
+      /* 캐시 미스는 정상이다(첫 로그인 · 캐시 비움 · 시크릿 창). 조용히 서버 경로로 넘긴다. */
+      return false
+    }
+    if (stale() || !snapshot.exists()) return false
+
+    const cachedProfile = snapshot.data() as UserProfile
+    setProfile(cachedProfile)
+    setStatus(cachedProfile.status)
+    return true
   }, [])
 
   /**

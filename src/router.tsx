@@ -14,19 +14,52 @@ import { AuthProvider, useAuth } from './contexts/AuthProvider'
 import { useLastActiveAt } from './lib/useLastActiveAt'
 import { DockLayout } from './routes/DockLayout'
 import { RequireAuth, RequireRole, type RouteHandle } from './routes/RequireAuth'
-import Admin from './screens/Admin'
-import ClassStudents from './screens/ClassStudents'
-import Duty from './screens/Duty'
-import GradeClasses from './screens/GradeClasses'
 import Home from './screens/Home'
 import Login from './screens/Login'
-import Pending from './screens/Pending'
-import PolicyOss from './screens/PolicyOss'
-import PolicyPrivacy from './screens/PolicyPrivacy'
-import PolicyTerms from './screens/PolicyTerms'
-import Records from './screens/Records'
-import Settings from './screens/Settings'
-import Signup from './screens/Signup'
+
+/* ============================================================
+   🔴 **W-27 — 화면 13장 중 11장을 코드 분할했다.**
+
+   **왜.** 옛 빌드는 번들이 **1개 · 1,109 kB**였고 앱을 켤 때마다 그 전부를 파싱했다.
+   폰에서 이것은 눈에 보이는 지연이다. 지금은 부팅 경로에 필요한 것만 파싱한다.
+
+   🔴 **`Home`과 `Login`만 즉시 로드다.** manifest의 `start_url`이 `/?source=pwa`라
+   **PWA를 켜면 항상 인덱스 라우트에 착지한다** — 그 자리를 분할하면 켜는 순간
+   청크 하나를 더 기다리게 되어 고치려던 것을 되살린다. `Login`은 미인증 계정이
+   그 착지에서 곧바로 밀려 가는 곳이라 같은 이유로 남겼다.
+
+   🔴 **`React.lazy`가 아니라 라우터의 `lazy`다.** `React.lazy`는 `Suspense` 폴백을
+   요구하고, 그 폴백이 화면 전환마다 **빈 칸으로 번쩍인다.** 라우터의 `lazy`는
+   청크가 도착할 때까지 **이전 화면을 그대로 둔 채** 전환을 붙잡으므로 깜빡임이 없다.
+
+   ⚠ **오프라인 도달성(EC-01·EC-44)은 그대로다.** `vite.config.ts`의 `collectShell`이
+   `/assets/**`를 전부 precache하므로 **분할된 청크도 한 벌로 설치된다.** 즉 설치가
+   받아 오는 총 바이트는 변하지 않고, **켤 때 파싱하는 양만** 줄어든다.
+   ⚠ 새 화면을 추가할 때 이 표에 넣지 않으면 즉시 로드가 되어 조용히 부팅이 무거워진다.
+   ============================================================ */
+const loadAdmin = () => import('./screens/Admin')
+const loadClassStudents = () => import('./screens/ClassStudents')
+const loadDuty = () => import('./screens/Duty')
+const loadGradeClasses = () => import('./screens/GradeClasses')
+const loadPending = () => import('./screens/Pending')
+const loadPolicyOss = () => import('./screens/PolicyOss')
+const loadPolicyPrivacy = () => import('./screens/PolicyPrivacy')
+const loadPolicyTerms = () => import('./screens/PolicyTerms')
+const loadRecords = () => import('./screens/Records')
+const loadSettings = () => import('./screens/Settings')
+const loadSignup = () => import('./screens/Signup')
+
+/**
+ * 위 `import()` 하나를 라우터가 아는 형태(`{ Component }`)로 바꾼다.
+ *
+ * ⚠ **로더 이름을 `load*`로 둔 것은 취향이 아니다.** `Admin`처럼 대문자로 두면
+ * oxlint의 `react(only-export-components)`가 **컴포넌트로 오인해** 이 파일에만
+ * 경고 11개를 새로 만든다(기준선 18 유지 · 규약 4-6과 같은 태도).
+ * 이름이 하는 일과도 맞다 — 이것들은 컴포넌트가 아니라 **청크를 가져오는 함수**다.
+ */
+function screen(load: () => Promise<{ default: React.ComponentType }>) {
+  return async () => ({ Component: (await load()).default })
+}
 
 /**
  * PRD §6.1 화면 맵 + §6.3 뒤로가기 규칙 + §4.3 접근 매트릭스.
@@ -204,9 +237,9 @@ export const router = createBrowserRouter([
         element: <ScreenTransition />,
         handle: { skipsAuthGate: true } satisfies RouteHandle,
         children: [
-          { path: 'policy/privacy', element: <PolicyPrivacy /> },
-          { path: 'policy/terms', element: <PolicyTerms /> },
-          { path: 'policy/oss', element: <PolicyOss /> },
+          { path: 'policy/privacy', lazy: screen(loadPolicyPrivacy) },
+          { path: 'policy/terms', lazy: screen(loadPolicyTerms) },
+          { path: 'policy/oss', lazy: screen(loadPolicyOss) },
         ],
       },
 
@@ -224,7 +257,7 @@ export const router = createBrowserRouter([
               },
               {
                 path: 'signup',
-                element: <Signup />,
+                lazy: screen(loadSignup),
                 /* BR-28 — 거절 계정은 재신청할 수 있다. S2-1의 `가입 코드 다시 입력`이
                    여기로 오므로 `rejected`가 없으면 `/pending`으로 되튕긴다.
                    **착지 표는 그대로다** — `rejected`의 기본 착지는 여전히 `/pending`이고,
@@ -233,7 +266,7 @@ export const router = createBrowserRouter([
               },
               {
                 path: 'pending',
-                element: <Pending />,
+                lazy: screen(loadPending),
                 handle: { allow: ['pending', 'rejected'] } satisfies RouteHandle,
               },
               {
@@ -241,11 +274,11 @@ export const router = createBrowserRouter([
                 path: 'grade/:grade',
                 element: <GradeGuard />,
                 children: [
-                  { index: true, element: <GradeClasses /> },
+                  { index: true, lazy: screen(loadGradeClasses) },
                   {
                     path: 'class/:classNo',
                     element: <ClassGuard />,
-                    children: [{ index: true, element: <ClassStudents /> }],
+                    children: [{ index: true, lazy: screen(loadClassStudents) }],
                   },
                 ],
               },
@@ -261,18 +294,26 @@ export const router = createBrowserRouter([
               {
                 element: <ScreenTransition />,
                 children: [
+                  /* 🔴 인덱스는 즉시 로드다 — `start_url`의 착지점이다(위 표 주석). */
                   { index: true, element: <Home /> },
-                  { path: 'records', element: <Records /> },
+                  { path: 'records', lazy: screen(loadRecords) },
                   {
                     path: 'admin',
-                    element: (
-                      <RequireRole roles={ADMIN_ROLES}>
-                        <Admin />
-                      </RequireRole>
-                    ),
+                    /* 🔴 **역할 가드는 분할 안쪽이 아니라 바깥에 남는다.** `RequireRole`은
+                       즉시 로드된 채로 있고, 청크가 도착한 뒤 그 안을 감싼다. */
+                    lazy: async () => {
+                      const { default: AdminScreen } = await loadAdmin()
+                      return {
+                        Component: () => (
+                          <RequireRole roles={ADMIN_ROLES}>
+                            <AdminScreen />
+                          </RequireRole>
+                        ),
+                      }
+                    },
                   },
-                  { path: 'duty', element: <Duty /> },
-                  { path: 'settings', element: <Settings /> },
+                  { path: 'duty', lazy: screen(loadDuty) },
+                  { path: 'settings', lazy: screen(loadSettings) },
                 ],
               },
             ],

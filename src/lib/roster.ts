@@ -286,12 +286,6 @@ export function capStudentNo(raw: string, caret: number): { value: string; caret
   return { value, caret: Math.max(0, Math.min(next, value.length)) }
 }
 
-/** 🔴 입력 판정 — 이제 **학번만** 받는다. 숫자 1~5자리면 참이다. */
-export function isStudentNoQuery(q: string): boolean {
-  const t = q.trim()
-  return t.length > 0 && t.length <= STUDENT_NO_LEN && /^[0-9]+$/.test(t)
-}
-
 /**
  * §2.4 — 🔴 **W-26 사용자 확정: 학번 「앞자리부터 일치」다.**
  *
