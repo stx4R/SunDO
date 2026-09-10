@@ -9,9 +9,10 @@ import { Field, type FieldHandle } from './Field'
 import { RosterEmptyIcon } from './icons'
 import { RecordSheet } from './RecordSheet'
 import {
-  isStudentNoQuery,
-  searchScope,
+  capStudentNo,
+  scopeForStudentNo,
   searchStudents,
+  STUDENT_NO_LEN,
   type Student,
   type StudentHit,
 } from '../lib/roster'
@@ -24,10 +25,12 @@ const TITLE = '학생 검색'
  * 그대로 쓸 수 없어(거짓말이 된다) 문구를 정했다 — **전부 보고서 §9 ③에 올렸다.**
  * 어법은 사전을 따랐다: 라벨은 명사구, 안내는 `…해 주세요`, 빈 상태는 `…없습니다`.
  */
-const LABEL_SEARCH = '학번 또는 이름'
-const HINT = '학번 또는 이름을 입력하면 바로 기록을 작성할 수 있습니다'
+/* 🔴 **W-26 — 셋 다 「이름」이 빠졌다.** 사용자 요구로 검색이 **학번 전용**이 됐고
+   (`roster.matchStudent` 참조), 문구가 이름을 계속 말하면 그것이 곧 거짓말이다. */
+const LABEL_SEARCH = '학번'
+const HINT = '학번을 입력하면 바로 기록을 작성할 수 있습니다'
 const EMPTY = '검색 결과가 없습니다'
-const EMPTY_HINT = '학번 5자리나 이름 일부를 입력해 보세요'
+const EMPTY_HINT = `학번 앞자리부터 최대 ${STUDENT_NO_LEN}자리까지 입력해 보세요`
 /** 일부 반을 못 읽었을 때. §8.10.3 ER-03의 파생이다. */
 const PARTIAL = '일부 반의 명부를 불러오지 못했습니다'
 
@@ -80,14 +83,23 @@ export function StudentSearchSheet({
   const [sheetOpen, setSheetOpen] = useState(false)
   const tappingRef = useRef(false)
 
-  const scope = useMemo(() => searchScope(classCountByGrade), [classCountByGrade])
-
   useEffect(() => {
     if (!open) return
     searchRef.current?.focus()
   }, [open])
 
   const term = q.trim()
+
+  /**
+   * 🔴 **W-26 — 훑을 반을 `term`으로 좁힌다.** 이전에는 `classCountByGrade`만 보고
+   * **24개 반 전부**를 만들어 두고 매 검색이 그것을 통째로 돌았다. 이제 앞자리가
+   * 반을 특정하므로 5자리를 다 치면 **1개 반**이다(`roster.scopeForStudentNo`).
+   * `term`이 의존성에 들어온 것이 이 회차의 변경점이다.
+   */
+  const scope = useMemo(
+    () => scopeForStudentNo(term, classCountByGrade),
+    [term, classCountByGrade],
+  )
 
   useEffect(() => {
     /* 🔴 **효과 본문에서 setState를 하지 않는다.** 검색어가 비면 아무것도 하지 않고,
@@ -109,6 +121,9 @@ export function StudentSearchSheet({
         signal,
       ).then((result) => {
         if (signal.aborted) return
+        /* 🔴 **빈 결과도 반드시 반영한다.** 훑을 반이 0개인 입력에서는 `onPartial`이
+           한 번도 불리지 않아 직전 검색어의 결과가 그대로 남아 있었다(`roster.ts` 주석). */
+        setHits(result.hits)
         setPartial(result.failed > 0)
         setSettledTerm(term)
       })
@@ -130,7 +145,6 @@ export function StudentSearchSheet({
     setSheetOpen(true)
   }
 
-  const numeric = isStudentNoQuery(q)
   /**
    * 🔴 **렌더에서 파생한다.** 검색어가 바뀐 직후에는 `hits`가 아직 옛 검색어의 결과이므로
    * **그 자리에서 가린다** — 상태를 비우려고 효과를 돌리면 렌더가 한 번 더 돈다.
@@ -147,11 +161,19 @@ export function StudentSearchSheet({
           <Field
             ref={searchRef}
             label={LABEL_SEARCH}
-            placeholder="20303 또는 홍길동"
+            placeholder="20303"
             value={q}
             onChange={setQ}
-            /* 🔴 숫자만 입력 중이면 숫자 키패드를 띄운다. 이름으로 바뀌면 되돌린다. */
-            inputMode={numeric ? 'numeric' : 'text'}
+            /**
+             * 🔴 **W-26 — `numeric` 고정이다.**
+             * 이전에는 `isStudentNoQuery(q)`로 `text`↔`numeric`을 오갔고, iOS는 포커스된
+             * 입력의 `inputmode`가 바뀌면 **키보드를 갈아 끼운다** — 첫 글자를 친 순간
+             * 자판이 통째로 바뀌면서 사용감이 끊겼다(사용자 보고).
+             * 아래 `transform`이 숫자 아닌 글자를 애초에 막으므로 되돌릴 이유도 없다.
+             */
+            inputMode="numeric"
+            /* 숫자만 · 최대 5자리. `capReasonText`·`capPlace`와 같은 계약이다(§7.3). */
+            transform={capStudentNo}
             leadingIcon={<SearchIcon />}
           />
         </div>

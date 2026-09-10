@@ -74,14 +74,33 @@ export function AppShell({ children, hasDock = false, bottomGap }: AppShellProps
    * 않는다.** 더하면 배너와 콘텐츠가 각각 계산해 safe-area가 2배가 된다(§3.2).
    * 배너가 없을 때의 문자열은 **바꾸지 마라** — 기존 6화면의 computed 값이 여기서 나온다.
    */
-  const padTop = online ? `calc(env(safe-area-inset-top) + ${topGap}px)` : `${topGap}px`
+  /**
+   * 🔴 **W-26 A-2 — 상단 `safe-area`가 패딩에서 「마진」으로 옮겨졌다.**
+   *
+   * 🔬 증상: 스크롤하면 본문이 **상태 표시줄 뒤로 올라가** 시계와 겹쳤다(사용자 첨부2).
+   * 원인은 스크롤 영역의 **상자가 스테이지 맨 위(y=0)에서 시작**하고 safe-area를
+   * **패딩으로만** 갖고 있던 것이다 — 패딩은 자리를 비울 뿐 **자르지 않는다.**
+   *
+   * ⇒ safe-area만큼을 **마진**으로 바꾸면 스크롤 상자 자체가 상태 표시줄 아래에서
+   * 시작하고, 넘어간 내용은 그 경계에서 **잘린다.**
+   * 🔴 **쉬는 상태의 좌표는 한 픽셀도 바뀌지 않는다** — `마진(safe) + 패딩(topGap)`의
+   * 합이 이전 `패딩(safe + topGap)`과 같다. 기존 화면들의 computed 값이 여기서 나온다.
+   *
+   * ⚠ **하단은 자르지 않는다**(사용자 확정). 독은 반투명 유리 알약이고 내용이 그 뒤로
+   * 비쳐 지나가는 것이 design 원문이다 — 잘라 내면 그 효과가 사라진다.
+   * ⚠ 오프라인이면 마진이 `0`이다. 배너(`.ofb`)가 이미 `safe-area`를 자기 마진에
+   * 갖고 있어 여기서 또 더하면 2배가 된다(§3.2 · W-09 계약 그대로).
+   */
+  const scrollMarginTop = online ? 'env(safe-area-inset-top)' : '0px'
 
   return (
     // 430px 초과 화면에서 좌우를 --bg-outer로 채운다.
-    <div className="min-h-dvh bg-sundo-bg-outer">
+    // 🔴 W-26 A-1 — `min-h-dvh` → `h-full`. 근거는 `index.css`의 `html, body` 블록에 있다.
+    <div className="h-full bg-sundo-bg-outer">
       <div
         // W-09 — 배너가 콘텐츠를 **밀어내려면** 스테이지가 flex 컬럼이어야 한다.
-        className="relative mx-auto flex h-dvh max-w-[430px] flex-col overflow-hidden"
+        // 🔴 W-26 A-1 — `h-dvh` → `h-full`.
+        className="relative mx-auto flex h-full max-w-[430px] flex-col overflow-hidden"
         style={{
           background: 'var(--gradient-stage)',
           // §7.1에 없는 값이라 인라인으로 둔다(보고서 §6).
@@ -110,7 +129,10 @@ export function AppShell({ children, hasDock = false, bottomGap }: AppShellProps
               <div
                 ref={setScrollEl}
                 className="relative min-h-0 flex-1 overflow-y-auto"
-                style={{ padding: `${padTop} 22px ${bottom}px` }}
+                style={{
+                  marginTop: scrollMarginTop,
+                  padding: `${topGap}px 22px ${bottom}px`,
+                }}
               >
                 {children}
               </div>

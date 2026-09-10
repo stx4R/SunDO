@@ -258,32 +258,91 @@ export interface StudentHit extends Student {
   classNo: number
 }
 
-/** 🔴 입력 판정 — **숫자면 학번, 아니면 이름**(§2.4). 공백은 무시한다. */
+/** §9.4.1 표시 학번은 고정 5자리다(`{학년}{반2}{번호2}`). */
+export const STUDENT_NO_LEN = 5
+
+/**
+ * 🔴 **W-26 — 입력을 숫자 5자리로 못 박는다.** `Field`의 `transform` 계약이다
+ * (`capReasonText`·`capPlace`와 같은 형태).
+ *
+ * 사용자 요구로 **검색은 학번만** 받는다. 숫자가 아닌 글자를 애초에 못 들어오게 하면
+ * ① 키보드를 `numeric` **고정**으로 둘 수 있고(이전에는 입력에 따라 `text`↔`numeric`이
+ * 바뀌었고 iOS에서 그 순간 키보드가 갈아 끼워지며 입력이 끊겼다)
+ * ② 아래 `scopeForStudentNo`가 **항상** 성립한다.
+ */
+export function capStudentNo(raw: string, caret: number): { value: string; caret: number } {
+  let value = ''
+  let next = caret
+  for (let i = 0; i < raw.length; i += 1) {
+    const ch = raw[i]
+    if (ch >= '0' && ch <= '9') {
+      if (value.length < STUDENT_NO_LEN) value += ch
+      else if (i < caret) next -= 1
+    } else if (i < caret) {
+      /* 지워진 글자가 캐럿 앞에 있었으면 캐럿도 그만큼 당긴다. */
+      next -= 1
+    }
+  }
+  return { value, caret: Math.max(0, Math.min(next, value.length)) }
+}
+
+/** 🔴 입력 판정 — 이제 **학번만** 받는다. 숫자 1~5자리면 참이다. */
 export function isStudentNoQuery(q: string): boolean {
   const t = q.trim()
-  return t.length > 0 && /^[0-9]+$/.test(t)
+  return t.length > 0 && t.length <= STUDENT_NO_LEN && /^[0-9]+$/.test(t)
 }
 
 /**
- * §2.4 — 학번은 **포함**, 이름도 **포함**이다.
+ * §2.4 — 🔴 **W-26 사용자 확정: 학번 「앞자리부터 일치」다.**
  *
- * 🔴 학번을 prefix가 아니라 포함으로 두는 이유: 부원이 기억하는 조각이 앞자리라는 보장이
- * 없다(「23번」으로 `20323`을 찾는다). 클라이언트 필터라 비용 차이가 0이다.
+ * ⚠ **이전에는 「포함」이었고 이름도 받았다.** 둘 다 이 회차가 닫았다 —
+ * 이름 검색은 사용자가 명시적으로 뺐고(「학번만 가능하도록」), 포함 일치는
+ * **앞자리로 반을 특정할 수 없게 만들어** 전 학년 24개 반을 매번 훑게 하는 원인이었다.
+ * `303`으로 `20303`을 찾는 동작은 사라진다 — 선택지와 대가를 적어 확정받았다.
  */
 export function matchStudent(student: Student, q: string): boolean {
   const t = q.trim()
   if (t === '') return false
-  return isStudentNoQuery(t) ? student.studentNo.includes(t) : student.name.includes(t)
+  return student.studentNo.startsWith(t)
 }
 
-/** 검색이 훑을 (학년, 반) 목록. `classCountByGrade`의 **문자열 키**를 그대로 읽는다. */
-export function searchScope(
+/**
+ * 🔴 **W-26 — 검색이 훑을 (학년, 반)을 「학번 앞자리」로 좁힌다.**
+ *
+ * 학번은 DR-01상 `{학년1}{반2}{번호2}`이므로 **앞자리가 곧 조회 대상 좌표**다.
+ * 앞자리 일치(`startsWith`)와 짝을 이루면 **결과를 하나도 놓치지 않으면서**
+ * 조회 대상이 이렇게 줄어든다:
+ *
+ * | 입력 | 훑는 반 |
+ * | --- | --- |
+ * | `2` | 2학년 전체(최대 10개) |
+ * | `20` · `21` | 반 번호가 그 숫자로 시작하는 반(1~9 또는 10) |
+ * | `203` 이상 | 🔴 **정확히 1개 반** |
+ *
+ * 🔬 **지금 느린 이유가 이것이었다** — 이전 `searchScope`는 입력과 무관하게 **24개 반
+ * 전부**를 돌려주었고 `searchStudents`가 그것을 **순차로 하나씩 기다리며** 조회했다.
+ * 5자리를 다 친 경우가 24 → 1로 줄어든다.
+ *
+ * ⚠ **범위를 벗어난 입력은 빈 배열이다.** 학년이 4거나 반이 개설 수를 넘으면 찾을
+ * 학생이 존재할 수 없다 — 없는 반을 조회하지 않는 것이 옳다.
+ */
+export function scopeForStudentNo(
+  q: string,
   classCountByGrade: Readonly<Record<string, number>>,
 ): readonly { grade: number; classNo: number }[] {
+  const t = q.trim()
+  if (t === '' || !/^[0-9]{1,5}$/.test(t)) return []
+
+  const grade = Number(t[0])
+  if (grade < 1 || grade > 3) return []
+  const count = classCountByGrade[String(grade)] ?? 0
+
   const out: { grade: number; classNo: number }[] = []
-  for (const grade of [1, 2, 3]) {
-    const count = classCountByGrade[String(grade)] ?? 0
-    for (let classNo = 1; classNo <= count; classNo += 1) out.push({ grade, classNo })
+  /* 🔴 반 번호는 **2자리 0채움**이다(`toStudentNo`의 `pad2`). 문자열 접두사로 비교해야
+     `1`이 `1반`과 `10반`을 함께 잡는다 — 숫자로 비교하면 그 관계가 사라진다. */
+  const classPrefix = t.slice(1, 3)
+  for (let classNo = 1; classNo <= count; classNo += 1) {
+    if (String(classNo).padStart(2, '0').startsWith(classPrefix)) out.push({ grade, classNo })
   }
   return out
 }
@@ -296,7 +355,12 @@ export function searchScope(
  *   `signal.aborted`를 매 반마다 본다.
  *
  * @param onPartial 지금까지 모인 결과. 반이 끝날 때마다 부른다
- * @returns 한 반이라도 실패했는가(부분 실패는 화면이 「일부만 찾았다」로 알린다)
+ * @returns 최종 결과와 실패한 반 수.
+ *   🔴 **`hits`를 함께 돌려주는 것이 W-26의 변경점이다.** 훑을 반이 **0개**인 입력
+ *   (예: 없는 학년·개설되지 않은 반)에서는 `onPartial`이 **한 번도 불리지 않아**
+ *   화면에 **직전 검색어의 결과가 그대로 남았다.** 호출부가 종료 시점에 이 값으로
+ *   덮어쓰면 그 거짓말이 사라진다 — 반대로 진행 중에는 옛 결과를 그대로 두어
+ *   글자를 칠 때마다 목록이 비었다 채워지는 깜빡임을 만들지 않는다.
  */
 export async function searchStudents(
   academicYear: number,
@@ -304,27 +368,42 @@ export async function searchStudents(
   query_: string,
   onPartial: (hits: readonly StudentHit[], done: number) => void,
   signal: { aborted: boolean },
-): Promise<{ failed: number }> {
+): Promise<{ failed: number; hits: readonly StudentHit[] }> {
   const hits: StudentHit[] = []
   let failed = 0
   let done = 0
 
-  for (const { grade, classNo } of scope) {
-    if (signal.aborted) break
-    const result = await fetchStudents(academicYear, grade, classNo)
-    if (signal.aborted) break
-    done += 1
-    if (result.kind === 'failed') {
-      failed += 1
-      continue
-    }
-    for (const student of result.students) {
-      if (matchStudent(student, query_)) hits.push({ ...student, grade, classNo })
-    }
-    /* 학번 오름차순 — S5와 같은 순서다(DR-01상 학년·반·번호 순과 항등). */
-    hits.sort((a, b) => a.studentNo.localeCompare(b.studentNo))
-    onPartial([...hits], done)
-  }
+  /**
+   * 🔴 **W-26 — 순차 `for await`에서 병렬로 바꿨다.**
+   *
+   * 🔬 이전 판은 반 하나를 **다 기다린 뒤** 다음 반을 조회했다. 24개 반이면 왕복이
+   * 24번 줄지어 서고, 모바일에서 반당 200~400ms면 **수 초**다 — 사용자가 본
+   * 「학번을 쳐도 안 나온다 · 뻑뻑하다」의 실체다. 앞자리 좁히기(`scopeForStudentNo`)가
+   * 대부분을 1개 반으로 줄이지만, 1자리만 친 순간(최대 10개 반)에는 병렬이 필요하다.
+   *
+   * ⚠ **스트리밍은 그대로다** — `Promise.all`로 묶되 각 반이 끝나는 **그 자리에서**
+   * `onPartial`을 부른다. 결과를 다 모을 때까지 기다리지 않는다.
+   * ⚠ **취소돼도 진행 중인 조회를 죽이지 않는다** — 그 결과는 `studentsCache`를 채워
+   *   다음 검색을 공짜로 만든다. 화면에만 반영하지 않는다.
+   */
+  await Promise.all(
+    scope.map(async ({ grade, classNo }) => {
+      const result = await fetchStudents(academicYear, grade, classNo)
+      if (signal.aborted) return
+      done += 1
+      if (result.kind === 'failed') {
+        failed += 1
+        return
+      }
+      for (const student of result.students) {
+        if (matchStudent(student, query_)) hits.push({ ...student, grade, classNo })
+      }
+      /* 학번 오름차순 — S5와 같은 순서다(DR-01상 학년·반·번호 순과 항등).
+         🔴 병렬이라 도착 순서가 반 순서와 다르다 — 매번 정렬해야 목록이 튀지 않는다. */
+      hits.sort((a, b) => a.studentNo.localeCompare(b.studentNo))
+      onPartial([...hits], done)
+    }),
+  )
 
-  return { failed }
+  return { failed, hits }
 }
